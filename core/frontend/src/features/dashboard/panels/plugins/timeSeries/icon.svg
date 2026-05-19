@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" fill="none">
+  <rect width="32" height="32" fill="#DADCDF" rx="3" />
+  <mask id="icon-timeseries_svg__a" width="32" height="32" x="0" y="0" maskUnits="userSpaceOnUse" style="mask-type:alpha">
+    <rect width="32" height="32" fill="#D5D7DB" rx="3" />
+  </mask>
+  <g mask="url(#icon-timeseries_svg__a)">
+    <path fill="#8960DA" d="M7.111 17.185 0 24.296V32h32V7.111l-4.74 4.148-7.112-1.185-5.333 9.482z" />
+    <path fill="url(#icon-timeseries_svg__b)" d="M6.857 23.309 0 28.896V32h32V18.963l-5.714 5.587-6.857-5.587-4.572 6.829z" />
+    <path fill="#fff" d="M32.156 19.116a.592.592 0 1 1 .792.88l-5.926 5.333a.59.59 0 0 1-.752.035l-6.63-4.973-4.386 6.032a.59.59 0 0 1-.643.22l-8.013-2.288-6.876 5.156a.593.593 0 1 1-.71-.948l7.11-5.333a.6.6 0 0 1 .518-.096l7.899 2.257 4.497-6.184a.59.59 0 0 1 .835-.126l6.72 5.041zm.097-13.08a.58.58 0 0 1 .825.15.625.625 0 0 1-.146.853l-5.926 4.282a.58.58 0 0 1-.437.102l-6.7-1.153-5.13 9.414a.585.585 0 0 1-.69.284L6.685 17.63l-6.858 7.08a.58.58 0 0 1-.838 0 .626.626 0 0 1 0-.865l7.11-7.34a.58.58 0 0 1 .594-.153l7.247 2.302 5.099-9.358a.59.59 0 0 1 .614-.303l6.872 1.182z" />
+  </g>
+  <defs>
+    <linearGradient id="icon-timeseries_svg__b" x1="16" x2="16" y1="18.963" y2="32" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#69CA9D" />
+      <stop offset="1" stop-color="#24A267" />
+    </linearGradient>
+  </defs>
+</svg>

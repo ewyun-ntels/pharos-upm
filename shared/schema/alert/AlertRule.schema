@@ -1,0 +1,39 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "AlertRule",
+  "description": "Schema for creating new alert rules (POST requests)",
+  "type": "object",
+  "properties": {
+    "alert_type": {
+      "description": "Type of alert rule",
+      "$ref": "AlertType.schema"
+    },
+    "rule": {
+      "description": "Rule configuration object (varies by alert_type)",
+      "type": "object"
+    },
+    "status": {
+      "type": "array",
+      "description": "Current alert status instances for this rule",
+      "items": {
+        "$ref": "AlertValue.schema"
+      },
+      "default": []
+    },
+    "timestamp": {
+      "type": "string",
+      "description": "Creation timestamp",
+      "format": "date-time"
+    },
+    "updated_at": {
+      "type": "string",
+      "description": "Last update timestamp",
+      "format": "date-time"
+    }
+  },
+  "required": [
+    "alert_type",
+    "rule"
+  ],
+  "additionalProperties": false
+}

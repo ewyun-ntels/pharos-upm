@@ -1,0 +1,28 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://ntels.com/pharos/schemas/PermissionKeys.schema.json",
+  "title": "PermissionKeys",
+  "description": "All available permission keys in the system",
+  "type": "string",
+  "enum": [
+    "role:super_admin",
+    "role:user_create",
+    "role:user_read",
+    "role:user_update",
+    "role:user_delete",
+    "role:alert_create",
+    "role:alert_read",
+    "role:alert_update",
+    "role:alert_delete",
+    "role:notification_create",
+    "role:notification_read",
+    "role:notification_update",
+    "role:notification_delete",
+    "role:dashboard_create",
+    "role:group_add",
+    "attr:temporary_user",
+    "attr:skip_temporarily_block",
+    "attr:password_retry_unlimited",
+    "attr:password_change"
+  ]
+}

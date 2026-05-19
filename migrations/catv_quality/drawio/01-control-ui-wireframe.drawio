@@ -1,0 +1,364 @@
+<mxfile host="app.diagrams.net" modified="2026-02-12T00:00:00.000Z" agent="5.0" version="24.0.0">
+  <diagram name="STB 제어 화면 Wireframe" id="control-ui">
+    <mxGraphModel dx="1434" dy="844" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1600" pageHeight="3000" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        
+        <!-- 제목 -->
+        <mxCell id="title" value="STB 제어 화면" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=28;fontStyle=1" vertex="1" parent="1">
+          <mxGeometry x="70" y="30" width="400" height="40" as="geometry" />
+        </mxCell>
+        
+        <mxCell id="subtitle" value="대량 STB 제어 및 모니터링" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=14;fontColor=#666666;" vertex="1" parent="1">
+          <mxGeometry x="70" y="75" width="400" height="25" as="geometry" />
+        </mxCell>
+        
+        <!-- 사용자 정보 -->
+        <mxCell id="user-info" value="👤 관리자 | 🔔 알림(3)" style="text;html=1;strokeColor=none;fillColor=none;align=right;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=13;" vertex="1" parent="1">
+          <mxGeometry x="1250" y="40" width="280" height="30" as="geometry" />
+        </mxCell>
+        
+        <!-- 전체 프레임 -->
+        <mxCell id="main-frame" value="" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#cccccc;arcSize=0;" vertex="1" parent="1">
+          <mxGeometry x="50" y="110" width="1500" height="900" as="geometry" />
+        </mxCell>
+        
+        <!-- 왼쪽: 장비 선택 UI -->
+        <mxCell id="left-panel" value="" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#f8f9fa;strokeColor=#dee2e6;arcSize=0;" vertex="1" parent="1">
+          <mxGeometry x="50" y="110" width="750" height="900" as="geometry" />
+        </mxCell>
+        
+        <mxCell id="left-header" value="1. 제어 대상 선택" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=18;fontStyle=1" vertex="1" parent="1">
+          <mxGeometry x="70" y="130" width="200" height="30" as="geometry" />
+        </mxCell>
+        
+        <!-- Type 선택 드롭다운 -->
+        <mxCell id="type-label" value="선택 방법" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=13;fontStyle=1" vertex="1" parent="1">
+          <mxGeometry x="70" y="180" width="100" height="25" as="geometry" />
+        </mxCell>
+        
+        <mxCell id="type-dropdown-box" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#ced4da;arcSize=10;" vertex="1" parent="1">
+          <mxGeometry x="70" y="210" width="700" height="45" as="geometry" />
+        </mxCell>
+        
+        <mxCell id="type-dropdown-text" value="SO 이름으로 선택" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=14;spacingLeft=15;" vertex="1" parent="1">
+          <mxGeometry x="70" y="210" width="650" height="45" as="geometry" />
+        </mxCell>
+        
+        <mxCell id="type-dropdown-icon" value="▼" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=12;fontColor=#6c757d;" vertex="1" parent="1">
+          <mxGeometry x="730" y="210" width="40" height="45" as="geometry" />
+        </mxCell>
+        
+        <mxCell id="type-help" value="💡 all, so, l3, cell, settopbox 중 선택" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=11;fontColor=#6c757d;" vertex="1" parent="1">
+          <mxGeometry x="70" y="260" width="300" height="20" as="geometry" />
+        </mxCell>
+        
+        <!-- 계층별 선택 UI (동적 표시) -->
+        <mxCell id="hierarchy-box" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8f9fa;strokeColor=#e9ecef;arcSize=5;dashed=1;dashPattern=3 3;" vertex="1" parent="1">
+          <mxGeometry x="70" y="300" width="700" height="520" as="geometry" />
+        </mxCell>
+        
+        <mxCell id="hierarchy-title" value="단계별 선택 (type에 따라 표시)" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=12;fontStyle=1;fontColor=#495057;" vertex="1" parent="1">
+          <mxGeometry x="90" y="315" width="300" height="25" as="geometry" />
+        </mxCell>
+        
+        <!-- Step 1: SO 선택 -->
+        <mxCell id="step1-label" value="① SO (방송사)" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=13;fontStyle=1" vertex="1" parent="1">
+          <mxGeometry x="90" y="355" width="150" height="25" as="geometry" />
+        </mxCell>
+        
+        <mxCell id="step1-dropdown" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#ced4da;arcSize=10;" vertex="1" parent="1">
+          <mxGeometry x="90" y="385" width="660" height="40" as="geometry" />
+        </mxCell>
+        
+        <mxCell id="step1-text" value="수원방송" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=13;spacingLeft=12;" vertex="1" parent="1">
+          <mxGeometry x="90" y="385" width="610" height="40" as="geometry" />
+        </mxCell>
+        
+        <mxCell id="step1-icon" value="▼" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=11;fontColor=#6c757d;" vertex="1" parent="1">
+          <mxGeometry x="710" y="385" width="40" height="40" as="geometry" />
+        </mxCell>
+        
+        <!-- Step 2: L3 선택 -->
+        <mxCell id="step2-label" value="② L3 장비" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=13;fontStyle=1" vertex="1" parent="1">
+          <mxGeometry x="90" y="445" width="150" height="25" as="geometry" />
+        </mxCell>
+        
+        <mxCell id="step2-dropdown" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#ced4da;arcSize=10;" vertex="1" parent="1">
+          <mxGeometry x="90" y="475" width="660" height="40" as="geometry" />
+        </mxCell>
+        
+        <mxCell id="step2-text" value="WB750213" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=13;spacingLeft=12;" vertex="1" parent="1">
+          <mxGeometry x="90" y="475" width="610" height="40" as="geometry" />
+        </mxCell>
+        
+        <mxCell id="step2-icon" value="▼" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=11;fontColor=#6c757d;" vertex="1" parent="1">
+          <mxGeometry x="710" y="475" width="40" height="40" as="geometry" />
+        </mxCell>
+        
+        <!-- Step 3: Cell 선택 (다중) -->
+        <mxCell id="step3-label" value="③ Cell 번호 (다중 선택 가능)" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=13;fontStyle=1" vertex="1" parent="1">
+          <mxGeometry x="90" y="535" width="250" height="25" as="geometry" />
+        </mxCell>
+        
+        <mxCell id="step3-list" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#ced4da;arcSize=5;align=left;verticalAlign=top;" vertex="1" parent="1">
+          <mxGeometry x="90" y="565" width="660" height="120" as="geometry" />
+        </mxCell>
+        
+        <mxCell id="step3-item1" value="☑ #S10022A" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=12;spacingLeft=12;" vertex="1" parent="1">
+          <mxGeometry x="95" y="575" width="650" height="30" as="geometry" />
+        </mxCell>
+        
+        <mxCell id="step3-item2" value="☑ #S10022B" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=12;spacingLeft=12;" vertex="1" parent="1">
+          <mxGeometry x="95" y="605" width="650" height="30" as="geometry" />
+        </mxCell>
+        
+        <mxCell id="step3-item3" value="☐ #S10027A" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=12;spacingLeft=12;" vertex="1" parent="1">
+          <mxGeometry x="95" y="635" width="650" height="30" as="geometry" />
+        </mxCell>
+        
+        <mxCell id="step3-count" value="+ 29개 더보기" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=11;fontColor=#0d6efd;spacingLeft=12;fontStyle=4" vertex="1" parent="1">
+          <mxGeometry x="95" y="665" width="650" height="20" as="geometry" />
+        </mxCell>
+        
+        <!-- Step 4: STB 목록 표시 -->
+        <mxCell id="step4-label" value="④ STB 목록 (자동 조회)" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=13;fontStyle=1" vertex="1" parent="1">
+          <mxGeometry x="90" y="705" width="200" height="25" as="geometry" />
+        </mxCell>
+        
+        <mxCell id="step4-info" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e7f1ff;strokeColor=#84b6f4;arcSize=5;" vertex="1" parent="1">
+          <mxGeometry x="90" y="735" width="660" height="70" as="geometry" />
+        </mxCell>
+        
+        <mxCell id="step4-text" value="📊 조회된 STB: 약 234대&#xa;CM MAC 주소 기준으로 제어 대상 설정됨&#xa;(000000000000, 0003786AF614, 001632FBCA27 ...)" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=top;whiteSpace=wrap;rounded=0;fontSize=11;spacingLeft=10;spacingTop=8;" vertex="1" parent="1">
+          <mxGeometry x="90" y="735" width="660" height="70" as="geometry" />
+        </mxCell>
+        
+        <!-- 선택 완료 버튼 -->
+        <mxCell id="select-confirm-btn" value="✓ 선택 완료 (234대)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#198754;strokeColor=#146c43;fontColor=#ffffff;fontSize=14;fontStyle=1" vertex="1" parent="1">
+          <mxGeometry x="70" y="840" width="700" height="50" as="geometry" />
+        </mxCell>
+        
+        <!-- 오른쪽: 제어 명령 설정 UI -->
+        <mxCell id="right-panel" value="" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#f8f9fa;strokeColor=#dee2e6;arcSize=0;" vertex="1" parent="1">
+          <mxGeometry x="800" y="110" width="750" height="900" as="geometry" />
+        </mxCell>
+        
+        <mxCell id="right-header" value="2. 제어 명령 설정" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=18;fontStyle=1" vertex="1" parent="1">
+          <mxGeometry x="820" y="130" width="200" height="30" as="geometry" />
+        </mxCell>
+        
+        <!-- work_type 선택 -->
+        <mxCell id="worktype-label" value="제어 명령" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=13;fontStyle=1" vertex="1" parent="1">
+          <mxGeometry x="820" y="180" width="100" height="25" as="geometry" />
+        </mxCell>
+        
+        <mxCell id="worktype-dropdown-box" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#ced4da;arcSize=10;" vertex="1" parent="1">
+          <mxGeometry x="820" y="210" width="700" height="45" as="geometry" />
+        </mxCell>
+        
+        <mxCell id="worktype-dropdown-text" value="stb_request_info (정보 전송 요청)" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=14;spacingLeft=15;" vertex="1" parent="1">
+          <mxGeometry x="820" y="210" width="650" height="45" as="geometry" />
+        </mxCell>
+        
+        <mxCell id="worktype-dropdown-icon" value="▼" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=12;fontColor=#6c757d;" vertex="1" parent="1">
+          <mxGeometry x="1480" y="210" width="40" height="45" as="geometry" />
+        </mxCell>
+        
+        <mxCell id="worktype-help" value="💡 41가지 명령 중 선택 (카테고리별)" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=11;fontColor=#6c757d;" vertex="1" parent="1">
+          <mxGeometry x="820" y="260" width="300" height="20" as="geometry" />
+        </mxCell>
+        
+        <!-- 카테고리 표시 -->
+        <mxCell id="cat-box" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e9ecef;strokeColor=#dee2e6;arcSize=5;align=left;verticalAlign=top;" vertex="1" parent="1">
+          <mxGeometry x="820" y="295" width="700" height="200" as="geometry" />
+        </mxCell>
+        
+        <mxCell id="cat-title" value="명령 카테고리" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=11;fontStyle=1;spacingLeft=10;spacingTop=5;" vertex="1" parent="1">
+          <mxGeometry x="820" y="300" width="150" height="20" as="geometry" />
+        </mxCell>
+       <mxCell id="cat-list" value="• 정보 수집 (2개): sysCheck, stb_request_info&#xa;• 재부팅 (4개): smartReboot, stbRestart, stb_control_restart, stb_control_reset&#xa;• 시청 제한 (5개): limitAge, tvLock, tvUnlock, chLock, chUnlock&#xa;• 디스플레이 설정 (3개): tvType, hdr, resolution&#xa;• 오디오 설정 (2개): audioMode, digitalAudio&#xa;• MAC 주소 (1개): getStbMac&#xa;• UI/알람 (5개): localUi, cloudUi, standbyMode, zappingAd, morningAlarm&#xa;• 네트워크 (7개): channelPlan, freqPlan, defaultGW, syncIp, qamStatus, channelInfo, channelScan&#xa;• HDMI/기타 (12개): factoryReset, hdmiCec, autoPowerOn, 채널 관리, 로그 수집 등" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=top;whiteSpace=wrap;rounded=0;fontSize=10;spacingLeft=15;spacingTop=5;" vertex="1" parent="1">
+          <mxGeometry x="820" y="325" width="690" height="165" as="geometry" />
+        </mxCell>
+        
+        <!-- work_value 입력 -->
+        <mxCell id="workvalue-label" value="설정 값 (선택사항)" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=13;fontStyle=1" vertex="1" parent="1">
+          <mxGeometry x="820" y="515" width="150" height="25" as="geometry" />
+        </mxCell>
+        
+        <mxCell id="workvalue-input-box" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#ced4da;arcSize=10;" vertex="1" parent="1">
+          <mxGeometry x="820" y="545" width="700" height="45" as="geometry" />
+        </mxCell>
+        
+        <mxCell id="workvalue-placeholder" value="null (stb_request_info는 값 불필요)" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=13;fontColor=#adb5bd;spacingLeft=15;" vertex="1" parent="1">
+          <mxGeometry x="820" y="545" width="700" height="45" as="geometry" />
+        </mxCell>
+        
+        <mxCell id="workvalue-help" value="예) limitAge: &quot;0&quot;~&quot;4&quot;, resolution: &quot;0&quot;~&quot;4&quot;, tvLock: &quot;0&quot;/&quot;1&quot;" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=11;fontColor=#6c757d;" vertex="1" parent="1">
+          <mxGeometry x="820" y="595" width="500" height="20" as="geometry" />
+        </mxCell>
+        
+        <!-- 실행 영역 -->
+        <mxCell id="execute-section" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#dee2e6;arcSize=5;" vertex="1" parent="1">
+          <mxGeometry x="820" y="635" width="700" height="375" as="geometry" />
+        </mxCell>
+        
+        <mxCell id="execute-title" value="실행" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=14;fontStyle=1;spacingLeft=10;" vertex="1" parent="1">
+          <mxGeometry x="820" y="645" width="100" height="25" as="geometry" />
+        </mxCell>
+        
+        <!-- 메인 실행 버튼 -->
+        <mxCell id="execute-btn" value="▶ 제어 실행" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#198754;strokeColor=#146c43;fontColor=#ffffff;fontSize=16;fontStyle=1" vertex="1" parent="1">
+          <mxGeometry x="840" y="685" width="660" height="60" as="geometry" />
+        </mxCell>
+        
+        <!-- 보조 버튼들 -->
+        <mxCell id="preview-btn" value="👁 JSON 미리보기" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#0d6efd;fontColor=#0d6efd;fontSize=13;fontStyle=0" vertex="1" parent="1">
+          <mxGeometry x="840" y="765" width="320" height="40" as="geometry" />
+        </mxCell>
+        
+        <mxCell id="reset-btn" value="🔄 초기화" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#6c757d;fontColor=#6c757d;fontSize=13;fontStyle=0" vertex="1" parent="1">
+          <mxGeometry x="1180" y="765" width="320" height="40" as="geometry" />
+        </mxCell>
+        
+        <!-- 처리 안내 텍스트 -->
+        <mxCell id="processing-info-text" value="💡 실행 정보&#xa;• 비동기 처리 후 job_id로 진행 상황 추적 가능&#xa;• K8s Jobs로 분산 처리 (batch-num 설정값)&#xa;• 결과는 Job 목록 화면에서 확인" style="text;html=1;strokeColor=none;fillColor=#e7f1ff;align=left;verticalAlign=top;whiteSpace=wrap;rounded=1;fontSize=11;fontColor=#495057;spacingLeft=10;spacingTop=8;" vertex="1" parent="1">
+          <mxGeometry x="840" y="825" width="660" height="170" as="geometry" />
+        </mxCell>
+        
+        <!-- 개발자 노트 섹션 -->
+        <mxCell id="dev-notes-bg" value="" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#f8f9fa;strokeColor=#dee2e6;arcSize=0;" vertex="1" parent="1">
+          <mxGeometry x="50" y="1040" width="1500" height="1850" as="geometry" />
+        </mxCell>
+        
+        <mxCell id="dev-notes-title" value="📖 개발자 노트 (API 상세 정보)" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=20;fontStyle=1" vertex="1" parent="1">
+          <mxGeometry x="70" y="1060" width="400" height="30" as="geometry" />
+        </mxCell>
+        
+        <!-- Type별 선택 방법 상세 -->
+        <mxCell id="type-detail-box" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#dee2e6;arcSize=5;align=left;verticalAlign=top;" vertex="1" parent="1">
+          <mxGeometry x="70" y="1110" width="1460" height="350" as="geometry" />
+        </mxCell>
+        
+        <mxCell id="type-detail-title" value="📁 Type별 선택 방법 및 API" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=14;fontStyle=1;spacingLeft=10;" vertex="1" parent="1">
+          <mxGeometry x="70" y="1120" width="300" height="25" as="geometry" />
+        </mxCell>
+        
+        <mxCell id="type-detail-content" value="• type=&quot;all&quot; (전체 STB):&#xa;  - ids: [] (빈 배열)&#xa;  - API 호출 불필요, 서버에서 dist_stb_information 전체 조회&#xa;&#xa;• type=&quot;so&quot; (SO 이름):&#xa;  - GET /catv/stb/sos | 응답: {&quot;count&quot;: 24, &quot;items&quot;: [&quot;&quot;, &quot;ABC방송&quot;, &quot;수원방송&quot;, ...]}&#xa;  - ids: [&quot;수원방송&quot;, &quot;ABC방송&quot;, ...] | SQL: SELECT DISTINCT SCRBR_SO_NM FROM dist_stb_information&#xa;&#xa;• type=&quot;l3&quot; (L3 장비 TID):&#xa;  - 1단계: GET /catv/stb/sos&#xa;  - 2단계: GET /catv/stb/sos/:so_id/l3s | 응답: {&quot;count&quot;: 84, &quot;items&quot;: [&quot;&quot;, &quot;WB750213&quot;, ...]}&#xa;  - ids: [&quot;WB750213&quot;, &quot;WB750105&quot;, ...] | SQL: SELECT DISTINCT L3_EQUIP_TID_VAL WHERE SCRBR_SO_NM = ?&#xa;&#xa;• type=&quot;cell&quot; (Cell 번호):&#xa;  - 1-3단계: GET .../sos → .../l3s → .../cells | 응답: {&quot;count&quot;: 32, &quot;items&quot;: [&quot;#S10022A&quot;, ...]}&#xa;  - ids: [&quot;#S10022A&quot;, &quot;#S10022B&quot;, ...] | SQL: SELECT DISTINCT CCELL_NUM WHERE SCRBR_SO_NM = ? AND L3_EQUIP_TID_VAL = ?&#xa;&#xa;• type=&quot;settopbox&quot; (개별 STB MAC):&#xa;  - 1-4단계: GET .../sos → .../l3s → .../cells → .../settopboxes | 응답: {&quot;count&quot;: 234, &quot;items&quot;: [&quot;000000000000&quot;, ...]}&#xa;  - ids: [&quot;000000000000&quot;, &quot;0003786AF614&quot;, ...] (CM_MAC_ADDR, 콜론 없는 12자리 16진수)&#xa;  - SQL: SELECT DISTINCT CM_MAC_ADDR WHERE ... AND CCELL_NUM = ?&#xa;&#xa;⚠️ 모든 API는 계층 구조를 따르며, 상위 계층부터 순차적으로 조회 필요" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=top;whiteSpace=wrap;rounded=0;fontSize=10;fontFamily=Courier New;spacingLeft=15;spacingTop=5;" vertex="1" parent="1">
+          <mxGeometry x="70" y="1150" width="1460" height="300" as="geometry" />
+        </mxCell>
+        
+        <!-- POST 요청/응답 예시 -->
+        <mxCell id="request-box" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#dee2e6;arcSize=5;align=left;verticalAlign=top;" vertex="1" parent="1">
+          <mxGeometry x="70" y="1480" width="700" height="260" as="geometry" />
+        </mxCell>
+        
+        <mxCell id="request-title" value="📤 POST /catv/stb/control 요청 예시" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=13;fontStyle=1;spacingLeft=10;" vertex="1" parent="1">
+          <mxGeometry x="70" y="1490" width="300" height="25" as="geometry" />
+        </mxCell>
+        
+        <mxCell id="request-json" value="{&#xa;  &quot;type&quot;: &quot;so&quot;,&#xa;  &quot;ids&quot;: [&quot;수원방송&quot;, &quot;ABC방송&quot;, &quot;강서방송&quot;],&#xa;  &quot;work_type&quot;: &quot;stb_request_info&quot;,&#xa;  &quot;work_value&quot;: null&#xa;}" style="text;html=1;strokeColor=#82b366;fillColor=#d5e8d4;align=left;verticalAlign=top;whiteSpace=wrap;rounded=1;fontSize=11;fontFamily=Courier New;spacingLeft=10;spacingTop=5;" vertex="1" parent="1">
+          <mxGeometry x="90" y="1525" width="660" height="200" as="geometry" />
+        </mxCell>
+        
+        <!-- 응답 예시 -->
+        <mxCell id="response-box" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#dee2e6;arcSize=5;align=left;verticalAlign=top;" vertex="1" parent="1">
+          <mxGeometry x="790" y="1480" width="740" height="260" as="geometry" />
+        </mxCell>
+        
+        <mxCell id="response-title" value="📥 응답 예시 (성공 시)" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=13;fontStyle=1;spacingLeft=10;" vertex="1" parent="1">
+          <mxGeometry x="790" y="1490" width="300" height="25" as="geometry" />
+        </mxCell>
+        
+        <mxCell id="response-json" value="{&#xa;  &quot;job_id&quot;: &quot;550e8400-e29b-41d4-a716-446655440000&quot;,&#xa;  &quot;task_ids&quot;: [&quot;...-0&quot;, &quot;...-1&quot;, &quot;...-2&quot;, &quot;...-3&quot;],&#xa;  &quot;fail&quot;: {}&#xa;}&#xa;&#xa;→ job_id로 진행 상황 조회:&#xa;GET /catv/stb/control/results/:job_id" style="text;html=1;strokeColor=#6c8ebf;fillColor=#dae8fc;align=left;verticalAlign=top;whiteSpace=wrap;rounded=1;fontSize=11;fontFamily=Courier New;spacingLeft=10;spacingTop=5;" vertex="1" parent="1">
+          <mxGeometry x="810" y="1525" width="700" height="200" as="geometry" />
+        </mxCell>
+        
+        <!-- 처리 정보 -->
+        <mxCell id="processing-detail-box" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#dee2e6;arcSize=5;align=left;verticalAlign=top;" vertex="1" parent="1">
+          <mxGeometry x="70" y="1760" width="1460" height="120" as="geometry" />
+        </mxCell>
+        
+        <mxCell id="processing-detail-title" value="📊 처리 정보 (K8s Jobs)" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=13;fontStyle=1;spacingLeft=10;" vertex="1" parent="1">
+          <mxGeometry x="70" y="1770" width="300" height="25" as="geometry" />
+        </mxCell>
+        
+        <mxCell id="processing-detail-content" value="• K8s Jobs: 4개 (설정값, -batch-num=4) | Worker Pool: 설정 가능 (-worker-pool)&#xa;• Rate Limit: 300 연결/초 | 최대 동시 연결: 1,500개&#xa;• 재시도 전략: Total 3회 (5초 간격), PortExhaustion 설정값 (20초 간격)&#xa;• 비동기 처리 후 job_id로 진행 상황 추적 가능&#xa;• 예상 처리 시간: ~1-2분 (234대 기준, 실제는 약 3-5분)&#xa;• 실패 처리: K8s Job 생성 실패 시 즉시 fail 반환, task_error_message에 상세 원인 기록" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=top;whiteSpace=wrap;rounded=0;fontSize=10;spacingLeft=15;spacingTop=5;" vertex="1" parent="1">
+          <mxGeometry x="70" y="1800" width="1460" height="70" as="geometry" />
+        </mxCell>
+        
+        <!-- 데이터베이스 스키마 -->
+        <mxCell id="db-schema-box" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#dee2e6;arcSize=5;align=left;verticalAlign=top;" vertex="1" parent="1">
+          <mxGeometry x="70" y="1900" width="1460" height="180" as="geometry" />
+        </mxCell>
+        
+        <mxCell id="db-schema-title" value="🗄 데이터베이스 스키마" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=13;fontStyle=1;spacingLeft=10;" vertex="1" parent="1">
+          <mxGeometry x="70" y="1910" width="300" height="25" as="geometry" />
+        </mxCell>
+        
+        <mxCell id="db-schema-content" value="dist_stb_information (STB 정보):&#xa;• 컬럼: CM_MAC_ADDR, CM_IP_ADDR, STB_MAC_ADDR, SRC_IP_ADDR | SCRBR_SO_NM, L3_EQUIP_TID_VAL, CCELL_NUM&#xa;• 엔진: ReplicatedReplacingMergeTree(UPDATE_TIME) | TTL: 30일&#xa;&#xa;dist_stb_control_job (Job + 결과 통합):&#xa;• 컬럼: request_received_at, job_id, task_id, task_data, task_status, task_error_message,&#xa;  task_created_at, task_updated_at, control_executed_at, cm_mac_addr, stb_mac_addr, work_type,&#xa;  result_code, result_message&#xa;• task_data: JSON 문자열 {&quot;cm_mac_addr&quot;: &quot;...&quot;, &quot;stb_mac_addr&quot;: &quot;...&quot;}&#xa;• task_status: pending, running, completed, failed&#xa;• result_code: &quot;1&quot; (성공), &quot;0&quot; (장비 에러), &quot;-1&quot; (시스템 에러), &quot;&quot; (K8s 실패)&#xa;• 엔진: ReplicatedReplacingMergeTree(task_updated_at) | ORDER BY: (request_received_at, job_id, task_id, task_data) | TTL: 365일" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=top;whiteSpace=wrap;rounded=0;fontSize=9;fontFamily=Courier New;spacingLeft=15;spacingTop=5;" vertex="1" parent="1">
+          <mxGeometry x="70" y="1940" width="1460" height="130" as="geometry" />
+        </mxCell>
+        
+        <!-- 결과 조회 API -->
+        <mxCell id="results-api-box" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#dee2e6;arcSize=5;align=left;verticalAlign=top;" vertex="1" parent="1">
+          <mxGeometry x="70" y="2100" width="1460" height="230" as="geometry" />
+        </mxCell>
+        
+        <mxCell id="results-api-title" value="🔍 결과 조회 API" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=13;fontStyle=1;spacingLeft=10;" vertex="1" parent="1">
+          <mxGeometry x="70" y="2110" width="300" height="25" as="geometry" />
+        </mxCell>
+        
+        <mxCell id="results-api-content" value="GET /catv/stb/control/results (전체 Job 목록):&#xa;• 응답: {&quot;filters&quot;: {...}, &quot;items&quot;: [{&quot;job_id&quot;, &quot;work_type&quot;, &quot;count_by_status&quot;: {...}}, ...]}&#xa;• count_by_status: {&quot;completed&quot;: N, &quot;failed&quot;: N, &quot;running&quot;: N, &quot;pending&quot;: N}&#xa;• limit: 기본 100, 최대 1000&#xa;&#xa;GET /catv/stb/control/results/:job_id (특정 Job 상세):&#xa;• 응답: {&quot;filters&quot;: {...}, &quot;items&quot;: [{task_id, cm_mac_addr, stb_mac_addr, result_code, result_message}, ...]}&#xa;• 필터: status (pending/running/completed/failed), result (&quot;1&quot;/&quot;0&quot;/&quot;-1&quot;), MAC 주소&#xa;• limit: 기본 1000, 최대 10000&#xa;&#xa;실제 운영 데이터 (2026-02-12):&#xa;• Job ID: 5c26dadd-c8ca-41ef-9e41-904d7c029fbd&#xa;• 총 81,106대: completed 28,640 (35.3%) / failed 51,125 (63.0%) / running 1,341 (1.7%)&#xa;• work_type: stb_request_info (정보 전송 요청)" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=top;whiteSpace=wrap;rounded=0;fontSize=9;fontFamily=Courier New;spacingLeft=15;spacingTop=5;" vertex="1" parent="1">
+          <mxGeometry x="70" y="2140" width="1460" height="180" as="geometry" />
+        </mxCell>
+        
+        <!-- 플랫폼 호환성 상세 -->
+        <mxCell id="platform-compat-box" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff3cd;strokeColor=#ffc107;arcSize=5;align=left;verticalAlign=top;" vertex="1" parent="1">
+          <mxGeometry x="70" y="2350" width="1460" height="110" as="geometry" />
+        </mxCell>
+        
+        <mxCell id="platform-compat-title" value="⚠️ 플랫폼 호환성 자동 검증" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=13;fontStyle=1;spacingLeft=10;" vertex="1" parent="1">
+          <mxGeometry x="70" y="2360" width="300" height="25" as="geometry" />
+        </mxCell>
+        
+        <mxCell id="platform-compat-content" value="Android 미지원: tvLock, chLock, zappingAd, morningAlarm, standbyMode&#xa;OCAP 모델별 제한:&#xa;• audioMode, hdmiCec: U300, HC100만 지원&#xa;• hdr: U300만 지원&#xa;→ 서버에서 호환성 체크 후 오류 반환, 실행 전 필터링" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=top;whiteSpace=wrap;rounded=0;fontSize=10;spacingLeft=15;spacingTop=5;" vertex="1" parent="1">
+          <mxGeometry x="70" y="2390" width="1460" height="60" as="geometry" />
+        </mxCell>
+        
+        <!-- work_value 예시 상세 -->
+        <mxCell id="workvalue-detail-box" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#dee2e6;arcSize=5;align=left;verticalAlign=top;" vertex="1" parent="1">
+          <mxGeometry x="70" y="2480" width="1460" height="140" as="geometry" />
+        </mxCell>
+        
+        <mxCell id="workvalue-detail-title" value="📝 work_value 예시" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=13;fontStyle=1;spacingLeft=10;" vertex="1" parent="1">
+          <mxGeometry x="70" y="2490" width="300" height="25" as="geometry" />
+        </mxCell>
+        
+        <mxCell id="workvalue-detail-content" value="• limitAge: &quot;0&quot; (전체), &quot;1&quot; (7세), &quot;2&quot; (12세), &quot;3&quot; (15세), &quot;4&quot; (19세)&#xa;• resolution: &quot;0&quot; (480i), &quot;1&quot; (480p), &quot;2&quot; (720p), &quot;3&quot; (1080i), &quot;4&quot; (1080p)&#xa;• audioMode: &quot;0&quot; (스테레오), &quot;1&quot; (좌), &quot;2&quot; (우)&#xa;• tvLock, chLock: &quot;1&quot; (잠금), &quot;0&quot; (해제)&#xa;• tvType: &quot;0&quot; (4:3), &quot;1&quot; (16:9), &quot;2&quot; (자동)&#xa;• digitalAudio: &quot;1&quot; (PCM), &quot;0&quot; (Bitstream)&#xa;• stb_request_info, sysCheck: null (값 불필요)" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=top;whiteSpace=wrap;rounded=0;fontSize=10;fontFamily=Courier New;spacingLeft=15;spacingTop=5;" vertex="1" parent="1">
+          <mxGeometry x="70" y="2520" width="1460" height="90" as="geometry" />
+        </mxCell>
+        
+        <!-- 전체 API 엔드포인트 -->
+        <mxCell id="all-endpoints-box" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#dee2e6;arcSize=5;align=left;verticalAlign=top;" vertex="1" parent="1">
+          <mxGeometry x="70" y="2640" width="1460" height="160" as="geometry" />
+        </mxCell>
+        
+        <mxCell id="all-endpoints-title" value="🔗 전체 API 엔드포인트" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=13;fontStyle=1;spacingLeft=10;" vertex="1" parent="1">
+          <mxGeometry x="70" y="2650" width="300" height="25" as="geometry" />
+        </mxCell>
+        
+        <mxCell id="all-endpoints-content" value="• GET /catv/stb/sos - SO 목록&#xa;• GET /catv/stb/sos/:so_id/l3s - L3 장비 목록&#xa;• GET /catv/stb/sos/:so_id/l3s/:l3_id/cells - Cell 목록&#xa;• GET /catv/stb/sos/:so_id/l3s/:l3_id/cells/:cell_id/settopboxes - CM MAC 주소 목록&#xa;• POST /catv/stb/control - 제어 실행&#xa;• GET /catv/stb/control/results - 전체 Job 목록&#xa;• GET /catv/stb/control/results/:job_id - 특정 Job 상세 결과" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=top;whiteSpace=wrap;rounded=0;fontSize=10;fontFamily=Courier New;spacingLeft=15;spacingTop=5;" vertex="1" parent="1">
+          <mxGeometry x="70" y="2680" width="1460" height="110" as="geometry" />
+        </mxCell>
+        
+        <!-- 푸터 -->
+        <mxCell id="footer" value="POST /catv/stb/control | v3.0 (Worker Pool, Memory Cache) | 와이어프레임 + 개발자 노트" style="text;html=1;strokeColor=none;fillColor=#f8f9fa;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=1;fontSize=10;fontColor=#6c757d;" vertex="1" parent="1">
+          <mxGeometry x="70" y="2830" width="1460" height="30" as="geometry" />
+        </mxCell>
+        
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

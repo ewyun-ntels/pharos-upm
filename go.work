@@ -1,0 +1,17 @@
+go 1.26.0
+
+use (
+	./core
+	./extensions/alarm
+	./extensions/catv/business
+	./extensions/dashboard/datasources/clickhouse
+	./extensions/example
+	./extensions/log
+	./meta/scripts
+	./shared
+	./third_party/GoVisual
+	./third_party/goflow
+	./tools/kafka-monitor
+	./tools/migration/catv
+	./tools/simulator/catv/transmission
+)

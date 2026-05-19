@@ -1,0 +1,14 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://ntels.com/pharos/schemas/SetAttributesRequest.schema.json",
+  "title": "SetAttributesRequest",
+  "description": "Request body for updating user attributes (PUT /user/{username}/attributes)",
+  "type": "object",
+  "properties": {
+    "attributes": {
+      "$ref": "Attributes.schema"
+    }
+  },
+  "required": ["attributes"],
+  "additionalProperties": false
+}

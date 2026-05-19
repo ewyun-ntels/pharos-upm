@@ -1,0 +1,32 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "NotificationRule",
+  "description": "Schema for creating new notification rules (POST requests)",
+  "type": "object",
+  "properties": {
+
+    "notification_type": {
+      "description": "Type of notification rule",
+      "$ref": "NotificationType.schema"
+    },
+    "rule": {
+      "type": "object",
+      "description": "Rule configuration object (varies by notification_type)"
+    },
+    "timestamp": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Creation timestamp"
+    },
+    "updated_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Last update timestamp"
+    }
+  },
+  "required": [
+    "notification_type",
+    "rule"
+  ],
+  "additionalProperties": false
+}

@@ -1,0 +1,1062 @@
+{
+  "dashboard": {
+    "title": "STB Control Job Dashboard",
+    "tags": ["catv", "stb", "control", "quality"],
+    "timezone": "browser",
+    "schemaVersion": 38,
+    "version": 0,
+    "refresh": "5m",
+    "templating": {
+      "list": [
+        {
+          "name": "job_id",
+          "type": "query",
+          "label": "Job ID",
+          "datasource": {
+            "type": "grafana-clickhouse-datasource",
+            "uid": "dff5fnhoq5nggb"
+          },
+          "query": "SELECT DISTINCT job_id FROM catv.dist_stb_control_job FINAL ORDER BY request_received_at DESC",
+          "refresh": 2,
+          "multi": true,
+          "includeAll": true,
+          "current": {},
+          "options": [],
+          "sort": 1,
+          "allValue": "All"
+        }
+      ]
+    },
+    "panels": [
+      {
+        "id": 100,
+        "title": "\uc804\uccb4 \uc131\uacf5\ub960",
+        "type": "stat",
+        "gridPos": {
+          "x": 0,
+          "y": 0,
+          "w": 6,
+          "h": 4
+        },
+        "datasource": {
+          "type": "grafana-clickhouse-datasource",
+          "uid": "dff5fnhoq5nggb"
+        },
+        "targets": [
+          {
+            "rawSql": "SELECT \n  countIf(result_code = '1') * 100.0 / count() as success_rate\nFROM catv.dist_stb_control_job FINAL\nWHERE $__conditionalAll(job_id IN (${job_id:singlequote}), ${job_id})\n  AND request_received_at >= $__fromTime AND request_received_at <= $__toTime",
+            "refId": "A",
+            "editorType": "sql",
+            "queryType": "table"
+          }
+        ],
+        "options": {
+          "graphMode": "area",
+          "colorMode": "value",
+          "orientation": "auto",
+          "reduceOptions": {
+            "values": false,
+            "calcs": ["lastNotNull"]
+          }
+        },
+        "fieldConfig": {
+          "defaults": {
+            "unit": "percent",
+            "decimals": 2,
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {
+                  "value": null,
+                  "color": "red"
+                },
+                {
+                  "value": 70,
+                  "color": "yellow"
+                },
+                {
+                  "value": 90,
+                  "color": "green"
+                }
+              ]
+            }
+          }
+        }
+      },
+      {
+        "id": 101,
+        "title": "\ucd1d Task \uc218",
+        "type": "stat",
+        "gridPos": {
+          "x": 6,
+          "y": 0,
+          "w": 6,
+          "h": 4
+        },
+        "datasource": {
+          "type": "grafana-clickhouse-datasource",
+          "uid": "dff5fnhoq5nggb"
+        },
+        "targets": [
+          {
+            "rawSql": "SELECT count(DISTINCT task_id) as total_tasks\nFROM catv.dist_stb_control_job FINAL\nWHERE $__conditionalAll(job_id IN (${job_id:singlequote}), ${job_id})\n  AND request_received_at >= $__fromTime AND request_received_at <= $__toTime",
+            "refId": "A",
+            "editorType": "sql",
+            "queryType": "table"
+          }
+        ],
+        "options": {
+          "graphMode": "area",
+          "colorMode": "value",
+          "orientation": "auto",
+          "reduceOptions": {
+            "values": false,
+            "calcs": ["lastNotNull"]
+          }
+        },
+        "fieldConfig": {
+          "defaults": {
+            "unit": "short",
+            "color": {
+              "mode": "thresholds"
+            },
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {
+                  "value": null,
+                  "color": "blue"
+                }
+              ]
+            }
+          }
+        }
+      },
+      {
+        "id": 102,
+        "title": "\uace0\uc720 Job ID \uc218",
+        "type": "stat",
+        "gridPos": {
+          "x": 12,
+          "y": 0,
+          "w": 6,
+          "h": 4
+        },
+        "datasource": {
+          "type": "grafana-clickhouse-datasource",
+          "uid": "dff5fnhoq5nggb"
+        },
+        "targets": [
+          {
+            "rawSql": "SELECT count(DISTINCT job_id) as unique_jobs\nFROM catv.dist_stb_control_job FINAL\nWHERE $__conditionalAll(job_id IN (${job_id:singlequote}), ${job_id})\n  AND request_received_at >= $__fromTime AND request_received_at <= $__toTime",
+            "refId": "A",
+            "editorType": "sql",
+            "queryType": "table"
+          }
+        ],
+        "options": {
+          "graphMode": "none",
+          "colorMode": "value",
+          "orientation": "auto",
+          "reduceOptions": {
+            "values": false,
+            "calcs": ["lastNotNull"]
+          }
+        },
+        "fieldConfig": {
+          "defaults": {
+            "unit": "short",
+            "color": {
+              "mode": "thresholds"
+            },
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {
+                  "value": null,
+                  "color": "purple"
+                }
+              ]
+            }
+          }
+        }
+      },
+      {
+        "id": 103,
+        "title": "\ucc98\ub9ac\ub41c STB \uc218",
+        "type": "stat",
+        "gridPos": {
+          "x": 18,
+          "y": 0,
+          "w": 6,
+          "h": 4
+        },
+        "datasource": {
+          "type": "grafana-clickhouse-datasource",
+          "uid": "dff5fnhoq5nggb"
+        },
+        "targets": [
+          {
+            "rawSql": "SELECT count(DISTINCT cm_mac_addr) as unique_stb\nFROM catv.dist_stb_control_job FINAL\nWHERE $__conditionalAll(job_id IN (${job_id:singlequote}), ${job_id})\n  AND request_received_at >= $__fromTime AND request_received_at <= $__toTime",
+            "refId": "A",
+            "editorType": "sql",
+            "queryType": "table"
+          }
+        ],
+        "options": {
+          "graphMode": "none",
+          "colorMode": "value",
+          "orientation": "auto",
+          "reduceOptions": {
+            "values": false,
+            "calcs": ["lastNotNull"]
+          }
+        },
+        "fieldConfig": {
+          "defaults": {
+            "unit": "short",
+            "color": {
+              "mode": "thresholds"
+            },
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {
+                  "value": null,
+                  "color": "orange"
+                }
+              ]
+            }
+          }
+        }
+      },
+      {
+        "id": 1,
+        "title": "Job \uc2e4\ud589 \ud604\ud669 (\uc2dc\uac04\ubcc4)",
+        "type": "timeseries",
+        "gridPos": {
+          "x": 0,
+          "y": 4,
+          "w": 24,
+          "h": 8
+        },
+        "datasource": {
+          "type": "grafana-clickhouse-datasource",
+          "uid": "dff5fnhoq5nggb"
+        },
+        "targets": [
+          {
+            "rawSql": "SELECT \n  $__timeInterval(request_received_at) as time,\n  count() as total_jobs,\n  countIf(result_code = '1') as success_jobs,\n  countIf(result_code = '0') as failed_jobs,\n  countIf(result_code = '') as not_control_jobs,\n countIf(result_code = '1') * 100.0 / count() as success_rate\nFROM catv.dist_stb_control_job FINAL\nWHERE $__conditionalAll(job_id IN (${job_id:singlequote}), ${job_id})\n  AND request_received_at >= $__fromTime AND request_received_at <= $__toTime\nGROUP BY time\nORDER BY time",
+            "refId": "A",
+            "editorType": "sql",
+            "queryType": "table"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "color": {
+              "mode": "palette-classic"
+            },
+            "custom": {
+              "drawStyle": "line",
+              "lineInterpolation": "smooth",
+              "lineWidth": 2,
+              "fillOpacity": 20,
+              "gradientMode": "opacity",
+              "showPoints": "never",
+              "pointSize": 5,
+              "spanNulls": false
+            },
+            "unit": "short"
+          }
+        },
+        "options": {
+          "tooltip": {
+            "mode": "multi"
+          },
+          "legend": {
+            "displayMode": "list",
+            "placement": "bottom"
+          }
+        },
+        "interval": "5m"
+      },
+      {
+        "id": 2,
+        "title": "Task \uc0c1\ud0dc\ubcc4 \ubd84\ud3ec",
+        "type": "piechart",
+        "gridPos": {
+          "x": 0,
+          "y": 32,
+          "w": 8,
+          "h": 8
+        },
+        "datasource": {
+          "type": "grafana-clickhouse-datasource",
+          "uid": "dff5fnhoq5nggb"
+        },
+        "targets": [
+          {
+            "rawSql": "SELECT \n  task_status,\n  count() as count\nFROM catv.dist_stb_control_job FINAL\nWHERE $__conditionalAll(job_id IN (${job_id:singlequote}), ${job_id})\n  AND request_received_at >= $__fromTime AND request_received_at <= $__toTime\nGROUP BY task_status",
+            "refId": "A",
+            "editorType": "sql",
+            "queryType": "table"
+          }
+        ],
+        "options": {
+          "legend": {
+            "displayMode": "table",
+            "placement": "right",
+            "values": ["value", "percent"]
+          },
+          "pieType": "pie",
+          "reduceOptions": {
+            "calcs": ["lastNotNull"],
+            "values": true
+          },
+          "tooltip": {
+            "mode": "single",
+            "hideZeros": false
+          }
+        }
+      },
+      {
+        "id": 3,
+        "title": "Work Type \ubcc4 \ubd84\ud3ec",
+        "type": "piechart",
+        "gridPos": {
+          "x": 8,
+          "y": 32,
+          "w": 8,
+          "h": 8
+        },
+        "datasource": {
+          "type": "grafana-clickhouse-datasource",
+          "uid": "dff5fnhoq5nggb"
+        },
+        "targets": [
+          {
+            "rawSql": "SELECT \n  work_type,\n  count() as count\nFROM catv.dist_stb_control_job FINAL\nWHERE $__conditionalAll(job_id IN (${job_id:singlequote}), ${job_id})\n  AND request_received_at >= $__fromTime AND request_received_at <= $__toTime\nGROUP BY work_type",
+            "refId": "A",
+            "editorType": "sql",
+            "queryType": "table"
+          }
+        ],
+        "options": {
+          "legend": {
+            "displayMode": "table",
+            "placement": "right",
+            "values": ["value", "percent"]
+          },
+          "pieType": "donut",
+          "reduceOptions": {
+            "calcs": ["lastNotNull"],
+            "values": true
+          },
+          "tooltip": {
+            "mode": "single",
+            "hideZeros": false
+          }
+        }
+      },
+      {
+        "id": 4,
+        "title": "\ucd5c\uadfc \uc2e4\ud589 \uacb0\uacfc (\uacb0\uacfc \ucf54\ub4dc\ubcc4)",
+        "type": "stat",
+        "gridPos": {
+          "x": 16,
+          "y": 32,
+          "w": 8,
+          "h": 8
+        },
+        "datasource": {
+          "type": "grafana-clickhouse-datasource",
+          "uid": "dff5fnhoq5nggb"
+        },
+        "targets": [
+          {
+            "rawSql": "SELECT \n  result_code,\n  count() as count\nFROM \n(\n  SELECT \n    request_received_at,\n    job_id,\n    IF(result_code = '0' OR result_code = '-1' OR result_code = '', '0', result_code) AS result_code\n  FROM catv.dist_stb_control_job FINAL\n  WHERE\n    $__conditionalAll(job_id IN (${job_id:singlequote}), ${job_id})\n    AND request_received_at >= $__fromTime\n    AND request_received_at <= $__toTime\n) AS subquery\nGROUP BY result_code\nORDER BY result_code",
+            "refId": "A",
+            "editorType": "sql",
+            "queryType": "table"
+          }
+        ],
+        "options": {
+          "graphMode": "area",
+          "colorMode": "value",
+          "justifyMode": "auto",
+          "orientation": "auto",
+          "reduceOptions": {
+            "calcs": ["lastNotNull"],
+            "values": true
+          }
+        },
+        "fieldConfig": {
+          "defaults": {
+            "mappings": [
+              {
+                "options": {
+                  "0": {
+                    "text": "Failed",
+                    "color": "red"
+                  },
+                  "1": {
+                    "text": "Success",
+                    "color": "green"
+                  }
+                },
+                "type": "value"
+              }
+            ],
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {
+                  "value": null,
+                  "color": "green"
+                },
+                {
+                  "value": 0,
+                  "color": "red"
+                },
+                {
+                  "value": 1,
+                  "color": "green"
+                }
+              ]
+            }
+          }
+        }
+      },
+      {
+        "id": 200,
+        "title": "\uc131\uacf5\ub960 \uc2dc\uac04 \ucd94\uc774",
+        "type": "timeseries",
+        "gridPos": {
+          "x": 0,
+          "y": 12,
+          "w": 12,
+          "h": 8
+        },
+        "datasource": {
+          "type": "grafana-clickhouse-datasource",
+          "uid": "dff5fnhoq5nggb"
+        },
+        "targets": [
+          {
+            "rawSql": "SELECT \n  $__timeInterval(request_received_at) as time,\n  countIf(result_code = '1') * 100.0 / count() as success_rate\nFROM catv.dist_stb_control_job FINAL\nWHERE $__conditionalAll(job_id IN (${job_id:singlequote}), ${job_id})\n  AND request_received_at >= $__fromTime AND request_received_at <= $__toTime\nGROUP BY time\nORDER BY time",
+            "refId": "A",
+            "editorType": "sql",
+            "queryType": "table"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "color": {
+              "mode": "palette-classic"
+            },
+            "custom": {
+              "drawStyle": "line",
+              "lineInterpolation": "smooth",
+              "lineWidth": 2,
+              "fillOpacity": 30,
+              "gradientMode": "opacity",
+              "showPoints": "auto"
+            },
+            "unit": "percent",
+            "min": 0,
+            "max": 100,
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {
+                  "value": null,
+                  "color": "transparent"
+                },
+                {
+                  "value": 70,
+                  "color": "red"
+                },
+                {
+                  "value": 90,
+                  "color": "green"
+                }
+              ]
+            }
+          },
+          "overrides": []
+        },
+        "options": {
+          "tooltip": {
+            "mode": "multi"
+          },
+          "legend": {
+            "displayMode": "list",
+            "placement": "bottom"
+          }
+        },
+        "interval": "1h"
+      },
+      {
+        "id": 201,
+        "title": "Work Type\ubcc4 \uc2e4\ud589 \ucd94\uc774",
+        "type": "timeseries",
+        "gridPos": {
+          "x": 12,
+          "y": 12,
+          "w": 12,
+          "h": 8
+        },
+        "datasource": {
+          "type": "grafana-clickhouse-datasource",
+          "uid": "dff5fnhoq5nggb"
+        },
+        "targets": [
+          {
+            "rawSql": "SELECT \n  $__timeInterval(request_received_at) as time,\n  work_type,\n  count() as count\nFROM catv.dist_stb_control_job FINAL\nWHERE $__conditionalAll(job_id IN (${job_id:singlequote}), ${job_id})\n  AND request_received_at >= $__fromTime AND request_received_at <= $__toTime\nGROUP BY time, work_type\nORDER BY time, work_type",
+            "refId": "A",
+            "format": 0,
+            "editorType": "sql"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "color": {
+              "mode": "palette-classic"
+            },
+            "custom": {
+              "drawStyle": "line",
+              "lineInterpolation": "smooth",
+              "lineWidth": 2,
+              "fillOpacity": 10,
+              "showPoints": "never",
+              "stacking": {
+                "mode": "normal"
+              }
+            },
+            "unit": "short"
+          }
+        },
+        "options": {
+          "tooltip": {
+            "mode": "multi"
+          },
+          "legend": {
+            "displayMode": "list",
+            "placement": "bottom"
+          }
+        },
+        "interval": "1h"
+      },
+      {
+        "id": 202,
+        "title": "Task Status\ubcc4 \uc0c1\uc138 \ud1b5\uacc4",
+        "type": "table",
+        "gridPos": {
+          "x": 0,
+          "y": 20,
+          "w": 12,
+          "h": 8
+        },
+        "datasource": {
+          "type": "grafana-clickhouse-datasource",
+          "uid": "dff5fnhoq5nggb"
+        },
+        "targets": [
+          {
+            "rawSql": "SELECT \n  task_status,\n  count() as total_count,\n  countIf(result_code = '1') as success_count,\n  countIf(result_code = '0') as fail_count,\n  countIf(result_code = '') as not_control_count,\n  countIf(result_code = '1') * 100.0 / count() as success_rate,\n  count(DISTINCT job_id) as unique_jobs,\n  count(DISTINCT cm_mac_addr) as unique_stbs\nFROM catv.dist_stb_control_job FINAL\nWHERE $__conditionalAll(job_id IN (${job_id:singlequote}), ${job_id})\n  AND request_received_at >= $__fromTime AND request_received_at <= $__toTime\nGROUP BY task_status\nORDER BY total_count DESC",
+            "refId": "A",
+            "format": 1,
+            "editorType": "sql",
+            "queryType": "table"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "custom": {
+              "align": "auto",
+              "displayMode": "auto"
+            }
+          },
+          "overrides": [
+            {
+              "matcher": {
+                "id": "byName",
+                "options": "success_rate"
+              },
+              "properties": [
+                {
+                  "id": "unit",
+                  "value": "percent"
+                },
+                {
+                  "id": "decimals",
+                  "value": 2
+                },
+                {
+                  "id": "custom.displayMode",
+                  "value": "gradient-gauge"
+                },
+                {
+                  "id": "thresholds",
+                  "value": {
+                    "mode": "absolute",
+                    "steps": [
+                      {
+                        "value": null,
+                        "color": "red"
+                      },
+                      {
+                        "value": 70,
+                        "color": "yellow"
+                      },
+                      {
+                        "value": 90,
+                        "color": "green"
+                      }
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "matcher": {
+                "id": "byName",
+                "options": "total_count"
+              },
+              "properties": [
+                {
+                  "id": "custom.displayMode",
+                  "value": "color-background"
+                },
+                {
+                  "id": "custom.width",
+                  "value": 120
+                }
+              ]
+            }
+          ]
+        },
+        "options": {
+          "showHeader": true,
+          "sortBy": [
+            {
+              "displayName": "total_count",
+              "desc": true
+            }
+          ]
+        }
+      },
+      {
+        "id": 203,
+        "title": "Work Type\ubcc4 \uc0c1\uc138 \ud1b5\uacc4",
+        "type": "table",
+        "gridPos": {
+          "x": 12,
+          "y": 20,
+          "w": 12,
+          "h": 8
+        },
+        "datasource": {
+          "type": "grafana-clickhouse-datasource",
+          "uid": "dff5fnhoq5nggb"
+        },
+        "targets": [
+          {
+            "rawSql": "SELECT \n  work_type,\n  count() as total_count,\n  countIf(result_code = '1') as success_count,\n  countIf(result_code = '0') as fail_count,\n  countIf(result_code = '') as not_control_count,\n  countIf(result_code = '1') * 100.0 / count() as success_rate,\n  count(DISTINCT job_id) as unique_jobs,\n  count(DISTINCT cm_mac_addr) as unique_stbs,\n  count(DISTINCT cm_mac_addr) as unique_cms\nFROM catv.dist_stb_control_job FINAL\nWHERE $__conditionalAll(job_id IN (${job_id:singlequote}), ${job_id})\n  AND request_received_at >= $__fromTime AND request_received_at <= $__toTime\nGROUP BY work_type\nORDER BY total_count DESC",
+            "refId": "A",
+            "format": 1,
+            "editorType": "sql",
+            "queryType": "table"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "custom": {
+              "align": "auto",
+              "displayMode": "auto"
+            }
+          },
+          "overrides": [
+            {
+              "matcher": {
+                "id": "byName",
+                "options": "success_rate"
+              },
+              "properties": [
+                {
+                  "id": "unit",
+                  "value": "percent"
+                },
+                {
+                  "id": "decimals",
+                  "value": 2
+                },
+                {
+                  "id": "custom.displayMode",
+                  "value": "gradient-gauge"
+                },
+                {
+                  "id": "thresholds",
+                  "value": {
+                    "mode": "absolute",
+                    "steps": [
+                      {
+                        "value": null,
+                        "color": "red"
+                      },
+                      {
+                        "value": 70,
+                        "color": "yellow"
+                      },
+                      {
+                        "value": 90,
+                        "color": "green"
+                      }
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "matcher": {
+                "id": "byName",
+                "options": "total_count"
+              },
+              "properties": [
+                {
+                  "id": "custom.displayMode",
+                  "value": "color-background"
+                },
+                {
+                  "id": "custom.width",
+                  "value": 120
+                }
+              ]
+            }
+          ]
+        },
+        "options": {
+          "showHeader": true,
+          "sortBy": [
+            {
+              "displayName": "total_count",
+              "desc": true
+            }
+          ]
+        }
+      },
+      {
+        "id": 5,
+        "title": "Control Job \ubaa9\ub85d",
+        "type": "table",
+        "gridPos": {
+          "x": 0,
+          "y": 40,
+          "w": 24,
+          "h": 10
+        },
+        "datasource": {
+          "type": "grafana-clickhouse-datasource",
+          "uid": "dff5fnhoq5nggb"
+        },
+        "targets": [
+          {
+            "rawSql": "SELECT \n  request_received_at,\n  control_executed_at,\n  job_id,\n  task_id,\n  cm_mac_addr,\n  stb_mac_addr,\n  work_type,\n  task_status,\n  result_code,\n  CASE \n    WHEN result_code = '1' THEN 'Success'\n    WHEN result_code = '0' THEN 'Failed'\n    ELSE 'Unknown'\n  END as result_status,\n  length(result_message) as message_length,\n  result_message\nFROM catv.dist_stb_control_job FINAL\nWHERE $__conditionalAll(job_id IN (${job_id:singlequote}), ${job_id})\n  AND request_received_at >= $__fromTime AND request_received_at <= $__toTime\nORDER BY request_received_at DESC\nLIMIT 200",
+            "refId": "A",
+            "format": 1,
+            "editorType": "sql",
+            "queryType": "table"
+          }
+        ],
+        "options": {
+          "showHeader": true,
+          "sortBy": [
+            {
+              "displayName": "request_received_at",
+              "desc": true
+            }
+          ]
+        },
+        "fieldConfig": {
+          "defaults": {
+            "custom": {
+              "align": "auto",
+              "displayMode": "auto"
+            }
+          },
+          "overrides": [
+            {
+              "matcher": {
+                "id": "byName",
+                "options": "result_message"
+              },
+              "properties": [
+                {
+                  "id": "custom.width",
+                  "value": 300
+                }
+              ]
+            }
+          ]
+        }
+      },
+      {
+        "id": 6,
+        "title": "STB \uc815\ubcf4 \uc0c1\uc138 (work_type=stb_request_info)",
+        "type": "table",
+        "gridPos": {
+          "x": 0,
+          "y": 50,
+          "w": 24,
+          "h": 12
+        },
+        "datasource": {
+          "type": "grafana-clickhouse-datasource",
+          "uid": "dff5fnhoq5nggb"
+        },
+        "targets": [
+          {
+            "rawSql": "SELECT \n  request_received_at,\n  control_executed_at,\n  job_id,\n  cm_mac_addr,\n  stb_mac_addr,\n  task_status,\n  result_code,\n  JSONExtractString(result_message, 'stbModel') as stb_model,\n  JSONExtractString(result_message, 'stbState') as stb_state,\n  JSONExtractString(result_message, 'stbIp') as stb_ip,\n  JSONExtractString(result_message, 'cmIp') as cm_ip,\n  JSONExtractString(result_message, 'chName') as ch_name,\n  JSONExtractString(result_message, 'chNum') as ch_num,\n  JSONExtractString(result_message, 'chPrg') as ch_program,\n  JSONExtractString(result_message, 'chFreq') as ch_freq,\n  JSONExtractString(result_message, 'volume') as volume,\n  JSONExtractString(result_message, 'resolution') as resolution,\n  JSONExtractString(result_message, 'mwVer') as mw_version,\n  JSONExtractString(result_message, 'cloudVer') as cloud_version,\n  JSONExtractString(result_message, 'localVer') as local_version,\n  JSONExtractString(result_message, 'runningTime') as running_time,\n  JSONExtractString(result_message, 'pwrLvl') as power_level,\n  toFloat32OrNull(replaceRegexpAll(JSONExtractString(result_message, 'snr'), '[^0-9.]', '')) as snr_numeric,\n  JSONExtractString(result_message, 'snr') as snr,\n  JSONExtractString(result_message, 'sigWeak') as signal_weak,\n  JSONExtractString(result_message, 'audioMode') as audio_mode,\n  JSONExtractString(result_message, 'hdmiCec') as hdmi_cec,\n  JSONExtractString(result_message, 'standbyMode') as standby_mode\nFROM catv.dist_stb_control_job FINAL\nWHERE $__conditionalAll(job_id IN (${job_id:singlequote}), ${job_id})\n  AND work_type = 'stb_request_info'\n  AND request_received_at >= $__fromTime AND request_received_at <= $__toTime\nORDER BY request_received_at DESC\nLIMIT 100",
+            "refId": "A",
+            "format": 1,
+            "editorType": "sql",
+            "queryType": "table"
+          }
+        ],
+        "options": {
+          "showHeader": true,
+          "sortBy": [
+            {
+              "displayName": "request_received_at",
+              "desc": true
+            }
+          ]
+        },
+        "fieldConfig": {
+          "defaults": {
+            "custom": {
+              "align": "auto",
+              "displayMode": "auto"
+            }
+          }
+        }
+      },
+      {
+        "id": 7,
+        "title": "STB \ubaa8\ub378\ubcc4 \ubd84\ud3ec",
+        "type": "bargauge",
+        "gridPos": {
+          "x": 0,
+          "y": 62,
+          "w": 12,
+          "h": 8
+        },
+        "datasource": {
+          "type": "grafana-clickhouse-datasource",
+          "uid": "dff5fnhoq5nggb"
+        },
+        "targets": [
+          {
+            "rawSql": "SELECT \n  IF(stb_model = '', 'unknown', stb_model) AS stb_model,\n  count() as count\nFROM\n(\n  SELECT\n    *,\n    JSONExtractString(result_message, 'stbModel') as stb_model\n  FROM catv.dist_stb_control_job FINAL\n  WHERE\n    $__conditionalAll(job_id IN (${job_id:singlequote}), ${job_id})\n    AND work_type = 'stb_request_info'\n    AND control_executed_at IS NOT NULL AND request_received_at >= $__fromTime AND request_received_at <= $__toTime\n)\nGROUP BY stb_model\nORDER BY count DESC",
+            "refId": "A",
+            "editorType": "sql",
+            "queryType": "table"
+          }
+        ],
+        "options": {
+          "orientation": "horizontal",
+          "displayMode": "gradient",
+          "reduceOptions": {
+            "calcs": ["lastNotNull"],
+            "fields": "",
+            "values": true
+          },
+          "showUnfilled": true
+        }
+      },
+      {
+        "id": 8,
+        "title": "STB \uc0c1\ud0dc\ubcc4 \ubd84\ud3ec",
+        "type": "piechart",
+        "gridPos": {
+          "x": 12,
+          "y": 62,
+          "w": 12,
+          "h": 8
+        },
+        "datasource": {
+          "type": "grafana-clickhouse-datasource",
+          "uid": "dff5fnhoq5nggb"
+        },
+        "targets": [
+          {
+            "rawSql": "SELECT \n  IF(stb_state = '', 'unknown', stb_state) AS stb_state,\n  count() as count\nFROM (\n  SELECT\n    *,\n    JSONExtractString(result_message, 'stbState') as stb_state\n  FROM catv.dist_stb_control_job FINAL\n  WHERE\n    $__conditionalAll(job_id IN (${job_id:singlequote}), ${job_id})\n    AND work_type = 'stb_request_info'\n    AND control_executed_at IS NOT NULL AND request_received_at >= $__fromTime AND request_received_at <= $__toTime\n)\nGROUP BY stb_state\nORDER BY count DESC",
+            "refId": "A",
+            "editorType": "sql",
+            "queryType": "table"
+          }
+        ],
+        "options": {
+          "legend": {
+            "displayMode": "table",
+            "placement": "right",
+            "values": ["value", "percent"]
+          },
+          "reduceOptions": {
+            "calcs": ["lastNotNull"],
+            "fields": "",
+            "values": true
+          },
+          "pieType": "pie"
+        }
+      },
+      {
+        "id": 9,
+        "title": "\uc2e0\ud638 \ud488\uc9c8 \uc9c0\ud45c (\ud3c9\uade0 SNR)",
+        "type": "stat",
+        "gridPos": {
+          "x": 0,
+          "y": 70,
+          "w": 8,
+          "h": 6
+        },
+        "datasource": {
+          "type": "grafana-clickhouse-datasource",
+          "uid": "dff5fnhoq5nggb"
+        },
+        "targets": [
+          {
+            "rawSql": "SELECT \n  avg(toFloat32OrNull(replaceRegexpAll(JSONExtractString(result_message, 'snr'), '[^0-9.]', ''))) as avg_snr\nFROM catv.dist_stb_control_job FINAL\nWHERE $__conditionalAll(job_id IN (${job_id:singlequote}), ${job_id})\n  AND work_type = 'stb_request_info'\n  AND control_executed_at IS NOT NULL AND request_received_at >= $__fromTime AND request_received_at <= $__toTime",
+            "refId": "A",
+            "editorType": "sql",
+            "queryType": "table"
+          }
+        ],
+        "options": {
+          "graphMode": "area",
+          "colorMode": "value",
+          "orientation": "auto",
+          "reduceOptions": {
+            "values": false,
+            "calcs": ["lastNotNull"]
+          }
+        },
+        "fieldConfig": {
+          "defaults": {
+            "unit": "dB",
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {
+                  "value": null,
+                  "color": "red"
+                },
+                {
+                  "value": 20,
+                  "color": "yellow"
+                },
+                {
+                  "value": 30,
+                  "color": "green"
+                }
+              ]
+            }
+          }
+        }
+      },
+      {
+        "id": 10,
+        "title": "\uc2e0\ud638 \uc57d\ud568 \ube44\uc728",
+        "type": "stat",
+        "gridPos": {
+          "x": 8,
+          "y": 70,
+          "w": 8,
+          "h": 6
+        },
+        "datasource": {
+          "type": "grafana-clickhouse-datasource",
+          "uid": "dff5fnhoq5nggb"
+        },
+        "targets": [
+          {
+            "rawSql": "SELECT \n  countIf(JSONExtractString(result_message, 'sigWeak') = 'Y') * 100.0 / count() as weak_signal_pct\nFROM catv.dist_stb_control_job FINAL\nWHERE $__conditionalAll(job_id IN (${job_id:singlequote}), ${job_id})\n  AND work_type = 'stb_request_info'\n  AND control_executed_at IS NOT NULL AND request_received_at >= $__fromTime AND request_received_at <= $__toTime",
+            "refId": "A",
+            "editorType": "sql",
+            "queryType": "table"
+          }
+        ],
+        "options": {
+          "graphMode": "area",
+          "colorMode": "value",
+          "orientation": "auto",
+          "reduceOptions": {
+            "values": false,
+            "calcs": ["lastNotNull"]
+          }
+        },
+        "fieldConfig": {
+          "defaults": {
+            "unit": "percent",
+            "decimals": 2,
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {
+                  "value": null,
+                  "color": "green"
+                },
+                {
+                  "value": 10,
+                  "color": "yellow"
+                },
+                {
+                  "value": 30,
+                  "color": "red"
+                }
+              ]
+            }
+          }
+        }
+      },
+      {
+        "id": 11,
+        "title": "\ud574\uc0c1\ub3c4\ubcc4 \ubd84\ud3ec",
+        "type": "stat",
+        "gridPos": {
+          "x": 16,
+          "y": 70,
+          "w": 8,
+          "h": 6
+        },
+        "datasource": {
+          "type": "grafana-clickhouse-datasource",
+          "uid": "dff5fnhoq5nggb"
+        },
+        "targets": [
+          {
+            "rawSql": "SELECT \n  JSONExtractString(result_message, 'resolution') as resolution,\n  count() as count\nFROM catv.dist_stb_control_job FINAL\nWHERE $__conditionalAll(job_id IN (${job_id:singlequote}), ${job_id})\n  AND work_type = 'stb_request_info'\n  AND control_executed_at IS NOT NULL AND request_received_at >= $__fromTime AND request_received_at <= $__toTime\nGROUP BY resolution\nORDER BY count DESC",
+            "refId": "A",
+            "editorType": "sql",
+            "queryType": "table"
+          }
+        ],
+        "options": {
+          "graphMode": "none",
+          "colorMode": "value",
+          "orientation": "auto",
+          "reduceOptions": {
+            "values": false,
+            "calcs": ["lastNotNull"]
+          }
+        }
+      }
+    ],
+    "time": {
+      "from": "now-7d",
+      "to": "now"
+    }
+  },
+  "overwrite": true
+}

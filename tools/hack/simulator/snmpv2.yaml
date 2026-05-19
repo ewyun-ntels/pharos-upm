@@ -1,0 +1,48 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: esn-snmpv2-sim
+  namespace: esn
+  labels:
+    app: esn-snmpv2-sim
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: esn-snmpv2-sim
+  template:
+    metadata:
+      labels:
+        app: esn-snmpv2-sim
+    spec:
+      containers:
+        - name: server
+          image: ntels.harbor.core/esn/esn-dev:latest
+          command:
+            - /opt/pharos/bin/pharos
+            - sim
+            - snmpv2
+            - 0.0.0.0:9162
+          ports:
+            - name: snmp
+              containerPort: 9162
+              protocol: UDP
+  serviceName: ''
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: esn-snmpv2-sim
+  namespace: esn
+  labels:
+    app: esn-snmpv2-sim
+spec:
+  ports:
+    - name: snmpv2
+      port: 9162
+      targetPort: 9162
+      nodePort: 31100
+      protocol: UDP
+  selector:
+    app: esn-snmpv2-sim
+  type: NodePort

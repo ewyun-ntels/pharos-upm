@@ -1,0 +1,245 @@
+<mxfile host="app.diagrams.net" modified="2026-02-09T00:00:00.000Z" agent="5.0" version="24.0.0">
+  <diagram name="시스템 아키텍처" id="architecture-diagram">
+    <mxGraphModel dx="1434" dy="844" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="2000" pageHeight="1600" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        
+        <!-- 제목 -->
+        <mxCell id="title" value="SKB CATV STB 제어 시스템 아키텍처 (v3.0)" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=26;fontStyle=1" vertex="1" parent="1">
+          <mxGeometry x="40" y="20" width="800" height="40" as="geometry" />
+        </mxCell>
+        
+        <!-- ========== Layer 1: 외부 인터페이스 ========== -->
+        <mxCell id="layer1-bg" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;opacity=20;" vertex="1" parent="1">
+          <mxGeometry x="40" y="80" width="1900" height="180" as="geometry" />
+        </mxCell>
+        <mxCell id="layer1-label" value="Layer 1: 외부 인터페이스" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=top;whiteSpace=wrap;rounded=0;fontSize=16;fontStyle=1" vertex="1" parent="1">
+          <mxGeometry x="60" y="90" width="300" height="30" as="geometry" />
+        </mxCell>
+        
+        <!-- 관리자 -->
+        <mxCell id="comp-admin" value="&lt;b&gt;관리자&lt;/b&gt;&#xa;&#xa;웹 브라우저&#xa;또는 API 클라이언트" style="shape=umlActor;verticalLabelPosition=bottom;verticalAlign=top;html=1;outlineConnect=0;fillColor=#dae8fc;strokeColor=#6c8ebf;" vertex="1" parent="1">
+          <mxGeometry x="120" y="130" width="50" height="100" as="geometry" />
+        </mxCell>
+        
+        <!-- STB 장비들 -->
+        <mxCell id="comp-stb-group" value="&lt;b&gt;STB 장비군&lt;/b&gt;&#xa;&#xa;📺 SMT-C5210 (OCAP)&#xa;📺 SMT-C7200 (OCAP)&#xa;📺 SMT-H3200 (Android)&#xa;&#xa;TCP 포트: 8801&#xa;&#xa;총 대수: ~80,000대" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d79b00;verticalAlign=top;spacingTop=5;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="1720" y="120" width="200" height="120" as="geometry" />
+        </mxCell>
+        
+        <!-- ========== Layer 2: HTTP API 계층 ========== -->
+        <mxCell id="layer2-bg" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;opacity=20;" vertex="1" parent="1">
+          <mxGeometry x="40" y="280" width="1900" height="280" as="geometry" />
+        </mxCell>
+        <mxCell id="layer2-label" value="Layer 2: HTTP API 계층 (Gin Framework)" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=top;whiteSpace=wrap;rounded=0;fontSize=16;fontStyle=1" vertex="1" parent="1">
+          <mxGeometry x="60" y="290" width="400" height="30" as="geometry" />
+        </mxCell>
+        
+        <!-- HTTP API 서버 -->
+        <mxCell id="comp-http-api" value="&lt;b&gt;HTTP API 서버&lt;/b&gt;&#xa;&#xa;pkg/control/http/&#xa;handler.go, api.go&#xa;&#xa;주요 엔드포인트:&#xa;• POST /catv/stb/control&#xa;• GET /catv/stb/control/results (기본 100, 최대 1000)&#xa;• GET /catv/stb/control/results/:job_id (기본 1000, 최대 10000)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;verticalAlign=top;spacingTop=5;fontSize=11;fontStyle=0" vertex="1" parent="1">
+          <mxGeometry x="280" y="330" width="300" height="200" as="geometry" />
+        </mxCell>
+        
+        <!-- 메모리 캐시 (v3.0) -->
+        <mxCell id="comp-memory" value="&lt;b&gt;메모리 캐시 (v3.0)&lt;/b&gt;&#xa;&#xa;stbControlJobTables&#xa;map[string][]StbControlJobTable&#xa;&#xa;역할:&#xa;• Job 데이터 임시 저장&#xa;• executionSubTaskMakeData()&#xa;• executionSubTaskInsert()&#xa;• 중복 DB 삽입 방지&#xa;&#xa;⚠️ 함수 종료 시 자동 GC" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;verticalAlign=top;spacingTop=5;fontSize=11;fontStyle=0" vertex="1" parent="1">
+          <mxGeometry x="640" y="330" width="280" height="200" as="geometry" />
+        </mxCell>
+        
+        <!-- 검증 로직 -->
+        <mxCell id="comp-validation" value="&lt;b&gt;검증 로직&lt;/b&gt;&#xa;&#xa;• work_type 유효성&#xa;• work_value 검증&#xa;• 플랫폼 호환성 체크&#xa;  (Android vs OCAP)&#xa;• 모델별 지원 여부&#xa;&#xa;40개 work_type 지원&#xa;(types.go AllWorkTypes)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;verticalAlign=top;spacingTop=5;fontSize=11;fontStyle=0" vertex="1" parent="1">
+          <mxGeometry x="980" y="330" width="260" height="200" as="geometry" />
+        </mxCell>
+        
+        <!-- ========== Layer 3: 오케스트레이션 계층 ========== -->
+        <mxCell id="layer3-bg" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;opacity=20;" vertex="1" parent="1">
+          <mxGeometry x="40" y="580" width="1900" height="320" as="geometry" />
+        </mxCell>
+        <mxCell id="layer3-label" value="Layer 3: 오케스트레이션 계층 (Kubernetes)" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=top;whiteSpace=wrap;rounded=0;fontSize=16;fontStyle=1" vertex="1" parent="1">
+          <mxGeometry x="60" y="590" width="500" height="30" as="geometry" />
+        </mxCell>
+        
+        <!-- K8s Job Controller -->
+        <mxCell id="comp-k8s-controller" value="&lt;b&gt;Kubernetes API&lt;/b&gt;&#xa;&#xa;Job Controller&#xa;&#xa;역할:&#xa;• pharos controller-job 생성&#xa;• Pod 스케줄링&#xa;• 실행 상태 관리&#xa;&#xa;네임스페이스:&#xa;config.Catv.Control.K8sJob.Namespace" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;verticalAlign=top;spacingTop=5;fontSize=11;fontStyle=0" vertex="1" parent="1">
+          <mxGeometry x="100" y="640" width="320" height="230" as="geometry" />
+        </mxCell>
+        
+        <!-- Job Task 0 -->
+        <mxCell id="comp-job0" value="&lt;b&gt;Job Task 0&lt;/b&gt;&#xa;&#xa;Pod: pharos-controller-job-0&#xa;&#xa;실행 명령:&#xa;/opt/pharos/bin/pharos&#xa;  controller-job&#xa;  --config=/path/to/config&#xa;  --task-id=jobID-0&#xa;&#xa;※ TYPE, IDS, WORK_TYPE, WORK_VALUE는&#xa;  task_data JSON으로 DB 저장&#xa;&#xa;담당 디바이스: 0~24,999" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;verticalAlign=top;spacingTop=5;fontSize=10;fontStyle=0" vertex="1" parent="1">
+          <mxGeometry x="480" y="640" width="260" height="230" as="geometry" />
+        </mxCell>
+        
+        <!-- Job Task 1 -->
+        <mxCell id="comp-job1" value="&lt;b&gt;Job Task 1&lt;/b&gt;&#xa;&#xa;Pod: pharos-controller-job-1&#xa;&#xa;실행 명령: (동일)&#xa;--task-id=jobID-1&#xa;&#xa;담당 디바이스: 25,000~49,999" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;verticalAlign=top;spacingTop=5;fontSize=10;fontStyle=0" vertex="1" parent="1">
+          <mxGeometry x="800" y="640" width="260" height="230" as="geometry" />
+        </mxCell>
+        
+        <!-- Job Task 2 -->
+        <mxCell id="comp-job2" value="&lt;b&gt;Job Task 2&lt;/b&gt;&#xa;&#xa;Pod: pharos-controller-job-2&#xa;&#xa;실행 명령: (동일)&#xa;--task-id=jobID-2&#xa;&#xa;담당 디바이스: 50,000~74,999" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;verticalAlign=top;spacingTop=5;fontSize=10;fontStyle=0" vertex="1" parent="1">
+          <mxGeometry x="1120" y="640" width="260" height="230" as="geometry" />
+        </mxCell>
+        
+        <!-- Job Task 3 -->
+        <mxCell id="comp-job3" value="&lt;b&gt;Job Task 3&lt;/b&gt;&#xa;&#xa;Pod: pharos-controller-job-3&#xa;&#xa;실행 명령: (동일)&#xa;--task-id=jobID-3&#xa;&#xa;담당 디바이스: 75,000~99,999" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;verticalAlign=top;spacingTop=5;fontSize=10;fontStyle=0" vertex="1" parent="1">
+          <mxGeometry x="1440" y="640" width="260" height="230" as="geometry" />
+        </mxCell>
+        
+        <!-- 분산 처리 설명 -->
+        <mxCell id="comp-distribution" value="⚙️ 분산 처리&#xa;&#xa;총 디바이스: 80,000대&#xa;태스크 수: 4개&#xa;태스크당 디바이스: ~25,000개&#xa;&#xa;동시 실행&#xa;→ 처리 속도 향상" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;verticalAlign=top;spacingTop=5;fontSize=11;fontStyle=1" vertex="1" parent="1">
+          <mxGeometry x="1760" y="640" width="160" height="230" as="geometry" />
+        </mxCell>
+        
+        <!-- ========== Layer 4: Worker 실행 계층 ========== -->
+        <mxCell id="layer4-bg" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;opacity=20;" vertex="1" parent="1">
+          <mxGeometry x="40" y="920" width="1900" height="360" as="geometry" />
+        </mxCell>
+        <mxCell id="layer4-label" value="Layer 4: Worker 실행 계층 (TCP 제어)" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=top;whiteSpace=wrap;rounded=0;fontSize=16;fontStyle=1" vertex="1" parent="1">
+          <mxGeometry x="60" y="930" width="500" height="30" as="geometry" />
+        </mxCell>
+        
+        <!-- Worker Pool Handler -->
+        <mxCell id="comp-worker-pool" value="&lt;b&gt;Worker Pool Handler&lt;/b&gt;&#xa;&#xa;pkg/control/command/&#xa;worker_pool_handler.go&#xa;&#xa;주요 기능:&#xa;• SelectUnprocessedSTBs()&#xa;  (task_status=pending 조회)&#xa;• Rate Limit (300/초 기본값)&#xa;• Goroutine Pool (설정 가능)&#xa;• 2단계 재시도 로직&#xa;• 포트 고갈 대응&#xa;• AsyncBatchWriter 결과 업데이트" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;verticalAlign=top;spacingTop=5;fontSize=11;fontStyle=0" vertex="1" parent="1">
+          <mxGeometry x="100" y="980" width="340" height="270" as="geometry" />
+        </mxCell>
+        
+        <!-- TCP Connection Pool -->
+        <mxCell id="comp-tcp-pool" value="&lt;b&gt;TCP Connection Manager&lt;/b&gt;&#xa;&#xa;직접 연결 방식 (v3.0)&#xa;❌ Connection Pool 미사용&#xa;✅ 매 요청마다 새 연결&#xa;&#xa;이유:&#xa;• STB 장비 특성상 연결 유지 불안정&#xa;• Pool overhead 제거&#xa;• 메모리 효율화&#xa;&#xa;연결 설정:&#xa;• Timeout: 3초&#xa;• Send Timeout: 5초&#xa;• Keep-Alive: 비활성화" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;verticalAlign=top;spacingTop=5;fontSize=11;fontStyle=0" vertex="1" parent="1">
+          <mxGeometry x="500" y="980" width="340" height="270" as="geometry" />
+        </mxCell>
+        
+        <!-- 응답 파싱 -->
+        <mxCell id="comp-parser" value="&lt;b&gt;응답 파싱&lt;/b&gt;&#xa;&#xa;parseResponse()&#xa;&#xa;응답 형식:&#xa;{&#xa;  &quot;code&quot;: &quot;1&quot;,  // 또는 &quot;0&quot;, &quot;-1&quot;&#xa;  &quot;message&quot;: &quot;success&quot;&#xa;}&#xa;&#xa;에러 매핑:&#xa;• code = &quot;1&quot; → 성공&#xa;• code = &quot;0&quot; → 장비 에러&#xa;  (wrong parameter, not supported, ...)&#xa;• code = &quot;-1&quot; → 시스템 에러&#xa;  (timeout, refused, unreachable, ...)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;verticalAlign=top;spacingTop=5;fontSize=10;fontStyle=0" vertex="1" parent="1">
+          <mxGeometry x="900" y="980" width="340" height="270" as="geometry" />
+        </mxCell>
+        
+        <!-- Rate Limiter -->
+        <mxCell id="comp-rate-limiter" value="&lt;b&gt;Rate Limiter&lt;/b&gt;&#xa;&#xa;golang.org/x/time/rate&#xa;&#xa;설정:&#xa;rate.NewLimiter(300, 300)&#xa;&#xa;제한:&#xa;• 초당 300 연결&#xa;• 버스트 300&#xa;&#xa;목적:&#xa;• 포트 고갈 방지&#xa;• STB 부하 분산&#xa;• 네트워크 안정성" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;verticalAlign=top;spacingTop=5;fontSize=11;fontStyle=0" vertex="1" parent="1">
+          <mxGeometry x="1300" y="980" width="280" height="270" as="geometry" />
+        </mxCell>
+        
+        <!-- 재시도 전략 -->
+        <mxCell id="comp-retry" value="&lt;b&gt;재시도 전략 (2단계)&lt;/b&gt;&#xa;&#xa;1️⃣ 포트 고갈 재시도:&#xa;   • Retry.PortExhaustion.Count&#xa;   • isPortExhaustionError() 체크&#xa;     (EADDRNOTAVAIL, EADDRINUSE, EMFILE)&#xa;   • Progressive backoff&#xa;     (attempt+1) × Delay (기본 20초)&#xa;&#xa;2️⃣ 전체 재시도:&#xa;   • Retry.Total.Count&#xa;   • isRetryableError() 체크:&#xa;     connection refused, timeout,&#xa;     network unreachable, reset,&#xa;     broken pipe, no route to host&#xa;   • Linear backoff&#xa;     attempt × Delay (기본 5초)&#xa;&#xa;3️⃣ 재시도 불가:&#xa;   • 파싱 에러&#xa;   • ResponseCodeFailure (&quot;0&quot;)&#xa;   • ResponseCodeSuccess (&quot;1&quot;)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;verticalAlign=top;spacingTop=5;fontSize=10;fontStyle=0" vertex="1" parent="1">
+          <mxGeometry x="1640" y="980" width="280" height="270" as="geometry" />
+        </mxCell>
+        
+        <!-- ========== Layer 5: 데이터 계층 ========== -->
+        <mxCell id="layer5-bg" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;opacity=20;" vertex="1" parent="1">
+          <mxGeometry x="40" y="1300" width="1900" height="260" as="geometry" />
+        </mxCell>
+        <mxCell id="layer5-label" value="Layer 5: 데이터 계층 (ClickHouse)" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=top;whiteSpace=wrap;rounded=0;fontSize=16;fontStyle=1" vertex="1" parent="1">
+          <mxGeometry x="60" y="1310" width="500" height="30" as="geometry" />
+        </mxCell>
+        
+        <!-- ClickHouse 클러스터 -->
+        <mxCell id="comp-clickhouse" value="&lt;b&gt;ClickHouse 분산 클러스터&lt;/b&gt;&#xa;&#xa;로컬 테이블: stb_control_job&#xa;엔진: ReplicatedReplacingMergeTree(task_updated_at)&#xa;ORDER BY: (request_received_at, job_id, task_id, task_data)&#xa;PARTITION BY: toYYYYMM(request_received_at)&#xa;TTL: request_received_at + 365일&#xa;&#xa;분산 테이블: dist_stb_control_job&#xa;Distributed(cluster, database, stb_control_job, rand())&#xa;&#xa;※ FINAL 절로 최신 상태만 조회" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;verticalAlign=top;spacingTop=5;fontSize=11;fontStyle=0" vertex="1" parent="1">
+          <mxGeometry x="100" y="1360" width="440" height="170" as="geometry" />
+        </mxCell>
+        
+        <!-- 테이블 스키마 -->
+        <mxCell id="comp-schema" value="&lt;b&gt;테이블 스키마 (StbControlJobTable)&lt;/b&gt;&#xa;&#xa;• request_received_at (DateTime)&#xa;• job_id (UUID, 공통 식별자)&#xa;• task_id (UUID, 태스크별 식별자)&#xa;• task_data (JSON: cm_mac, cm_ip, stb_mac,&#xa;  src_ip, work_type, work_value)&#xa;• task_status (pending/running/completed/failed)&#xa;• task_error_message (String, 에러 상세)&#xa;• task_created_at (DateTime)&#xa;• task_updated_at (DateTime)&#xa;• control_executed_at (Nullable DateTime)&#xa;• cm_mac_addr (Cable Modem MAC)&#xa;• stb_mac_addr (Set-Top Box MAC)&#xa;• work_type (제어 명령 타입)&#xa;• result_code (&quot;1&quot;/&quot;0&quot;/&quot;-1&quot;/&quot;&quot;)&#xa;• result_message (응답 메시지)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;verticalAlign=top;spacingTop=5;fontSize=10;fontStyle=0" vertex="1" parent="1">
+          <mxGeometry x="600" y="1360" width="340" height="170" as="geometry" />
+        </mxCell>
+        
+        <!-- 병합 전략 -->
+        <mxCell id="comp-merge" value="&lt;b&gt;병합 전략 (v3.0 최적화)&lt;/b&gt;&#xa;&#xa;❌ 이전 (v2.0):&#xa;1. pending 삽입 (80K)&#xa;2. running 업데이트 → 새 행 삽입 (80K)&#xa;3. completed 업데이트 → 새 행 삽입 (80K)&#xa;총 240K 행 생성&#xa;&#xa;✅ 현재 (v3.0):&#xa;1. 메모리에서 상태 관리&#xa;2. K8s Job 생성 후 pending 삽입 (80K)&#xa;3. Worker가 completed 업데이트 (80K → 병합)&#xa;총 80K 행만 최종 유지 (67% 감소)&#xa;&#xa;FINAL 절로 최신 상태만 조회" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;verticalAlign=top;spacingTop=5;fontSize=10;fontStyle=0" vertex="1" parent="1">
+          <mxGeometry x="1000" y="1360" width="400" height="170" as="geometry" />
+        </mxCell>
+        
+        <!-- 쿼리 최적화 -->
+        <mxCell id="comp-query" value="&lt;b&gt;쿼리 최적화&lt;/b&gt;&#xa;&#xa;1️⃣ 조회 시 FINAL 필수:&#xa;SELECT * FROM dist_stb_control_job FINAL&#xa;WHERE job_id = ?&#xa;&#xa;2️⃣ 배치 삽입:&#xa;INSERT INTO dist_stb_control_job&#xa;VALUES (...10,000개...)&#xa;&#xa;3️⃣ 인덱스 활용:&#xa;ORDER BY (request_received_at, job_id, task_id, task_data)&#xa;→ job_id, task_id로 빠른 조회" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;verticalAlign=top;spacingTop=5;fontSize=10;fontStyle=0" vertex="1" parent="1">
+          <mxGeometry x="1460" y="1360" width="460" height="170" as="geometry" />
+        </mxCell>
+        
+        <!-- 화살표들 (데이터 흐름) -->
+        <!-- Layer 1 → Layer 2 -->
+        <mxCell id="arrow1" value="HTTP POST/GET" style="edgeStyle=orthogonalEdgeStyle;html=1;align=center;verticalAlign=top;endArrow=block;endFill=1;strokeWidth=3;strokeColor=#6c8ebf;" edge="1" parent="1">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="145" y="240" as="sourcePoint" />
+            <mxPoint x="430" y="330" as="targetPoint" />
+            <Array as="points">
+              <mxPoint x="145" y="280" />
+              <mxPoint x="430" y="280" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        
+        <!-- Layer 2 → Layer 3 -->
+        <mxCell id="arrow2" value="K8s Job 생성" style="edgeStyle=orthogonalEdgeStyle;html=1;align=center;verticalAlign=top;endArrow=block;endFill=1;strokeWidth=3;strokeColor=#d6b656;" edge="1" parent="1">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="430" y="530" as="sourcePoint" />
+            <mxPoint x="260" y="640" as="targetPoint" />
+            <Array as="points">
+              <mxPoint x="430" y="580" />
+              <mxPoint x="260" y="580" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        
+        <!-- Layer 3 → Layer 4 -->
+        <mxCell id="arrow3" value="Pod 실행" style="edgeStyle=orthogonalEdgeStyle;html=1;align=center;verticalAlign=top;endArrow=block;endFill=1;strokeWidth=3;strokeColor=#82b366;" edge="1" parent="1">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="610" y="870" as="sourcePoint" />
+            <mxPoint x="270" y="980" as="targetPoint" />
+            <Array as="points">
+              <mxPoint x="610" y="920" />
+              <mxPoint x="270" y="920" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        
+        <!-- Layer 4 → STB -->
+        <mxCell id="arrow4" value="TCP 제어" style="edgeStyle=orthogonalEdgeStyle;html=1;align=center;verticalAlign=top;endArrow=block;endFill=1;strokeWidth=3;strokeColor=#b85450;dashed=1;" edge="1" parent="1">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="1240" y="980" as="sourcePoint" />
+            <mxPoint x="1820" y="240" as="targetPoint" />
+            <Array as="points">
+              <mxPoint x="1240" y="950" />
+              <mxPoint x="1960" y="950" />
+              <mxPoint x="1960" y="240" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        
+        <!-- Layer 2 ↔ Layer 5 -->
+        <mxCell id="arrow5" value="DB 조회/삽입" style="edgeStyle=orthogonalEdgeStyle;html=1;align=center;verticalAlign=top;endArrow=block;endFill=1;strokeWidth=3;strokeColor=#d6b656;startArrow=block;startFill=1;" edge="1" parent="1">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="430" y="530" as="sourcePoint" />
+            <mxPoint x="320" y="1360" as="targetPoint" />
+            <Array as="points">
+              <mxPoint x="430" y="1340" />
+              <mxPoint x="320" y="1340" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        
+        <!-- Layer 4 ↔ Layer 5 -->
+        <mxCell id="arrow6" value="조회/업데이트" style="edgeStyle=orthogonalEdgeStyle;html=1;align=center;verticalAlign=top;endArrow=block;endFill=1;strokeWidth=3;strokeColor=#b85450;startArrow=block;startFill=1;" edge="1" parent="1">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="270" y="1250" as="sourcePoint" />
+            <mxPoint x="320" y="1360" as="targetPoint" />
+            <Array as="points">
+              <mxPoint x="270" y="1300" />
+              <mxPoint x="320" y="1300" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        
+        <!-- 성능 지표 박스 -->
+        <mxCell id="perf-box" value="📊 성능 지표 (예시)&#xa;&#xa;총 디바이스: 80,000대&#xa;태스크 수: 4개 (K8s Jobs)&#xa;태스크당 디바이스: ~25,000개&#xa;동시 연결: WorkerCount (설정값)&#xa;Rate Limit: 300 연결/초 (기본값)&#xa;예상 처리 시간: ~5-10분&#xa;&#xa;성공률: ~99.5%&#xa;장비 에러: ~0.3%&#xa;시스템 에러: ~0.16%&#xa;Pending/Running: ~0.04%" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;align=left;verticalAlign=top;spacingLeft=10;spacingTop=5;fontSize=11;fontFamily=Courier New;fontStyle=1" vertex="1" parent="1">
+          <mxGeometry x="60" y="80" width="300" height="240" as="geometry" />
+        </mxCell>
+        
+        <!-- v3.0 최적화 박스 -->
+        <mxCell id="opt-box" value="✅ v3.0 주요 최적화&#xa;&#xa;1️⃣ 중복 삽입 제거&#xa;   ❌ 이전: pending → running → completed&#xa;     (3회 삽입, 240K 행 생성)&#xa;   ✅ 현재: pending 1회 + completed 업데이트&#xa;     (80K 행만 유지, 67% 감소)&#xa;&#xa;2️⃣ 메모리 관리&#xa;   • stbControlJobTables map 기반 저장&#xa;   • executionSubTaskInsert() 완료 후&#xa;     함수 종료 시 자동 GC&#xa;   • 메모리 누수 방지&#xa;&#xa;3️⃣ 배치 처리 정확성&#xa;   • 마지막 배치: index == len()-1&#xa;   • MaxCount, MaxSize 조건&#xa;   • 누락 없는 완전한 삽입&#xa;&#xa;4️⃣ 환경변수 필터링&#xa;   • envMap으로 AllowedEnvVars만 전달&#xa;   • K8s Pod 보안 및 메모리 최적화&#xa;&#xa;5️⃣ 직접 TCP 연결&#xa;   • Connection Pool 제거&#xa;   • net.DialTimeout 직접 사용&#xa;   • 포트 고갈 대응 (Rate Limit 300/초)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;align=left;verticalAlign=top;spacingLeft=10;spacingTop=5;fontSize=10;fontFamily=Courier New;fontStyle=1" vertex="1" parent="1">
+          <mxGeometry x="1300" y="330" width="340" height="420" as="geometry" />
+        </mxCell>
+        
+        <!-- 41개 work_type 박스 -->
+        <mxCell id="worktype-box" value="📋 40개 work_type 지원&#xa;&#xa;정보 수집 (2개):&#xa;• sysCheck, stb_request_info&#xa;&#xa;재부팅 (4개):&#xa;• smartReboot, stbRestart,&#xa;  stb_control_restart,&#xa;  stb_control_reset&#xa;&#xa;단말 제어 (34개):&#xa;• limitAge, tvLock, skipCh&#xa;• easyBuying, resetPin, favCh&#xa;• zappingAd, miniEpg, tvCaption&#xa;• vodView, resolution, hdmiCec&#xa;• mobilePay, bootMenu, audioLang&#xa;• voiceGuide, chUpDown, volume&#xa;• limitContents, stbPower&#xa;• ... (총 34개, types.go 참조)&#xa;&#xa;플랫폼별 제약 (문서상):&#xa;🚫 Android 미지원: limitAge 등&#xa;🚫 OCAP 모델별: getSerialNumber 등&#xa;※ 실제 코드에서는 STB가 직접 응답" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;align=left;verticalAlign=top;spacingLeft=10;spacingTop=5;fontSize=10;fontFamily=Courier New;fontStyle=1" vertex="1" parent="1">
+          <mxGeometry x="1680" y="330" width="260" height="420" as="geometry" />
+        </mxCell>
+        
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

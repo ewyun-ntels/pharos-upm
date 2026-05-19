@@ -1,0 +1,14 @@
+{
+  "type": "elasticsearch",
+  "name": "sample-elasticsearch",
+  "data": {
+    "version": 9,
+    "addresses": [
+      "http://192.168.15.105:9200"
+    ],
+    "bulk": {
+      "flush_bytes": 5000000,
+      "flush_interval": "30s"
+    }
+  }
+}

@@ -1,0 +1,14 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "RoleMetadataConfigHistoryResponse",
+  "type": "object",
+  "properties": {
+    "history": {
+      "type": "array",
+      "items": {
+        "$ref": "RoleMetadataConfigEntity.schema"
+      }
+    }
+  },
+  "required": ["history"]
+}

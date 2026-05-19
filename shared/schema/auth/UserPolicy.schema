@@ -1,0 +1,22 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "UserPolicy",
+  "description": "User policy configuration (username rules) from GET /auth/config",
+  "type": "object",
+  "properties": {
+    "email_allowed": {
+      "type": "boolean",
+      "description": "Whether email format is allowed for username"
+    },
+    "min_length": {
+      "type": "integer",
+      "description": "Minimum username length"
+    },
+    "max_length": {
+      "type": "integer",
+      "description": "Maximum username length"
+    }
+  },
+  "required": ["email_allowed", "min_length", "max_length"],
+  "additionalProperties": false
+}

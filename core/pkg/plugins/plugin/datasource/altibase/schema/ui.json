@@ -1,0 +1,10 @@
+{
+  "data": {
+    "version": {
+      "ui:widget": "radio"
+    },
+    "password": {
+      "ui:widget": "password"
+    }
+  }
+}

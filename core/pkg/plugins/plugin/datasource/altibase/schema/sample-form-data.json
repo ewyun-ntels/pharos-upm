@@ -1,0 +1,14 @@
+{
+  "type": "altibase",
+  "name": "sample-altibase",
+  "data": {
+    "version": 7,
+    "dsn": "10.255.100.90",
+    "port": 20300,
+    "database": "mydb",
+    "uid": "esnpv",
+    "password": "esnpv#03",
+    "max_open_connection": 10,
+    "max_lifetime": 14400
+  }
+}

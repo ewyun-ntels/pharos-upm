@@ -1,0 +1,168 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "QueryAlertRule",
+  "description": "Schema for query-based alert rules that evaluate database queries against thresholds",
+  "type": "object",
+  "properties": {
+    "id": {
+      "type": "string",
+      "description": "Unique identifier for the alert rule",
+      "format": "uuid"
+    },
+    "alert_type": {
+      "const": "query"
+    },
+    "name": {
+      "type": "string",
+      "description": "Name of the alert rule",
+      "minLength": 1
+    },
+    "description": {
+      "type": "string",
+      "description": "Description shown when alert is triggered"
+    },
+    "notifications": {
+      "type": "array",
+      "description": "List of notification destinations",
+      "items": {
+        "type": "string"
+      },
+      "default": []
+    },
+    "datasource": {
+      "type": "string",
+      "description": "Name of the datasource to query",
+      "minLength": 1
+    },
+    "datasource_query": {
+      "type": "object",
+      "description": "Query configuration for datasource",
+      "properties": {
+        "query": {
+          "type": "string",
+          "description": "SQL query or query template",
+          "minLength": 1
+        },
+        "variables": {
+          "type": "object",
+          "description": "Variables for query templating",
+          "additionalProperties": true
+        },
+        "time_label": {
+          "type": "string",
+          "description": "Column name for timestamp values",
+          "minLength": 1
+        },
+        "variable_label": {
+          "type": "string",
+          "description": "Column name for the value to evaluate",
+          "minLength": 1
+        }
+      },
+      "required": [
+        "query",
+        "time_label",
+        "variable_label"
+      ],
+      "additionalProperties": false
+    },
+    "threshold": {
+      "type": "array",
+      "description": "List of threshold conditions",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Unique identifier for the threshold",
+            "format": "uuid"
+          },
+          "condition": {
+            "type": "string",
+            "description": "Comparison operation type",
+            "enum": [
+              "is_above",
+              "is_below",
+              "within_range",
+              "outside_range"
+            ]
+          },
+          "start_value": {
+            "type": "number",
+            "description": "Primary threshold value (single value for is_above/is_below, lower bound for range operations)"
+          },
+          "end_value": {
+            "type": "number",
+            "description": "Upper bound for range operations (unused for single value operations)"
+          },
+          "severity": {
+            "type": "string",
+            "description": "Severity level when threshold is met",
+            "enum": [
+              "Critical",
+              "Major",
+              "Minor",
+              "Normal"
+            ]
+          },
+          "labels": {
+            "type": "object",
+            "description": "Additional labels to attach to alerts from this threshold",
+            "additionalProperties": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "id",
+          "condition",
+          "start_value",
+          "severity"
+        ],
+        "additionalProperties": false,
+        "if": {
+          "properties": {
+            "condition": {
+              "enum": [
+                "within_range",
+                "outside_range"
+              ]
+            }
+          }
+        },
+        "then": {
+          "required": [
+            "end_value"
+          ]
+        }
+      }
+    },
+    "evaluation_interval": {
+      "type": "string",
+      "description": "Cron expression for evaluation schedule",
+      "minLength": 1
+    },
+    "check_type": {
+      "type": "string",
+      "description": "Type of check to perform on query results",
+      "enum": [
+        "last"
+      ],
+      "default": "last"
+    },
+    "query_delay_offset": {
+      "type": "integer",
+      "description": "Delay in seconds before executing query",
+      "minimum": 0,
+      "default": 0
+    }
+  },
+  "required": [
+    "datasource",
+    "datasource_query",
+    "threshold",
+    "evaluation_interval"
+  ],
+  "additionalProperties": false
+}

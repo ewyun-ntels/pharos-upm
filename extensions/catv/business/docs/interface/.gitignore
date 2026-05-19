@@ -1,0 +1,18 @@
+# 자동 생성 파일 (크기가 크고 재생성 가능)
+interface_data.json
+
+# Python 캐시
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+
+# 임시 파일
+*.tmp
+*.bak
+*~
+
+# OS 파일
+.DS_Store
+Thumbs.db

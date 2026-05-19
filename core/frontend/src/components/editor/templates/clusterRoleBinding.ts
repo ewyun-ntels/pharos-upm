@@ -1,0 +1,19 @@
+export const clusterRoleBinding = {
+  apiVersion: 'rbac.authorization.k8s.io/v1',
+  kind: 'ClusterRoleBinding',
+  metadata: {
+    name: 'developer-read-all',
+  },
+  subjects: [
+    {
+      kind: 'ServiceAccount',
+      name: 'developer',
+      namespace: 'default',
+    },
+  ],
+  roleRef: {
+    kind: 'ClusterRole',
+    name: 'read-all-clusterrole',
+    apiGroup: 'rbac.authorization.k8s.io',
+  },
+};

@@ -1,0 +1,7 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Kind",
+  "description": "Panel/filter kind used for backend query routing. Determines where a panel or filter is located: headerL (top-left), headerR (top-right), left (sidebar), panels (chart panel grid).",
+  "type": "string",
+  "enum": ["headerL", "headerR", "left", "panels"]
+}

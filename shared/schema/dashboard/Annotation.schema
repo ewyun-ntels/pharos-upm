@@ -1,0 +1,35 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Annotation",
+  "description": "Annotation for marking specific timestamps on timeseries charts. scope='global' means visible on all timeseries panels; scope='panel' means visible only on the panel that owns it.",
+  "type": "object",
+  "properties": {
+    "id": {
+      "type": "string",
+      "description": "Unique identifier for the annotation"
+    },
+    "time": {
+      "type": "number",
+      "description": "Unix timestamp in milliseconds"
+    },
+    "text": {
+      "type": "string",
+      "description": "Annotation label text"
+    },
+    "color": {
+      "type": "string",
+      "description": "Line and label color (CSS color string). Defaults to red if omitted."
+    },
+    "scope": {
+      "type": "string",
+      "enum": ["global", "panel"],
+      "description": "global: stored in DashboardConfig.annotations, shown on all timeseries panels. panel: stored in panel.options.annotations, shown only on that panel."
+    },
+    "panel_id": {
+      "type": "string",
+      "description": "For panel-scoped annotations: the panel ID this annotation belongs to. Null/omitted for global annotations."
+    }
+  },
+  "required": ["id", "time", "text", "scope"],
+  "additionalProperties": false
+}

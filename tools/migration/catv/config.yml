@@ -1,0 +1,27 @@
+clickhouse:
+  debug: false
+  timezone: "UTC"
+  endpoints: ["192.168.15.102:30900"]
+  username: "default" 
+  password: "default"
+  database: "catv"
+  dial_timeout: "30s"
+  max_open_connections: 10
+  max_idle_max_open_connections: 5
+  connection_max_lifetime: "1h"
+  read_timeout: "30s"
+
+migration:
+  max_workers: 10
+  failure_threshold: 0.1  # 실패율 임계값 (10%), 이 비율 초과 시 중단
+  progress_interval: 100  # 진행률 로그 출력 간격 (작업 개수)
+  save_failed_ranges: true  # 실패한 시간 구간을 파일로 저장
+  table:
+    source: "dist_stb_monitoring_raw"
+    destination: "dist_stb_monitoring_raw_xxx"
+  where:
+    time:
+      field: "insert_time"
+      start: "2026-02-06 00:00:00" # KST, >=
+      end: "2026-02-06 23:59:59" # KST, <=
+      interval: "1m"

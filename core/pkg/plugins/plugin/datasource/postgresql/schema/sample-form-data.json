@@ -1,0 +1,13 @@
+{
+  "type": "postgresql",
+  "name": "sample-postgresql",
+  "data": {
+    "host": "192.168.15.103",
+    "port": 5432,
+    "database": "postgres",
+    "max_open_connection": 10,
+    "max_lifetime": 14400,
+    "username": "admin",
+    "password": "admin"
+  }
+}

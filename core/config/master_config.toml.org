@@ -1,0 +1,601 @@
+[serve]
+server_schema = "http"
+nats_schema = "nats" # tls
+
+[daemon]
+# Daemon configuration
+pid_file = "./data/pharos.pid"
+log_file = "./log/pharos.log"
+# Restart policy: "no", "on-failure", "always"
+restart_policy = "on-failure"
+# Maximum restart attempts (0 = unlimited)
+max_restarts = 5
+# Restart delay in seconds
+restart_delay = 5
+
+# Why servers are not array
+## Can't continue building images for config changes in cluster environment
+## Can't find a way to change config with env when it's array
+[servers.http]
+port = 8080
+
+[servers.https]
+port = 8443
+# TLS protocol version settings for HTTPS server. Supported values: "1.2" or "1.3".
+# Leave unset to use defaults (min 1.2, max 1.3).
+tls_min_version = "1.2"
+tls_max_version = "1.3"
+
+[servers.https.cert]
+# JWT 서명용 인증서를 자동으로 생성할지 여부
+# true이면 서버 시작 시 cert/key 파일 자동 생성
+auto_generate=true
+dir = "./core/config/cert/tls"
+# key_file, cert_file이 존재하지 않을경우 dir에 정의되어 있는 tls.key, tls.cert를 사용
+#key_file = "./core/config/cert/tls/tls.key"
+#cert_file = "./core/config/cert/tls/tls.cert"
+#ca_file = "./core/config/cert/tls/tls_ca.crt"
+
+[servers.https.cert.auto_generate_info]
+common_name='core'
+organization=['ntels.com']
+# optional, SAN에 포함할 DNS 도메인 목록
+#subject_alternate_name_dns_names=["localhost","core.local"]
+# optional, SAN에 포함할 IP 주소 목록
+#subject_alternate_name_ips=["127.0.0.1","10.0.0.1"]
+# optional, 인증서 만료일
+not_after="2100-01-01T23:59:59Z"
+
+[servers.nats]
+port = 4222
+
+[servers.nats.cert]
+auto_generate=true
+dir = "./core/config/cert/nats/tls"
+key_file = ""
+cert_file = ""
+ca_file = ""
+insecure_skip_verify = false
+
+[servers.nats.cert.auto_generate_info]
+common_name='core'
+organization=['ntels.com']
+subject_alternate_name_dns_names=[]
+subject_alternate_name_ips=["127.0.0.1", "192.168.15.101"]
+not_after="2100-01-01T23:59:59Z"
+
+[clients.nats]
+url = "nats://127.0.0.1:4222"
+key_file = ""
+cert_file = ""
+ca_file = ""
+
+# ---------------------------------------------------------------------------
+# Outbound client TLS configuration for HTTP/gRPC/etc. used by this process.
+# These values are read by common.BuildDefaultClientTLS().
+# - insecure_skip_verify: Do NOT verify server cert (ONLY for testing). Default false.
+# - min_version / max_version: "1.2" or "1.3".
+#   If unset, defaults are min=1.2, max=1.3. If min > max, max is clamped to min.
+# ---------------------------------------------------------------------------
+[client_tls]
+# WARNING: true로 설정하면 서버 인증서 검증을 건너뜁니다. 운영 환경에서는 반드시 false 유지.
+insecure_skip_verify = false
+# 지원 버전: "1.2" 또는 "1.3"
+min_version = "1.2"
+max_version = "1.3"
+
+[migration]
+disable = true
+migration_dir = "./migrations/esn/migration"
+artifact_dir = "./migrations/esn/artifact"
+# Optional delay before running API migrations (e.g., "2s", "500ms").
+# This can be used to ensure dependencies are up before migrations start.
+# wait = "2s"
+
+#[[migration.env]]
+#name = "user"
+#value = "admin"
+#[[migration.env]]
+#name = "password"
+#valueFromEnv = "MIGRATION_PASSWORD"
+
+
+[[migration.env]]
+name = "snmp_target"
+value = "localhost"
+[[migration.env]]
+name = "snmp_port"
+value = "9162"
+#valueFromEnv = "MIGRATION_PASSWORD"
+[[migration.env]]
+name = "snmp_engine_id"
+value = "0x80001f888059dc486145a26322"
+[[migration.env]]
+name = "snmp_username"
+value = "traptest"
+[[migration.env]]
+name = "snmp_auth_protocol"
+value = "SHA"
+[[migration.env]]
+name = "snmp_auth_passphrase"
+value = "mypassword"
+[[migration.env]]
+name = "snmp_priv_protocol"
+value = "AES"
+[[migration.env]]
+name = "snmp_priv_passphrase"
+value = "mypassword"
+
+[[migration.env]]
+name = "snmp_target1"
+value = "localhost"
+[[migration.env]]
+name = "snmp_port1"
+value = "9162"
+#valueFromEnv = "MIGRATION_PASSWORD"
+[[migration.env]]
+name = "snmp_engine_id1"
+value = "0x80001f888059dc486145a26322"
+[[migration.env]]
+name = "snmp_username1"
+value = "traptest"
+[[migration.env]]
+name = "snmp_auth_protocol1"
+value = "SHA"
+[[migration.env]]
+name = "snmp_auth_passphrase1"
+value = "mypassword"
+[[migration.env]]
+name = "snmp_priv_protocol1"
+value = "AES"
+[[migration.env]]
+name = "snmp_priv_passphrase1"
+value = "mypassword"
+
+[[migration.env]]
+name = "snmp_target2"
+value = "localhost"
+[[migration.env]]
+name = "snmp_port2"
+value = "9162"
+#valueFromEnv = "MIGRATION_PASSWORD"
+[[migration.env]]
+name = "snmp_engine_id2"
+value = "0x80001f888059dc486145a26322"
+[[migration.env]]
+name = "snmp_username2"
+value = "traptest"
+[[migration.env]]
+name = "snmp_auth_protocol2"
+value = "SHA"
+[[migration.env]]
+name = "snmp_auth_passphrase2"
+value = "mypassword"
+[[migration.env]]
+name = "snmp_priv_protocol2"
+value = "AES"
+[[migration.env]]
+name = "snmp_priv_passphrase2"
+value = "mypassword"
+
+
+[database]
+driver = "postgresql"
+
+[database.sqlite]
+path = "./pharos.db"
+
+[database.sqlite.backup]
+use = false
+schedule = "0 0 3 * * *"
+directory = "./backup/sqlite"
+ttl = "7d" # "ns", "us" (or "µs"), "ms", "s", "m", "h", "d", "w", "y"
+
+[database.postgresql]
+host = "10.255.254.22"
+port = 30432
+username = "upmems"
+password = "upmems"
+database = "upmems"
+max_open_connection = 50
+max_lifetime = 0
+
+# ----------------------------------------------------------------------------
+# Optional statistics DB: separate connection pool managed by ORM
+# Uncomment and configure if you use a dedicated DB for statistics.
+[statistics.database]
+driver = "postgresql" # sqlite or "postgresql", "clickhouse"
+
+[statistics.database.migration.clickhouse]
+cluster_name = "clickhouse_cluster_replicated"
+
+# If sqlite
+[statistics.database.sqlite]
+path = "./statistics.db"
+
+# If postgresql
+[statistics.database.postgresql]
+host = "10.255.254.22"
+port = 30432
+username = "upmems"
+password = "upmems"
+database = "upmems"
+max_open_connection = 100
+max_lifetime = 0
+
+[statistics.database.clickhouse]
+database = "catv"
+host = "192.168.15.102"
+port = 30900
+username = "default"
+password = "default"
+max_open_connection = 100
+max_lifetime = 0
+
+[workflow]
+use = true
+
+[workflow.execution]
+ttl = "1d" # "ns", "us" (or "µs"), "ms", "s", "m", "h", "d", "w", "y"
+
+# clickhouse
+#[master.statistics.clickhouse]
+#database = "tarzan"
+#schema = "http"
+#host = "192.168.15.101"
+#http_port = 31478
+#tcp_port = 30173
+#username = "default"
+#password = "B8i4G17XrC"
+#max_open_connection = 10
+#max_lifetime = 0
+
+[auth]
+# 사용자 IP, User Agent 정보를 Session table 및 History table에 추가
+collect_client_info = true
+# 0: none, 1: block, 2: all
+authenticate_hint = 1
+cookie_mode = true
+csrf_protection = true
+secure_cookies = false
+global_secret = "global-secret-with-32-bytes-long"
+access_token_lifespan = "5m"
+refresh_token_lifespan = "30m"
+# iss(issuer)에 들어가는 발급자 정보
+jwt_issuer = "ntels.com"
+allowed_clients = ["7a1e1782d4162e17dfc6f2bedd2c74ca", "test"]
+
+[auth.jwt_cert]
+# JWT 서명용 인증서를 자동으로 생성할지 여부
+# true이면 서버 시작 시 cert/key 파일 자동 생성
+auto_generate=true
+# jwt_key_file이 존재할경우 jwt_dir 설정을 제외
+jwt_dir='./core/config/cert/jwt'
+#jwt_key_file= './core/config/cert/jwt/jwt.key'
+
+# jwt_dir위치에 cert 생성 jwt.key가 존재할경우 생성하지 않음
+[auth.jwt_cert.auto_generate_info]
+common_name='core'
+organization=['ntels.com']
+# optional, SAN에 포함할 DNS 도메인 목록
+#subject_alternate_name_dns_names=["localhost","jwt.local"]
+# optional, SAN에 포함할 IP 주소 목록
+#subject_alternate_name_ips=["127.0.0.1","10.0.0.1"]
+# optional, 인증서 만료일
+not_after="2100-01-01T23:59:59Z"
+
+[users]
+# 사용자 생성시 초기에 수행해야할 작업 지정
+# 하단에 설정된 기능을 순서대로 수행
+# password_change = 사용자 생성후 처음 진입할때 password_change 수행
+prepare = ["password_change"]
+login_retry_limit = 3
+# second 단위 설정
+login_retry_reset_timeout = 60
+# second 단위 설정
+login_block_duration = 60
+# 중복을 확인하기 위한 passowrd 최대 저장 갯수
+password_history_retention = 10
+
+[users.user_rule]
+email_allowed = true
+min_length = 1
+max_length = 32
+
+[users.password_rule]
+min_length = 1
+min_uppercase = 0
+min_lowercase = 0
+min_digits = 0
+min_special = 0
+password_ttl = '180d'
+password_expired_rule = ["password_change"]
+
+# ----------------------------------------------------------------------------
+# Role Configuration
+# Composite roles with associated roles, display metadata, and grouping
+# ----------------------------------------------------------------------------
+[role."role:super_admin"]
+display_name = "Dev Admin"
+group = "role"
+selectable = true
+
+[role."role:tarzan_admin_role"]
+roles = {}
+display_name = "Admin"
+group = "role"
+selectable = true
+
+[role."role:samsung_admin_role"]
+roles = {}
+display_name = "SAdmin"
+group = "role"
+selectable = true
+
+[role."role:samsung_user_role"]
+roles = {}
+display_name = "User"
+group = "role"
+selectable = true
+
+[[auth.clients]]
+id = "master"
+secret = "$2a$10$iKFbhmJDmyWo1MkX2ruwE./I.3dg1HN48bLRUwCzJlQ71X7LAxLS2"
+
+[[auth.clients]]
+id = "agent"
+secret = "$2a$10$.hAOKh87ckvW7l5fMw1YBuC4FJw9kvFnNGPTe0sM9ofpQG8DkmFrG"
+
+[history]
+use = true
+ignore_paths = ["/alert/event/", "/ui/"]
+
+[logger]
+level = "debug" #debug, info, warn, error
+# Enable console output
+console = true
+# Enable JSON format change
+#json = false
+#file_name = "pharos.log"
+# Log path (e.g. "./logs")
+#log_path = "./logs"
+# MB before rotation
+#max_size = 10
+# Max old files to retain
+#max_backups = 15
+# Days to retain old files
+#max_age = 15
+# Gzip compress rotated files
+#compress = false # true
+# Duration string for forced rotation (e.g. "24h", "2h30m")
+#rotation_interval = "24h"
+
+[plugins]
+sample = false
+path = "./bin/plugins"
+
+# Badges settings
+[badges]
+# Cache TTL for GET /badges/:name responses; set to "0s" to disable caching
+cache_ttl = "1m"
+
+[[provisioning.plugins.datasources]]
+type = "postgresql"
+name = "postgresql-01"
+[provisioning.plugins.datasources.data]
+host = "10.255.254.22"
+port = 30432
+database = "ntels"
+username = "ntels"
+password = "ntels1234"
+max_open_connection = 10
+max_lifetime = 14400
+
+[[provisioning.plugins.datasources]]
+type = "altibase"
+name = "altibase-01"
+[provisioning.plugins.datasources.data]
+version = 7
+dsn = "10.255.100.90"
+port = 20300
+database = "mydb"
+uid = "esnpv"
+password = "esnpv#03"
+max_open_connection = 10
+max_lifetime = 14400
+
+[[provisioning.plugins.datasources]]
+type = "vertica"
+name = "vertica-01"
+[provisioning.plugins.datasources.data]
+host = "192.168.15.101"
+port = 30000
+database = "vertdb"
+username = "dbadmin"
+password = "dbadmin"
+max_open_connection = 10
+max_lifetime = 14400
+
+[[provisioning.plugins.datasources]]
+type = "prometheus"
+name = "thanos-query"
+[provisioning.plugins.datasources.data]
+address = "http://10.255.254.22:30232"
+
+[[provisioning.plugins.datasources]]
+type = "elasticsearch"
+name = "elasticsearch-01"
+[provisioning.plugins.datasources.data]
+version = 9
+addresses = ["http://192.168.15.105:9200"]
+[provisioning.plugins.datasources.data.bulk]
+flush_bytes = 5000000
+flush_interval = "30s"
+
+
+[collect.statistics]
+use = true
+schedule = "*/15 * * * * *"
+
+[collect.statistics.report]
+use = true
+schedule = "0 0 3 * * *"
+ttl = "3d" # "ns", "us" (or "µs"), "ms", "s", "m", "h", "d", "w", "y"
+
+[collect.statistics.report.metric]
+path = "./metrics"
+retention_period = 3
+
+[shared-library.altibase.6]
+driver = "./core/config/shared-library/altibase/linux/6.5.1.10.3/libaltibase_odbc-64bit-ul64.so"
+
+[shared-library.altibase.7]
+driver = "./core/config/shared-library/altibase/linux/7.3.0/libaltibase_odbc-64bit-ul64.so"
+
+[nats]
+max_payload = 10485760
+jetstream = false
+jetstream_max_memory = 1073741824
+jetstream_max_store = 1073741824
+store_dir = "./nats/storage"
+routes = ["nats://127.0.0.1:6222"]
+
+[nats.cluster]
+name = "cluster-name"
+listen = "nats://0.0.0.0:6222"
+
+[nats.log]
+debug = true
+trace = true
+
+[etl.elasticsearch]
+version = 9
+addresses = ["http://192.168.15.105:9200"]
+[etl.elasticsearch.bulk]
+flush_bytes = 5000000
+flush_interval = "30s"
+
+[metrics]
+use = true
+
+[pool.connection]
+max_idle_time = "30s" # "ns", "us" (or "µs"), "ms", "s", "m", "h", "d", "w", "y"
+max_size = 1024
+shard_count = 16 # Optimal for high concurrency (power of 2 for fast modulo)
+
+[pool.workers]
+worker_count = 6000 # min_worker_count = max_connections_per_second × avg_processing_time_seconds
+job_queue_size = 1200000
+batch_size = 333
+enable_metrics = false
+
+[catv.migration.database]
+driver = "postgresql"
+
+[catv.migration.database.migration.clickhouse]
+cluster_name = "clickhouse_cluster_replicated"
+
+[catv.migration.database.clickhouse]
+database = "catv"
+host = "192.168.15.102"
+port = 30900
+username = "default"
+password = "default"
+max_open_connection = 100
+max_lifetime = 0
+
+[catv.migration.database.postgresql]
+host = "10.255.254.22"
+port = 30432
+username = "upmems"
+password = "upmems"
+database = "upmems"
+max_open_connection = 100
+max_lifetime = 0
+
+[catv.database]
+driver = "postgresql"
+
+[catv.database.clickhouse]
+database = "catv"
+host = "192.168.15.102"
+port = 30900
+username = "default"
+password = "default"
+max_open_connection = 100
+max_lifetime = 0
+
+[catv.database.postgresql]
+host = "10.255.254.22"
+port = 30432
+username = "upmems"
+password = "upmems"
+database = "upmems"
+max_open_connection = 100
+max_lifetime = 0
+
+[catv.control]
+use = true
+simulation = false
+port = 8801
+max_connections_per_second = 333 # Calculation: 20,000 ports / 60s TIME_WAIT = 333/s
+
+[catv.control.batch]
+max_count = 10000
+max_size = 52428800
+flush_interval = "30s"
+
+[catv.control.timeout]
+connection = "5s"
+send = "30s"
+
+[catv.control.retry.total]
+count = 1
+delay = "5s"
+
+[catv.control.retry.port_exhaustion]
+count = 3
+delay = "20s"
+
+[catv.control.k8s_job]
+count = 1
+namespace = "catv"
+image = "catv-repo:3000/catv-containers/pharos-dev:test"
+service_account_name = "catv-master"
+config_map_name = "catv-master-config"
+secret_name = "catv-master-credentials"
+active_deadline_seconds = 1800
+backoff_limit = 3
+ttl_seconds_after_finished = 86400
+allowed_env_vars = ["SERVE_TYPE", "AUTH_KEY_FILE", "CATV_CONTROLLER_K8S_JOB_NAMESPACE", "CATV_DATABASE_CLICKHOUSE_PASSWORD"]
+
+[catv.collect.transmission]
+use = true
+
+[catv.collect.transmission.daily]
+port = 50001
+
+[catv.collect.transmission.diagnostic]
+port = 50003
+
+[catv.collect.transmission.network_quality_transition]
+port = 50004
+
+[catv.collect.transmission.periodic]
+port = 50000
+
+[catv.collect.transmission.quality_measurement]
+port = 50005
+
+[catv.collect.weather]
+use = true
+simulation = false
+address = "weather.xhift.co.kr:21"
+user = ""
+password = ""
+cron_spec = "0 0 * * * *"
+base_directory = "/"
+
+[catv.collect.weather.timeout]
+connection = "10s"
+shut = "30s"

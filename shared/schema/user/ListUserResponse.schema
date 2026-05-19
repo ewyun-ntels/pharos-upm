@@ -1,0 +1,17 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://ntels.com/pharos/schemas/user/ListUserResponse.schema.json",
+  "title": "ListUserResponse",
+  "description": "Response body for listing users (GET /user)",
+  "type": "object",
+  "properties": {
+    "users": {
+      "type": "array",
+      "description": "List of users",
+      "items": {
+        "$ref": "User.schema"
+      }
+    }
+  },
+  "additionalProperties": false
+}

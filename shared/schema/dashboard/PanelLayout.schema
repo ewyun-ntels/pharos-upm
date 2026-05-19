@@ -1,0 +1,63 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "PanelLayout",
+  "description": "Grid layout configuration for react-grid-layout",
+  "type": "object",
+  "properties": {
+    "x": {
+      "type": "number",
+      "description": "Grid X position"
+    },
+    "y": {
+      "type": "number",
+      "description": "Grid Y position"
+    },
+    "w": {
+      "type": "number",
+      "description": "Grid width (columns)"
+    },
+    "h": {
+      "type": "number",
+      "description": "Grid height (rows)"
+    },
+    "minW": {
+      "type": "number",
+      "description": "Minimum width constraint"
+    },
+    "minH": {
+      "type": "number",
+      "description": "Minimum height constraint"
+    },
+    "maxW": {
+      "type": "number",
+      "description": "Maximum width constraint"
+    },
+    "maxH": {
+      "type": "number",
+      "description": "Maximum height constraint"
+    },
+    "isDraggable": {
+      "type": "boolean",
+      "description": "Whether panel can be dragged"
+    },
+    "isResizable": {
+      "type": "boolean",
+      "description": "Whether panel can be resized"
+    },
+    "static": {
+      "type": "boolean",
+      "description": "Whether panel is fixed (no drag/resize)"
+    },
+    "type": {
+      "type": "string",
+      "enum": ["card", "row"],
+      "description": "Layout type: card (normal panel) or row (container for nested panels)"
+    },
+    "collapsed": {
+      "type": "boolean",
+      "description": "Whether row is collapsed (only for type='row')"
+    }
+  },
+  "required": ["x", "y", "w", "h", "type"],
+  "additionalProperties": false
+}

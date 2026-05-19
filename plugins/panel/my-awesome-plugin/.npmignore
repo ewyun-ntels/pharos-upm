@@ -1,0 +1,12 @@
+# NPM publish 제외 파일
+node_modules/
+src/
+tsconfig.json
+vite.config.ts
+.gitignore
+*.log
+
+# 포함할 파일만 명시 (package.json의 files 필드 사용 권장)
+# dist/
+# README.md
+# package.json

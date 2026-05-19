@@ -1,0 +1,21 @@
+{
+  "name": "clickhouse-datasource",
+  "version": "1.0.0",
+  "type": "datasource",
+  "displayName": "ClickHouse Datasource",
+  "description": "ClickHouse datasource extension migrated from built-in plugin",
+  "author": "Pharos Team",
+  "backend": {
+    "enabled": true
+  },
+  "frontend": {
+    "enabled": true,
+    "components": {
+      "queryBuilder": "./src/components/QueryBuilder",
+      "configEditor": "./src/components/ConfigEditor"
+    }
+  },
+  "dependencies": {
+    "core": "^1.0.0"
+  }
+}

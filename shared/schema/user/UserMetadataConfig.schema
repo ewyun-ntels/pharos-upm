@@ -1,0 +1,21 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://ntels.com/pharos/schemas/UserMetadataConfig.schema.json",
+  "title": "UserMetadataConfig",
+  "description": "JSON Schema configuration for user additional info fields (runtime configurable)",
+  "type": "object",
+  "properties": {
+    "schema": {
+      "type": "object",
+      "description": "JSONSchema definition for user additional fields",
+      "additionalProperties": true
+    },
+    "uiSchema": {
+      "type": "object",
+      "description": "React JSONSchema Form UI hints and customization",
+      "additionalProperties": true
+    }
+  },
+  "required": ["schema"],
+  "additionalProperties": false
+}

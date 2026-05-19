@@ -1,0 +1,73 @@
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: esn-master
+  namespace: esn
+  labels:
+    app: esn-master
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: esn-master
+  template:
+    metadata:
+      labels:
+        app: esn-master
+    spec:
+      volumes:
+        - name: esn-store
+          persistentVolumeClaim:
+            claimName: esn-store
+        - name: cert
+          secret:
+            secretName: master-cert
+            defaultMode: 420
+      containers:
+        - name: server
+          image: ntels.harbor.core/esn/esn-dev:latest
+          command:
+            - /opt/pharos/bin/pharos
+            - serve
+            - '--config'
+            - /opt/pharos/config/master_config.toml
+          env:
+            - name: SERVE_TYPE
+              value: master
+            - name: AUTH_KEY_FILE
+              value: "/opt/pharos/config/jwt.key"
+            - name: SERVERS_HTTP_ENABLE
+              value: 'true'
+            - name: SERVERS_HTTPS_ENABLE
+              value: 'true'
+            - name: DATABASE_SQLITE_PATH
+              value: /store/esn.db
+            - name: MASTER_STATISTICS_CLICKHOUSE_HOST
+              value: 192.168.5.99
+            - name: MASTER_STATISTICS_CLICKHOUSE_HTTP_PORT
+              value: '8123'
+            - name: MASTER_STATISTICS_CLICKHOUSE_TCP_PORT
+              value: '9000'
+            - name: MASTER_STATISTICS_CLICKHOUSE_USERNAME
+              value: ntels
+            - name: MASTER_STATISTICS_CLICKHOUSE_PASSWORD
+              value: ntels1234
+            - name: MASTER_STATISTICS_CLICKHOUSE_DATABASE
+              value: default
+          ports:
+            - name: http
+              containerPort: 8080
+              protocol: TCP
+            - name: https
+              containerPort: 8443
+              protocol: TCP
+          volumeMounts:
+            - name: esn-store
+              mountPath: /store
+            - name: cert
+              readOnly: true
+              mountPath: /esn/cert
+          imagePullPolicy: Always
+      restartPolicy: Always
+  serviceName: ''

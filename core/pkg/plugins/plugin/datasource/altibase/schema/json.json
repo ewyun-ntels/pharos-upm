@@ -1,0 +1,79 @@
+{
+  "type": "object",
+  "required": [
+    "type",
+    "name"
+  ],
+  "properties": {
+    "type": {
+      "type": "string",
+      "title": "Type",
+      "default": "altibase",
+      "readOnly": true
+    },
+    "name": {
+      "type": "string",
+      "title": "Name",
+      "default": "altibase-01"
+    },
+    "data": {
+      "type": "object",
+      "required": [
+        "version",
+        "dsn",
+        "port",
+        "uid",
+        "database",
+        "password",
+        "max_open_connection",
+        "max_lifetime"
+      ],
+      "properties": {
+        "version": {
+          "type": "integer",
+          "title": "Version",
+          "default": 7,
+          "enum": [
+            6,
+            7
+          ]
+        },
+        "dsn": {
+          "type": "string",
+          "title": "Dsn",
+          "default": "127.0.0.1"
+        },
+        "port": {
+          "type": "integer",
+          "title": "Port",
+          "default": 20300
+        },
+        "database": {
+          "type": "string",
+          "title": "Database",
+          "default": "database"
+        },
+        "uid": {
+          "type": "string",
+          "title": "Uid",
+          "default": "uid"
+        },
+        "password": {
+          "type": "string",
+          "title": "Password",
+          "default": "password"
+        },
+        "max_open_connection": {
+          "type": "integer",
+          "title": "Max open connection",
+          "default": 10
+        },
+        "max_lifetime": {
+          "type": "integer",
+          "title": "Max lifetime",
+          "default": 14400
+        }
+      }
+    }
+  }
+}

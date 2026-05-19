@@ -1,0 +1,4 @@
+packages:
+  - "core/frontend"
+  - "shared/frontend"
+  - "extensions/**/frontend"

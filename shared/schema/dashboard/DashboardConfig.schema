@@ -1,0 +1,54 @@
+{
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "title": "DashboardConfig",
+    "type": "object",
+    "properties": {
+        "panels": {
+            "type": "array",
+            "description": "Array of panels in the dashboard",
+            "items": {
+                "$ref": "Panel.schema"
+            }
+        },
+        "annotations": {
+            "type": "array",
+            "description": "Global annotations visible on all timeseries panels in this dashboard",
+            "items": {
+                "$ref": "Annotation.schema"
+            }
+        },
+        "description": {
+            "type": "string"
+        },
+        "displayName": {
+            "type": "string"
+        },
+        "groupName": {
+            "type": "string"
+        },
+        "favorite": {
+            "type": "boolean"
+        },
+        "filters": {
+            "type": "array",
+            "description": "Unified filter configuration (replaces headerL, headerR, left)",
+            "items": {
+                "$ref": "FilterConfig.schema"
+            }
+        },
+        "title": {
+            "type": "string"
+        },
+        "type": {
+            "type": "string"
+        }
+    },
+    "required": [
+        "description",
+        "displayName",
+        "favorite",
+        "filters",
+        "title",
+        "type"
+    ]
+}

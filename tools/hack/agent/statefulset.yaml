@@ -1,0 +1,58 @@
+---
+apiVersion: apps/v1
+#kind: Deployment
+kind: StatefulSet
+metadata:
+  name: pharos-agent
+  labels:
+    app: pharos-agent
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: pharos-agent
+  template:
+    metadata:
+      labels:
+        app: pharos-agent
+    spec:
+      containers:
+        - name: server
+          image: ntels.harbor.core/pharos/pharos-dev:latest
+          command:
+            - /opt/pharos/bin/pharos
+            - serve
+            - '--config'
+            - /opt/pharos/config/agent_config.toml
+          env:
+            - name: SERVE_TYPE
+              value: agent
+            - name: AUTH_KEY_FILE
+              value: "/opt/pharos/config/jwt.key"
+          ports:
+            - name: http
+              containerPort: 8080
+              protocol: TCP
+            - name: https
+              containerPort: 8443
+              protocol: TCP
+          volumeMounts:
+            - name: cert
+              readOnly: true
+              mountPath: /pharos/cert
+            - name: metric-entries
+              mountPath: /opt/pharos/config/metric-entries.json
+              subPath: metric-entries.json
+          imagePullPolicy: Always
+      volumes:
+        - name: cert
+          secret:
+            secretName: agent-cert
+            defaultMode: 420
+        - name: metric-entries
+          configMap:
+            name: metric-entries
+            items:
+              - key: metric-entries.json
+                path: metric-entries.json
+      restartPolicy: Always

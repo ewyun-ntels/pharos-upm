@@ -1,0 +1,161 @@
+# Grafana → PHAROS 쿼리 변환 가이드
+
+---
+
+## 1. 변수 문법 변환
+
+| Grafana      | PHAROS                        | 비고                              |
+|-------------|-------------------------------|-----------------------------------|
+| `$job`      | `{{job\|default:'.*'}}`        | 미등록 시 전체 매칭 fallback       |
+| `$pod`      | `{{pod\|default:'.*'}}`        | 미등록 시 전체 매칭 fallback       |
+| `$sys_id`   | `{{sys_id\|default:'.*'}}`     | 미등록 시 전체 매칭 fallback       |
+| `$1`        | `$1`                           | label_replace 캡처그룹 → 그대로   |
+| `$__rate_interval` | `2m` 또는 `5m` 고정값   | PHAROS 미지원, 적절한 고정값 사용  |
+
+- `|default:'.*'` 는 PHAROS 변수 미등록 시 Pongo2가 `.*` 로 렌더링해 전체 매칭
+- `|default:` 없이 미등록 변수를 쓰면 빈 문자열로 렌더링되어 쿼리 결과 없음
+
+---
+
+## 2. 단위(Unit) 변환
+
+Grafana `percentunit` = 값이 0~1 범위, 화면에 ×100 해서 % 표시
+
+PHAROS는 `%(1-100)` 옵션만 있으므로 쿼리에서 직접 ×100 처리 필요.
+
+```
+# 처리완료율 / 응답송신율처럼 0~1 범위로 나오는 ratio 쿼리
+→ 쿼리 전체를 괄호로 감싸고 * 100 추가
+→ Panel Chart Options: Unit = %(1-100), Y-axis max = 100
+```
+
+---
+
+## 3. 범례(Legend) 변환
+
+Grafana `legendFormat: "{{sys_id}} 처리완료율"`
+→ PHAROS 패널 설정 **Legend rule**: `{sys_id} {_label}`
+→ 각 쿼리의 **label 필드**: `처리완료율`, `응답송신율` 등 입력
+
+| 자리표시자    | 의미                              |
+|-------------|-----------------------------------|
+| `{라벨명}`  | Prometheus 반환 메트릭 라벨 값     |
+| `{_label}`  | 패널 에디터 각 쿼리의 label 필드   |
+
+---
+
+## 4. 변환 예시
+
+### (a) Request Count 쿼리
+
+**Grafana:**
+```
+round(
+  sum by (sys_id) (
+    label_replace(
+      increase(tcp_bridge_inbound_requests_total{job=~"$job", pod=~"$pod"}[2m]),
+      "sys_id", "$1", "pod", ".*(tcp-bridge-[0-9]+).*"
+    )
+  ) and on (sys_id) max by (sys_id) (
+    tcp_bridge:ready_connection_state:max{job=~"$job", pod=~"$pod", sys_id=~"$sys_id"}
+  )
+)
+```
+
+**PHAROS:**
+```
+round(
+  sum by (sys_id) (
+    label_replace(
+      increase(tcp_bridge_inbound_requests_total{job=~"{{job|default:'.*'}}", pod=~"{{pod|default:'.*'}}"}[2m]),
+      "sys_id", "$1", "pod", ".*(tcp-bridge-[0-9]+).*"
+    )
+  ) and on (sys_id) max by (sys_id) (
+    tcp_bridge:ready_connection_state:max{job=~"{{job|default:'.*'}}", pod=~"{{pod|default:'.*'}}", sys_id=~"{{sys_id|default:'.*'}}"}
+  )
+)
+```
+Legend rule: `{sys_id} request`
+
+---
+
+### (b) 처리완료율 쿼리 (percentunit → ×100)
+
+**Grafana:**
+```
+(((sum by (sys_id) (label_replace(
+    increase(tcp_bridge_outbound_outcomes_total{job=~"$job", pod=~"$pod", reason="ok"}[2m]),
+    "sys_id", "$1", "pod", ".*(tcp-bridge-[0-9]+).*"
+  ))) or on (sys_id) (sum by (sys_id) (label_replace(
+    increase(tcp_bridge_outbound_requests_total{job=~"$job", pod=~"$pod"}[2m]),
+    "sys_id", "$1", "pod", ".*(tcp-bridge-[0-9]+).*"
+  )) * 0)
+) / clamp_min(sum by (sys_id) (label_replace(
+    increase(tcp_bridge_outbound_requests_total{job=~"$job", pod=~"$pod"}[2m]),
+    "sys_id", "$1", "pod", ".*(tcp-bridge-[0-9]+).*"
+  )), 1)
+) and on (sys_id) max by (sys_id) (
+  tcp_bridge:ready_connection_state:max{job=~"$job", pod=~"$pod", sys_id=~"$sys_id"}
+)
+```
+
+**PHAROS (변수 치환 + ×100):**
+```
+((((sum by (sys_id) (label_replace(
+    increase(tcp_bridge_outbound_outcomes_total{job=~"{{job|default:'.*'}}", pod=~"{{pod|default:'.*'}}", reason="ok"}[2m]),
+    "sys_id", "$1", "pod", ".*(tcp-bridge-[0-9]+).*"
+  ))) or on (sys_id) (sum by (sys_id) (label_replace(
+    increase(tcp_bridge_outbound_requests_total{job=~"{{job|default:'.*'}}", pod=~"{{pod|default:'.*'}}"}[2m]),
+    "sys_id", "$1", "pod", ".*(tcp-bridge-[0-9]+).*"
+  )) * 0)
+) / clamp_min(sum by (sys_id) (label_replace(
+    increase(tcp_bridge_outbound_requests_total{job=~"{{job|default:'.*'}}", pod=~"{{pod|default:'.*'}}"}[2m]),
+    "sys_id", "$1", "pod", ".*(tcp-bridge-[0-9]+).*"
+  )), 1)
+) and on (sys_id) max by (sys_id) (
+  tcp_bridge:ready_connection_state:max{job=~"{{job|default:'.*'}}", pod=~"{{pod|default:'.*'}}", sys_id=~"{{sys_id|default:'.*'}}"}
+)) * 100
+```
+Unit: `%(1-100)`, Y-axis max: `100`
+Legend rule: `{sys_id} {_label}`, 쿼리 label: `처리완료율`
+
+---
+
+### (c) $__rate_interval 사용 쿼리
+
+**Grafana:**
+```
+sum by (connection_name, msg_type, reason) (
+  (label_replace(
+    increase(tcp_bridge_inbound_outcomes_total{job=~"$job", pod=~"$pod", reason!="ok"}[$__rate_interval]),
+    "sys_id", "$1", "pod", ".*(tcp-bridge-[0-9]+).*"
+  )) and on (sys_id, connection_name) max by (sys_id, connection_name) (
+    tcp_bridge:ready_connection_state:max{job=~"$job", pod=~"$pod", sys_id=~"$sys_id"}
+  )
+)
+```
+
+**PHAROS ($__rate_interval → 고정값 2m):**
+```
+sum by (connection_name, msg_type, reason) (
+  (label_replace(
+    increase(tcp_bridge_inbound_outcomes_total{job=~"{{job|default:'.*'}}", pod=~"{{pod|default:'.*'}}", reason!="ok"}[2m]),
+    "sys_id", "$1", "pod", ".*(tcp-bridge-[0-9]+).*"
+  )) and on (sys_id, connection_name) max by (sys_id, connection_name) (
+    tcp_bridge:ready_connection_state:max{job=~"{{job|default:'.*'}}", pod=~"{{pod|default:'.*'}}", sys_id=~"{{sys_id|default:'.*'}}"}
+  )
+)
+```
+Legend rule: `{connection_name} / {msg_type} / {reason}`
+
+---
+
+## 5. 변환 체크리스트
+
+- [ ] `$variable` → `{{variable|default:'.*'}}`
+- [ ] `$1` 캡처그룹은 그대로 유지
+- [ ] `$__rate_interval` → `2m` 또는 적절한 고정값
+- [ ] `percentunit` 쿼리 → 마지막에 `* 100` 추가, Unit = `%(1-100)`, Y-axis max = 100
+- [ ] `legendFormat: "{{label}}"` → Legend rule: `{label}`, 멀티쿼리면 `{_label}` 추가
+- [ ] 멀티쿼리 패널: 각 쿼리 label 필드에 이름 입력 후 Legend rule에 `{_label}` 사용
+- [ ] `and on (sys_id)` 절의 필터도 누락 없이 변환 (`sys_id=~"{{sys_id|default:'.*'}}"`)

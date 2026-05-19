@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" fill="none">
+  <path fill="#DADCDF" fill-rule="evenodd" d="M32 20a1 1 0 0 1-1 1H1a1 1 0 0 1-1-1v-8a1 1 0 0 1 1-1h30a1 1 0 0 1 1 1z" clip-rule="evenodd" />
+  <path fill="#000" fill-opacity="0.2" fill-rule="evenodd" d="M32 20a1 1 0 0 1-1 1H1a1 1 0 0 1-1-1v-8a1 1 0 0 1 1-1h30a1 1 0 0 1 1 1z" clip-rule="evenodd" />
+  <path fill="url(#icon-barpercent_svg__a)" fill-rule="evenodd" d="M21.333 19.4c0 .56 0 .84-.109 1.054a1 1 0 0 1-.437.437c-.214.109-.494.109-1.054.109H1.6c-.56 0-.84 0-1.054-.109a1 1 0 0 1-.437-.437C0 20.24 0 19.96 0 19.4v-6.8c0-.56 0-.84.109-1.054a1 1 0 0 1 .437-.437C.76 11 1.04 11 1.6 11h18.133c.56 0 .84 0 1.054.109a1 1 0 0 1 .437.437c.11.214.11.494.11 1.054v6.8z" clip-rule="evenodd" />
+  <path fill="#000" fill-opacity="0.2" fill-rule="evenodd" d="M21.333 19.4c0 .56 0 .84-.109 1.054a1 1 0 0 1-.437.437c-.214.109-.494.109-1.054.109H1.6c-.56 0-.84 0-1.054-.109a1 1 0 0 1-.437-.437C0 20.24 0 19.96 0 19.4v-6.8c0-.56 0-.84.109-1.054a1 1 0 0 1 .437-.437C.76 11 1.04 11 1.6 11h18.133c.56 0 .84 0 1.054.109a1 1 0 0 1 .437.437c.11.214.11.494.11 1.054v6.8z" clip-rule="evenodd" />
+  <defs>
+    <linearGradient id="icon-barpercent_svg__a" x1="21.333" x2="1.333" y1="16" y2="16" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#24A267" />
+      <stop offset="1" stop-color="#6AD3A2" />
+    </linearGradient>
+  </defs>
+</svg>

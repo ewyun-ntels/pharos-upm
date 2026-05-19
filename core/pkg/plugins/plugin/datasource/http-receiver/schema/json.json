@@ -1,0 +1,74 @@
+{
+  "type": "object",
+  "required": [
+    "type",
+    "name"
+  ],
+  "properties": {
+    "type": {
+      "type": "string",
+      "title": "Type",
+      "default": "http-receiver",
+      "readOnly": true
+    },
+    "name": {
+      "type": "string",
+      "title": "Name",
+      "default": "http-receiver-01"
+    },
+    "data": {
+      "type": "object",
+      "required": [
+        "port",
+        "uris"
+      ],
+      "properties": {
+        "port": {
+          "type": "integer",
+          "title": "Port",
+          "default": 1000
+        },
+        "uris": {
+          "type": "array",
+          "title": "URIs",
+          "items": {
+            "type": "object",
+            "required": [
+              "uri",
+              "method"
+            ],
+            "properties": {
+              "uri": {
+                "type": "string",
+                "title": "Uri",
+                "default": "receive"
+              },
+              "method": {
+                "type": "array",
+                "title": "Method",
+                "default": [
+                  "GET"
+                ],
+                "items": {
+                  "type": "string",
+                  "enum": [
+                    "GET",
+                    "HEAD",
+                    "POST",
+                    "PUT",
+                    "PATCH",
+                    "DELETE",
+                    "CONNECT",
+                    "OPTIONS",
+                    "TRACE"
+                  ]
+                },
+                "uniqueItems": true
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

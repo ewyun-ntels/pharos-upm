@@ -1,0 +1,16 @@
+{
+  "type": "http-receiver",
+  "name": "sample-http-receiver",
+  "data": {
+    "port": 10000,
+    "uris": [
+      {
+        "uri": "receive",
+        "method": [
+          "GET",
+          "POST"
+        ]
+      }
+    ]
+  }
+}

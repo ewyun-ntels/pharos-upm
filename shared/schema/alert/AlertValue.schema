@@ -1,0 +1,97 @@
+{
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "title": "AlertValue",
+    "description": "API response schema for alert instances and their status information",
+    "type": "object",
+    "properties": {
+        "id": {
+            "type": "string",
+            "description": "System-internal unique identifier for the alert instance"
+        },
+        "alert_id": {
+            "type": "string",
+            "description": "Alert identifier based on rule name and labels"
+        },
+        "name": {
+            "type": "string",
+            "description": "Name of the alert rule that generated this alert"
+        },
+        "alert_type": {
+            "type": "string",
+            "description": "Type of alert rule",
+            "enum": ["query", "event-status", "event-history"]
+        },
+        "description": {
+            "type": ["string", "null"],
+            "description": "Alert description"
+        },
+        "status": {
+            "type": "string",
+            "description": "Current alert status",
+            "enum": ["normal", "alerting", "event"]
+        },
+        "severity": {
+            "type": "string",
+            "description": "Alert severity level",
+            "enum": ["Critical", "Major", "Minor", "Normal"]
+        },
+        "previous_severity": {
+            "type": ["string", "null"],
+            "description": "Previous severity level",
+            "enum": ["Critical", "Major", "Minor", "Normal", null]
+        },
+        "value": {
+            "type": "number",
+            "description": "Current numeric value that triggered the alert"
+        },
+        "previous_value": {
+            "type": ["number", "null"],
+            "description": "Previous numeric value"
+        },
+        "mask": {
+            "type": "boolean",
+            "description": "Whether the alert is masked (suppressed)",
+            "default": false
+        },
+        "labels": {
+            "type": "object",
+            "description": "Key-value labels associated with the alert",
+            "additionalProperties": {
+                "type": "string"
+            }
+        },
+        "timestamp": {
+            "type": "string",
+            "description": "Alert occurrence timestamp",
+            "format": "date-time"
+        },
+        "updated_at": {
+            "type": "string",
+            "description": "Last update timestamp",
+            "format": "date-time"
+        },
+        "check_time": {
+            "type": ["string", "null"],
+            "description": "Rule execution timestamp",
+            "format": "date-time"
+        },
+        "previous_timestamp": {
+            "type": ["string", "null"],
+            "description": "Previous alert timestamp",
+            "format": "date-time"
+        }
+    },
+    "required": [
+        "id",
+        "alert_id", 
+        "name",
+        "alert_type",
+        "status",
+        "severity",
+        "value",
+        "mask",
+        "timestamp",
+        "updated_at"
+    ],
+    "additionalProperties": false
+}

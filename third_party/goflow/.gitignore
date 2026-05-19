@@ -1,0 +1,8 @@
+# Output of the go test coverage tool
+*.out
+
+# The goflow-example binaries
+goflow-example-*
+
+# Example store
+/gokv

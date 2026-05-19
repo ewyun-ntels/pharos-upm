@@ -1,0 +1,63 @@
+{
+  "type": "object",
+  "required": [
+    "type",
+    "name"
+  ],
+  "properties": {
+    "type": {
+      "type": "string",
+      "title": "Type",
+      "default": "elasticsearch",
+      "readOnly": true
+    },
+    "name": {
+      "type": "string",
+      "title": "Name",
+      "default": "elasticsearch-01"
+    },
+    "data": {
+      "type": "object",
+      "required": [
+        "version",
+        "addresses"
+      ],
+      "properties": {
+        "version": {
+          "type": "integer",
+          "title": "Version",
+          "default": 9,
+          "enum": [
+            8,
+            9
+          ]
+        },
+        "addresses": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "title": "Addresses",
+          "default": [
+            "http://localhost:9200"
+          ]
+        },
+        "bulk": {
+          "type": "object",
+          "properties": {
+            "flush_bytes": {
+              "type": "integer",
+              "title": "Bulk Flush Bytes",
+              "default": 5000000
+            },
+            "flush_interval": {
+              "type": "string",
+              "title": "Bulk Flush Interval",
+              "default": "30s"
+            }
+          }
+        }
+      }
+    }
+  }
+}

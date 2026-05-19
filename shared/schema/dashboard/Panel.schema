@@ -1,0 +1,43 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Panel",
+  "description": "Panel: Dashboard visualization unit. Contains content data and grid layout information.",
+  "type": "object",
+  "properties": {
+    "id": {
+      "type": "string",
+      "description": "Unique identifier for the panel"
+    },
+    "title": {
+      "type": "string",
+      "description": "Panel title displayed in UI"
+    },
+    "description": {
+      "type": "string",
+      "description": "Optional description for the panel"
+    },
+    "renderType": {
+      "type": "string",
+      "description": "Visualization type: pie, table, timeSeries, barGauge, etc."
+    },
+    "bgTransparent": {
+      "type": "boolean",
+      "description": "Whether panel background is transparent"
+    },
+    "dataProvider": {
+      "description": "Data source configuration",
+      "$ref": "DataProvider.schema"
+    },
+    "options": {
+      "type": "object",
+      "description": "Plugin-specific options. Structure varies by renderType (pie, table, line, etc). Stored as flexible JSON object.",
+      "additionalProperties": true
+    },
+    "layout": {
+      "description": "Grid layout configuration for react-grid-layout",
+      "$ref": "PanelLayout.schema"
+    }
+  },
+  "required": ["id", "title", "layout"],
+  "additionalProperties": false
+}

@@ -1,0 +1,22 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://ntels.com/pharos/schemas/user/Attributes.schema.json",
+  "title": "Attributes",
+  "description": "Structured user attributes - roles and info (shared/types/user.Attributes)",
+  "type": "object",
+  "properties": {
+    "roles": {
+      "type": "object",
+      "description": "User roles with prefixes (role:*, attr:*). All values must be boolean.",
+      "additionalProperties": {
+        "type": "boolean"
+      }
+    },
+    "info": {
+      "type": "object",
+      "description": "User information (flexible data)",
+      "additionalProperties": true
+    }
+  },
+  "additionalProperties": false
+}

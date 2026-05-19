@@ -1,0 +1,23 @@
+{
+  "name": "@pharos/extension-example",
+  "version": "1.0.0",
+  "private": true,
+  "main": "src/index.ts",
+  "types": "src/index.ts",
+  "scripts": {
+    "build": "echo 'Building example extension...'"
+  },
+  "dependencies": {
+    "@pharos/core": "workspace:*",
+    "@pharos/shared": "workspace:*"
+  },
+  "peerDependencies": {
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0"
+  },
+  "devDependencies": {
+    "@types/react": "19.2.14",
+    "@types/react-dom": "^19.2.3",
+    "typescript": "^6.0.3"
+  }
+}

@@ -1,0 +1,59 @@
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: pharos-master
+  namespace: pharos
+  labels:
+    app: pharos-master
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: pharos-master
+  template:
+    metadata:
+      labels:
+        app: pharos-master
+    spec:
+      volumes:
+        - name: pharos-store
+          persistentVolumeClaim:
+            claimName: pharos-store
+        - name: cert
+          secret:
+            secretName: master-cert
+            defaultMode: 420
+      containers:
+        - name: server
+          image: ntels.harbor.core/pharos/pharos-dev:latest
+          command:
+            - /opt/pharos/bin/pharos
+            - serve
+            - '--config'
+            - /opt/pharos/config/master_config.toml
+          env:
+            - name: SERVE_TYPE
+              value: master
+            - name: HISTORY_USE
+              value: "true"
+            - name: AUTH_KEY_FILE
+              value: "/opt/pharos/config/jwt.key"
+          ports:
+            - name: http
+              containerPort: 8080
+              protocol: TCP
+            - name: https
+              containerPort: 8443
+              protocol: TCP
+            - name: sample-plugin01
+              containerPort: 10000
+              protocol: TCP
+          volumeMounts:
+            - name: pharos-store
+              mountPath: /store
+            - name: cert
+              readOnly: true
+              mountPath: /pharos/cert
+          imagePullPolicy: Always
+      restartPolicy: Always

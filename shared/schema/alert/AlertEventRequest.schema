@@ -1,0 +1,43 @@
+{
+  "title": "Alert Event Request",
+  "description": "Request schema for sending events to alert rules via external integration",
+  "type": "object",
+  "properties": {
+    "alertId": {
+      "type": "string",
+      "description": "Unique identifier for the alert instance",
+      "minLength": 1,
+      "maxLength": 255,
+      "pattern": "^[a-zA-Z0-9_-]+$",
+      "examples": ["server-01-cpu", "db-connection-pool"]
+    },
+    "description": {
+      "type": "string",
+      "description": "Human-readable description of the event",
+      "maxLength": 1000,
+      "examples": ["CPU usage exceeded 90%", "Database connection timeout"]
+    },
+    "severity": {
+      "$ref": "AlertSeverity.schema"
+    },
+    "value": {
+      "type": "number",
+      "description": "Numeric value associated with the event",
+      "examples": [95.5, 1024, 0]
+    },
+    "labels": {
+      "type": "object",
+      "description": "Key-value pairs for additional event metadata",
+      "patternProperties": {
+        "^[a-zA-Z][a-zA-Z0-9_-]*$": {
+          "type": "string",
+          "maxLength": 255
+        }
+      },
+      "additionalProperties": false,
+      "examples": [{"hostname": "server-01", "region": "us-west-1"}]
+    }
+  },
+  "required": ["alertId", "severity"],
+  "additionalProperties": false
+}

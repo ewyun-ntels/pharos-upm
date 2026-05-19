@@ -1,0 +1,15 @@
+{
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "title": "DashboardCreateResponse",
+    "description": "API response type for dashboard POST requests",
+    "type": "object",
+    "properties": {
+        "id": {
+            "type": "string",
+            "description": "Created dashboard ID"
+        }
+    },
+    "required": [
+        "id"
+    ]
+}

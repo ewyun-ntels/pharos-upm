@@ -1,0 +1,63 @@
+# This workflow uses actions that are not certified by GitHub.
+# They are provided by a third-party and are governed by
+# separate terms of service, privacy policy, and support
+# documentation.
+
+name: Create and publish a Docker image
+
+on:
+  push:
+    tags:
+      - "v*.*.*"
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: fieldryand/goflow-example-simple
+
+jobs:
+  build-and-push-image:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      packages: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.22'
+
+      - name: Build goflow-example-simple
+        run: go build examples/simple/goflow-example-simple.go
+
+      - name: Log in to the Container registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract metadata (tags, labels) for Docker
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: org.opencontainers.image.source=https://github.com/fieldryand/goflow
+
+      - name: Tarball ui
+        run: tar -czvf goflow-ui.tar.gz ui
+
+      - name: Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: goflow-ui.tar.gz

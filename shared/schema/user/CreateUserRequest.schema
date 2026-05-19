@@ -1,0 +1,24 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://ntels.com/pharos/schemas/CreateUserRequest.schema.json",
+  "title": "CreateUserRequest",
+  "description": "Request body for creating a new user (POST /user)",
+  "type": "object",
+  "properties": {
+    "username": {
+      "type": "string",
+      "description": "User's unique identifier (username)",
+      "minLength": 1
+    },
+    "password": {
+      "type": "string",
+      "description": "User's password",
+      "minLength": 1
+    },
+    "attributes": {
+      "$ref": "Attributes.schema"
+    }
+  },
+  "required": ["username", "password"],
+  "additionalProperties": false
+}

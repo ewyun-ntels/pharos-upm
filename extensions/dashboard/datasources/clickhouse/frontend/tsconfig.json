@@ -1,0 +1,44 @@
+{
+  "compilerOptions": {
+    "target": "ES2020",
+    "useDefineForClassFields": true,
+    "lib": ["ES2020", "DOM", "DOM.Iterable"],
+    "module": "ESNext",
+    "skipLibCheck": true,
+    "jsx": "react-jsx",
+
+    /* Bundler mode */
+    "moduleResolution": "bundler",
+    "allowImportingTsExtensions": true,
+    "resolveJsonModule": true,
+    "isolatedModules": true,
+    "noEmit": true,
+
+    /* Linting */
+    "strict": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "noFallthroughCasesInSwitch": true,
+
+    "baseUrl": ".",
+    "paths": {
+      "@pharos/shared": ["../../../../../shared/frontend/src"],
+      "@pharos/shared/*": ["../../../../../shared/frontend/src/*"],
+      "@pharos/shared/components": ["../../../../../shared/frontend/src/components"],
+      "@pharos/shared/components/*": ["../../../../../shared/frontend/src/components/*"],
+      "@pharos/shared/components/ui": ["../../../../../shared/frontend/src/components/ui"],
+      "@pharos/shared/components/ui/*": ["../../../../../shared/frontend/src/components/ui/*"],
+      "@pharos/core": ["../../../../../core/frontend/src"],
+      "@pharos/core/*": ["../../../../../core/frontend/src/*"],
+      "@pharos/core/datasource-editor-registry": ["../../../../../core/frontend/src/features/dashboard/datasources/index.ts"],
+      "@*": ["../../../../../core/frontend/src/*"],
+      "@providers/*": ["../../../../../core/frontend/src/providers/*"],
+      "@components/*": ["../../../../../core/frontend/src/components/*"],
+      "@hooks/*": ["../../../../../core/frontend/src/hooks/*"],
+      "@lib/*": ["../../../../../core/frontend/src/lib/*"],
+      "@utils/*": ["../../../../../core/frontend/src/utils/*"]
+    }
+  },
+  "include": ["src"],
+  "exclude": ["node_modules", "dist"]
+}

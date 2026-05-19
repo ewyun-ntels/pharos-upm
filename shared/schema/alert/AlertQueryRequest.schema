@@ -1,0 +1,40 @@
+{
+  "title": "Alert Query Request",
+  "description": "Request schema for testing alert queries against data sources",
+  "type": "object",
+  "properties": {
+    "datasource": {
+      "type": "string",
+      "description": "Name of the datasource to query against",
+      "minLength": 1,
+      "maxLength": 100,
+      "examples": ["clickhouse", "postgresql", "prometheus"]
+    },
+    "query": {
+      "$ref": "#/$defs/QuerySpec"
+    }
+  },
+  "required": ["datasource", "query"],
+  "additionalProperties": false,
+  "$defs": {
+    "QuerySpec": {
+      "type": "object",
+      "description": "Query specification with SQL and variables",
+      "properties": {
+        "query": {
+          "type": "string",
+          "description": "SQL query string with variable placeholders",
+          "minLength": 1,
+          "examples": ["SELECT COUNT(*) FROM metrics WHERE cpu_usage > {{threshold}}"]
+        },
+        "variables": {
+          "type": "object",
+          "description": "Variables to substitute in the query",
+          "examples": [{"threshold": 80}]
+        }
+      },
+      "required": ["query"],
+      "additionalProperties": false
+    }
+  }
+}

@@ -1,0 +1,145 @@
+{
+  "actions": {
+    "show": "Show"
+  },
+  "label": {
+    "login": {
+      "sign_in": "Sign in"
+    },
+    "menu": {
+      "home": "Home",
+      "favorites": "Monitoring",
+      "reports": "Reports",
+      "dataSources": "Data sources",
+      "settings": "Settings",
+      "users": "Users",
+      "teams": "Teams",
+      "preferences": "Preferences",
+      "dashboard": "Dashboard",
+      "dashboards": "Dashboards",
+      "queryMonitoring": "Query analytics",
+      "dbMonitoring": "DB monitoring",
+      "dataStatus": "Data analytics",
+      "report": "Report",
+      "chartEditor": "Chart editor",
+      "alert": "Alerting"
+    },
+    "common": {
+      "nwdaf": "NWDAF",
+      "kubernetes": "kubernetes",
+      "profile": "Profile",
+      "setting": "Setting",
+      "menu": "Menu",
+      "theme": "Theme",
+      "fullScreen": "Full screen",
+      "logout": "Sign out",
+      "export": "Export",
+      "delete": "Delete",
+      "cancel": "Cancel",
+      "apply": "Apply",
+      "save": "Save",
+      "view": "View",
+      "rows": "row(s)",
+      "selected": "selected"
+    },
+    "monitoring": {
+      "monitoring": "Monitoring",
+      "refresh_interval": "Refresh interval",
+      "step": "Time interval",
+      "cpu_utilisation": "CPU utilization",
+      "cpu_requests_commitment": "Allowed maximum CPU usage",
+      "cpu_limits_commitment": "Maximum CPU capacity",
+      "memory_utilisation": "Memory utilization",
+      "memory_requests_commitment": "Allowed maximum memory usage",
+      "memory_limits_commitment": "Maximum memory capacity",
+      "kubernetes_namespace_cpu_utilisation": "Namespace CPU utilization",
+      "kubernetes_pod_status": "Pod status",
+      "kubernetes_node_cpu_statistics": "CPU statistics",
+      "kubernetes_node_cpu_avg_statistics": "CPU average statistics",
+      "kubernetes_memory_statistics": "Memory statistics",
+      "kubernetes_disk_statistics": "Disk statistics",
+      "kubernetes_event_types_overview": "Event types overview"
+    },
+    "user_management": {
+      "user_management": "User management",
+      "user_create": "User registration",
+      "email": "Email",
+      "email_input_empty_desc": "Please enter your email.",
+      "email_already_exist": "Email already exists.",
+      "user_name": "Username",
+      "user_name_input_empty_desc": "Please enter a username.",
+      "role": "Role",
+      "cancle": "Cancel",
+      "create": "Register",
+      "view_detail": "View details",
+      "user_view_detail": "User details",
+      "password_reset": "Password reset",
+      "password_reset_desc": "You can reset the user's password to the initial value.",
+      "password_change": "Change password",
+      "new_password": "New password",
+      "new_password_desc": "Please enter a new password.",
+      "new_password_confirm": "Confirm new password",
+      "new_password_confirm_desc": "Please confirm the new password.",
+      "password_not_match": "Passwords do not match.",
+      "edit": "Edit",
+      "user_edit": "Edit user",
+      "delete": "Delete",
+      "cofirm": "Confirm",
+      "regdate": "Registration date",
+      "email_input_validation_desc": "Invalid email format.",
+      "user_delete": "Delete user",
+      "page_not_permission": "You do not have permission to access this page.",
+      "password": "Password",
+      "password_confirm": "Confirm password",
+      "password_desc": "Please enter your password.",
+      "master_password": "Confirm password",
+      "incorrect_password": "Incorrect password."
+    },
+    "chart": {
+      "data_not_exists": "No data"
+    }
+  },
+  "msg": {
+    "login": {
+      "user_not_found": "Invalid username or password.",
+      "user_is_blocked": "Your account has been disabled. Contact the administrator.",
+      "user_is_temporarily_blocked": "Your account is temporarily blocked. Please try again later.",
+      "password_expired": "Your password has expired. Please change it to a new one.",
+      "password_mismatch": "Invalid username or password.",
+      "user_first_login": "You must change your password when you sign in for the first time. Please set a new password to access your account.",
+      "password_expired_change": "Your password has expired. Please set a new password before logging in.",
+      "password_successfully_changed": "Password successfully changed",
+      "password_successfully_description": "You can now sign in with your new password."
+    },
+    "common": {
+      "delete": "Are you sure you want to delete?",
+      "no_events": "No events found",
+      "exit_fullScreen": "Press ESC to exit full screen."
+    },
+    "monitoring": {},
+    "user_management": {
+      "delete_selected_user": "Do you want to delete the selected user(s)?",
+      "create_success": "User registration successful",
+      "user_create_successfully": "User registration was successful.",
+      "create_failed": "User registration failed",
+      "user_create_failed": "User registration failed.",
+      "edit_success": "Edit successful",
+      "user_edit_successfully": "User edit was successful.",
+      "edit_failed": "Edit failed",
+      "user_edit_failed": "User edit failed.",
+      "password_change_success": "Password change successful",
+      "password_change_successfully": "Password change was successful.",
+      "password_change_failed": "Password change failed",
+      "user_password_change_failed": "Password change was successful.",
+      "delete_success": "Delete successful",
+      "user_delete_successfully": "User deletion was successful.",
+      "delete_failed": "Delete failed",
+      "user_delete_failed": "User deletion failed."
+    }
+  },
+  "persistentvolumes": {
+    "sheets": {
+      "title": "Hello"
+    }
+  }
+}

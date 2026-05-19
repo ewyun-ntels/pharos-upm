@@ -1,0 +1,29 @@
+server:
+  host: '127.0.0.1'
+
+port:
+  daily: 50001
+  diagnostic: 50003
+  network_quality_transition: 50004
+  periodic: 50000
+  quality_measurement: 50005
+
+devices:
+  - hostId: '1A8020DF41'
+    macAddr: 'a0:72:2c:b6:ae:2b'
+    cmMac: 'a0:72:2c:b6:ae:2a'
+    stbIp: '10.43.81.14'
+    cmIp: '10.4.58.208'
+    stbModel: 'THX-U300'
+    mwVer: '3.1.46'
+    localVer: '1.0.6.03'
+    cloudVer: '1.6.12'
+  - hostId: '2B9031EF52'
+    macAddr: 'b1:83:3d:c7:bf:3c'
+    cmMac: 'b1:83:3d:c7:bf:3b'
+    stbIp: '10.43.82.15'
+    cmIp: '10.4.59.209'
+    stbModel: 'THX-U400'
+    mwVer: '3.2.10'
+    localVer: '1.1.2.05'
+    cloudVer: '1.7.5'

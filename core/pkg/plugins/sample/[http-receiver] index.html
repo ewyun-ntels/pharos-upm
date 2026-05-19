@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <meta charset="utf-8">
+        <title></title>
+        <style type="text/css">
+            input[type="text"] { width: 300px; }
+            .muted {color: #CCCCCC; font-size: 10px;}
+        </style>
+        <script type="text/javascript" src="https://unpkg.com/centrifuge@^5/dist/centrifuge.js"></script>
+        <script type="text/javascript">
+            // helper functions to work with escaping html.
+            const tagsToReplace = {'&': '&amp;', '<': '&lt;', '>': '&gt;'};
+            function replaceTag(tag) {return tagsToReplace[tag] || tag;}
+            function safeTagsReplace(str) {return str.replace(/[&<>]/g, replaceTag);}
+
+            // const channel = "http-receiver:${datasource-id}";
+            const channel = "http-receiver:sample-http-receiver";
+
+            window.addEventListener('load', function() {
+                const centrifuge = new Centrifuge('ws://192.168.15.101:30996/websocket/centrifuge', {});
+
+                const input = document.getElementById("input");
+                const container = document.getElementById('messages');
+
+                centrifuge.on('connecting', function(ctx){
+                    drawText('Connecting: ' + ctx.reason);
+                    input.setAttribute('disabled', 'true');
+                });
+
+                centrifuge.on('disconnected', function(ctx){
+                    drawText('Disconnected: ' + ctx.reason);
+                    input.setAttribute('disabled', 'true');
+                });
+
+                // bind listeners on centrifuge object instance events.
+                centrifuge.on('connected', function(ctx){
+                    drawText('Connected with client ID ' + ctx.client + ' over ' + ctx.transport);
+                    input.removeAttribute('disabled');
+                });
+
+                const sub = centrifuge.newSubscription(channel);
+                sub.on('publication', handlePublication)
+                    .on("subscribed", handleSubscribed)
+                    .on("error", handleSubscriptionError);
+
+                sub.subscribe();
+
+                centrifuge.connect();
+
+                function handleSubscribed(ctx) {
+                    drawText('Subscribed on channel ' + ctx.channel);
+                }
+
+                function handleSubscriptionError(err) {
+                    drawText('Subscription error in channel ' + err.channel + ': ' + err.message);
+                }
+
+                function handlePublication(ctx) {
+                    let clientID;
+                    if (ctx.info){
+                        clientID = ctx.info.client;
+                    } else {
+                        clientID = null;
+                    }
+                    const inputText = JSON.stringify(ctx.data);
+                    const text = safeTagsReplace(inputText) + ' <span class="muted">from ' + clientID + '</span>';
+                    drawText(text);
+                }
+
+                function drawText(text) {
+                    let e = document.createElement('li');
+                    e.innerHTML = [(new Date()).toString(), ' ' + text].join(':');
+                    container.insertBefore(e, container.firstChild);
+                }
+
+                document.getElementById('form').addEventListener('submit', function(event) {
+                    event.preventDefault();
+                    sub.publish({"input": input.value}).then(function() {
+                        // console.log('message accepted by server');
+                    }, function(err) {
+                        // console.log('error publishing message', err);
+                    });
+                    input.value = '';
+                });
+            });
+        </script>
+    </head>
+    <body>
+        <form id="form">
+            <label for="input"></label><input type="text" id="input" autocomplete="off" />
+            <input type="submit" id="submit" value="»">
+        </form>
+        <ul id="messages"></ul>
+    </body>
+</html>

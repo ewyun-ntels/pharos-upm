@@ -1,0 +1,8 @@
+{
+  "title": "Alert History Response", 
+  "description": "Array of alert history records ordered by timestamp descending",
+  "type": "array",
+  "items": {
+    "$ref": "AlertValue.schema"
+  }
+}

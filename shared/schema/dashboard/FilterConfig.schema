@@ -1,0 +1,46 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "FilterConfig",
+  "description": "Unified filter configuration (replaces headerL, headerR, left). Follows Panel pattern with common fields + type-specific options.",
+  "type": "object",
+  "properties": {
+    "id": {
+      "type": "string",
+      "description": "Unique identifier for the filter"
+    },
+    "type": {
+      "type": "string",
+      "description": "Filter type: select, datetime, step, refreshInterval, custom, tableSearch",
+      "enum": [
+        "select",
+        "datetime",
+        "step",
+        "refreshInterval",
+        "custom",
+        "tableSearch"
+      ]
+    },
+    "kind": {
+      "$ref": "Kind.schema"
+    },
+    "label": {
+      "type": "string",
+      "description": "Display label for the filter"
+    },
+    "datasourceName": {
+      "type": "string",
+      "description": "Data source name for dynamic filters"
+    },
+    "query": {
+      "type": "string",
+      "description": "Query string for data fetching"
+    },
+    "options": {
+      "type": "object",
+      "description": "Type-specific options. Structure varies by type (select, datetime, etc). For select type, use isMulti field to enable multi-selection. Stored as flexible JSON object.",
+      "additionalProperties": true
+    }
+  },
+  "required": ["id", "type", "kind"],
+  "additionalProperties": false
+}

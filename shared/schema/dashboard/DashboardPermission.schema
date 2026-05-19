@@ -1,0 +1,36 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "DashboardPermission",
+  "type": "object",
+  "definitions": {
+    "Action": {
+      "title": "Action",
+      "type": "string",
+      "enum": [
+        "viewer",
+        "editor",
+        "owner"
+      ]
+    }
+  },
+  "properties": {
+    "subject": {
+      "type": "string"
+    },
+    "object": {
+      "type": "string"
+    },
+    "action": {
+      "$ref": "#/definitions/Action"
+    },
+    "kind": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "subject",
+    "object",
+    "action",
+    "kind"
+  ]
+}

@@ -1,0 +1,11 @@
+{
+  "data": {
+    "uris": {
+      "items": {
+        "method": {
+          "ui:widget": "checkboxes"
+        }
+      }
+    }
+  }
+}

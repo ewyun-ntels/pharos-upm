@@ -1,0 +1,22 @@
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: esn-master
+  namespace: esn
+  labels:
+    app: esn-master
+spec:
+  ports:
+    - name: http
+      port: 8080
+      targetPort: 8080
+      nodePort: 30999
+    - name: https
+      port: 8443
+      targetPort: 8443
+      nodePort: 31000
+  type: NodePort
+  externalTrafficPolicy: Local
+  selector:
+    app: esn-master

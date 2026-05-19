@@ -1,0 +1,28 @@
+{
+  "compilerOptions": {
+    "target": "ES2020",
+    "lib": ["dom", "dom.iterable", "ES2020"],
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "jsx": "react-jsx",
+    "strict": true,
+    "esModuleInterop": true,
+    "allowSyntheticDefaultImports": true,
+    "skipLibCheck": true,
+    "forceConsistentCasingInFileNames": true,
+    "resolveJsonModule": true,
+    "isolatedModules": true,
+    "baseUrl": ".",
+    "paths": {
+      "@pharos/shared": ["../../../../shared/frontend/src"],
+      "@pharos/shared/*": ["../../../../shared/frontend/src/*"],
+      "@pharos/core": ["../../../../core/frontend/src"],
+      "@pharos/core/*": ["../../../../core/frontend/src/*"],
+      "@pharos/core/login-registry": ["../../../../core/frontend/src/features/login/index.ts"],
+      "@pharos/core/site-registry": ["../../../../core/frontend/src/features/site/index.ts"],
+      "@/*": ["../../../../core/frontend/src/*"]
+    }
+  },
+  "include": ["src/**/*"],
+  "exclude": ["node_modules"]
+}

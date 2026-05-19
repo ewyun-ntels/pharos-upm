@@ -1,0 +1,24 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "RoleGroup",
+  "description": "Represents a group of roles (e.g., Core, CATV, etc.)",
+  "type": "object",
+  "properties": {
+    "group": {
+      "type": "string",
+      "description": "Group identifier (e.g., 'core', 'catv')"
+    },
+    "displayName": {
+      "type": "string",
+      "description": "User-friendly display name for the group"
+    },
+    "roles": {
+      "type": "array",
+      "items": {
+        "$ref": "RoleMetadata.schema"
+      }
+    }
+  },
+  "required": ["group", "displayName", "roles"],
+  "additionalProperties": false
+}

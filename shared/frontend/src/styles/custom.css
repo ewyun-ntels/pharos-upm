@@ -1,0 +1,456 @@
+@import "tailwindcss";
+@plugin "tailwindcss-animate";
+@custom-variant dark (&:is(.dark *));
+
+/************** [tailwind4:250305]  *******************************
+** css 사용을 최대한 사용하지 않고 (component/ui-extension/"ui-extention") 컴포넌트로 디자인 작업하도록 한다. css를 별도 파일로 디자인 하지 않는 것이 기본 정책.
+** [shadcn 기본 컴포넌트 개발/디자인 편집 불가]
+components/ui/모든 "shadcn" 기본컴포넌트는 직접 편집하지 않는다. 추후 shadcn이 업데이트 되었을때 (component/ui)폴더 모두가 업데이트 될 수 있기 때문.
+** 위의 이유로 "ui-shadcn" 컴포넌트에 공통적으로 적용이 필요한 경우에만 custom.css에 공통 작성할 수도 있으나 권장하지 않음.
+---- ui-shadcn 공통 컴포넌트 디자인 적용 예외사항 ----
+01. [예외사항] table,dialog 등에 해당하는 ("ui-shadcn")의 bg가 기본적으로 투명하기 때문에, 전체 bg-background을 일일이 주지 않도록, 기본적인 세팅은 css에 적용함.
+02. [예외사항] radiogroup("ui-shadcn")은 newyork 테마에서 가독성이 좋지 않아 아래 css 에서 커스터마이징
+03. [예외사항] tooltip("ui-shadcn")은 newyork 테마에서 primary 컬러를 사용하고 있어, 너무 강조되므로 아래 css 에서 커스터마이징
+
+****** TODO table 소스에서 직접 적용할 예정 ********
+04. 목록형 table th 기본사이즈는 w-full로 지정하고, 첫번째 th, td에 체크박스 있을때와 마지막 th,td에 아이콘 svg.lucide-ellipsis-vertical 있을때 최소 사이즈 지정함. 추후 아이콘이 변경될 수 있으므로 lucide 이름 포함 속성으로 작성함
+**********************************************
+
+05. breadcrumb("ui-shadcn") 공통 컴포넌트이므로 컴포넌트로 수정할 수 없어 css로 링크색상, 마지막 li 색상을 지정함
+06. scrollbar 공통 디자인 변경, 단 textarea만 예외로 기본 브라우저 스타일 적용되어있음(resizer 문제)
+---- ui-extention 컴포넌트----
+01. ace editor 색상 커스터마이징
+
+/*********************************************
+theme 색상 정의 관련
+: globals.css의 테마색은 버전업데이트 시 초기화 및 수시로 변경될 수 있어
+custom.css에 최종 테마색을 !mportant로 지정해 놓아야함.
+**********************************************/
+
+:root {
+  --site: oklch(94% 0 247.84) !important;
+  --site-foreground: oklch(0.89 0.16 48) !important;
+  --background: oklch(1 0 0) !important;
+  --foreground: oklch(0.03 0 0) !important;
+  --card: oklch(1 0 0) !important;
+  --card-foreground: oklch(0.03 0 0) !important;
+  --popover: oklch(1 0 0) !important;
+  --popover-foreground: oklch(0.03 0 0) !important;
+  --primary: oklch(0.66 0.1197 156.75);/* Point color Custom */
+  --primary-foreground: oklch(0.98 0 0) !important;
+  --secondary: oklch(0.96 0 0) !important;
+  --secondary-foreground: oklch(0.09 0 0) !important;
+  --muted: oklch(0.96 0 0) !important;
+  --muted-foreground: oklch(0.45 0 0) !important;
+  --accent: oklch(0.96 0 0) !important;
+  --accent-foreground: oklch(0.09 0 0) !important;
+  --destructive: oklch(0.577 0.245 27.325) !important;
+  --destructive-foreground: oklch(0.98 0 0) !important;
+  --border: oklch(87.97% 0.004 286.32) !important;
+  --input: oklch(0.822 0 02) !important;
+  --shadow-xs: 0 1px 2px rgba(15, 23, 42, 0.08);
+  --ring: oklch(0.708 0 0) !important;
+  --radius: 0.4rem !important;
+
+  /* Chart Colors */
+  --chart-1: oklch(60.16% 0.2214 292.23) !important;
+  --chart-2: oklch(69.02% 0.1481 162.37) !important;
+  --chart-3: oklch(54.49% 0.2154 262.74) !important;
+  --chart-4: oklch(67.72% 0.1571 35.19) !important;
+  --chart-5: oklch(75.77% 0.159 55.91) !important;
+  --chart-6: oklch(78.58% 0.1598 85.31) !important;
+  --chart-7: oklch(58.72% 0.2224 17.72) !important;
+  --chart-8: oklch(72.75% 0.1408 10.65) !important;
+  --chart-9: oklch(81.72% 0.0906 9.38) !important;
+  --chart-10: oklch(54.07% 0.1519 148.41) !important;
+  --chart-11: oklch(72.05% 0.192 149.49) !important;
+  --chart-12: oklch(72.11% 0.1415 253.1) !important;
+  --chart-13: oklch(81.17% 0.097 249.1) !important;
+  --chart-14: oklch(40.86% 0.0507 54.49) !important;
+  --chart-15: oklch(40.86% 0.0507 54.49) !important;
+  --chart-16: oklch(62.4% 0.0913 66.63) !important;
+  --chart-17: oklch(55.59% 0.0111 58.09) !important;
+
+  /* Status Chart Colors */
+  --status-chart-running: oklch(62.3% 0.1688 149.18) !important;
+  --status-chart-normal: oklch(58.63% 0.1366 241.18) !important;
+  --status-chart-succeeded: oklch(78.58% 0.1598 85.31) !important;
+  --status-chart-pending: oklch(70.65% 0.186 48.13) !important;
+  --status-chart-warning: oklch(70.65% 0.186 48.13) !important;
+  --status-chart-failed: oklch(63.56% 0.2082 25.38) !important;
+  --status-chart-error: oklch(63.56% 0.2082 25.38) !important;
+  --status-chart-unknown: oklch(55.03% 0.0235 264.36) !important;
+  --status-chart-etc: oklch(55.03% 0.0235 264.36) !important;
+
+  /* Sidebar Colors */
+  --sidebar: oklch(0.985 0 0) !important;
+  --sidebar-foreground: oklch(0.03 0 0) !important; /* 글씨: 흰색 */
+  --sidebar-primary: oklch(0.21 0.006 285.885) !important; /* 강조색: 어두운 회색 */
+  --sidebar-primary-foreground:oklch(0.98 0 0)  !important; /* 강조색 위 글씨: 흰색 */
+  --sidebar-accent: oklch(0.96 0 0) !important; /* 호버/강조 배경: 약간 회색 */
+  --sidebar-accent-foreground: oklch(0.09 0 0) !important;
+  --sidebar-border: oklch(87.97% 0.004 286.32) !important; /* 테두리 */
+  --sidebar-ring: oklch(0.708 0 0) !important; /* 포커스 링 */
+}
+
+.dark {
+  --site: oklch(0.13 0 0) !important;
+  --site-foreground: oklch(0.98 0.08 210) !important;
+  --background: oklch(0.20 0 255) !important;
+  --foreground: oklch(0.98 0 0) !important;
+  --card: oklch(0.20 0 255) !important;
+  --card-foreground: oklch(0.98 0 0) !important;
+  --popover: oklch(0.24 0 0) !important;
+  --popover-foreground: oklch(0.98 0 0) !important;
+  --primary: oklch(0.66 0.1197 156.75);  /* Point color Custom */
+  --primary-foreground:  oklch(0.98 0 0)  !important;
+  --secondary: oklch(0.35 0 0) !important;
+  --secondary-foreground: oklch(0.98 0 0) !important;
+  --muted: oklch(0.35 0 0) !important;
+  --muted-foreground: oklch(0.63 0 0) !important;
+  --accent: oklch(0.35 0 0) !important;
+  --accent-foreground: oklch(0.98 0 0) !important;
+  --destructive: oklch(0.577 0.245 27.325) !important;
+  --destructive-foreground: oklch(0.98 0 0) !important;
+  --border: oklch(1 0 0 / 10%) !important;
+  --input: oklch(1 0 0 / 25%) !important;
+  --shadow-xs: 0 1px 2px rgba(15, 23, 42, 0.35);
+  --ring: oklch(0.556 0 0) !important;
+
+  /* Sidebar Colors */
+  --sidebar: oklch(0.205 0 0) !important;
+  --sidebar-foreground: oklch(0.98 0 0) !important; /* 글씨: 흰색 */
+  --sidebar-primary: oklch(0.488 0.243 264.376) !important; /* 강조색: 파란색 계열 */
+  --sidebar-primary-foreground: oklch(0.98 0 0)  !important; /* 강조색 위 글씨: 흰색 */
+  --sidebar-accent: oklch(0.269 0 0) !important; /* 호버/강조 배경: 밝은 회색 */
+  --sidebar-accent-foreground: oklch(0.98 0 0) !important;
+  --sidebar-border: oklch(1 0 0 / 10%) !important; /* 테두리 */
+  --sidebar-ring: oklch(0.556 0 0) !important; /* 포커스 링 */
+
+}
+
+@theme inline {
+  --color-site: var(--site); /* custom background */
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+
+  --color-chart-1: var(--chart-1) !important;
+  --color-chart-2: var(--chart-2) !important;
+  --color-chart-3: var(--chart-3) !important;
+  --color-chart-4: var(--chart-4) !important;
+  --color-chart-5: var(--chart-5) !important;
+  --color-chart-6: var(--chart-6) !important;
+  --color-chart-7: var(--chart-7) !important;
+  --color-chart-8: var(--chart-8) !important;
+  --color-chart-9: var(--chart-9) !important;
+  --color-chart-10: var(--chart-10) !important;
+  --color-chart-11: var(--chart-11) !important;
+  --color-chart-12: var(--chart-12) !important;
+  --color-chart-13: var(--chart-13) !important;
+  --color-chart-14: var(--chart-14) !important;
+  --color-chart-15: var(--chart-15) !important;
+  --color-chart-16: var(--chart-16) !important;
+  --color-chart-17: var(--chart-17) !important;
+  --color-status-chart-running: var(--status-chart-running) !important;
+  --color-status-chart-normal: var(--status-chart-normal) !important;
+  --color-status-chart-succeeded: var(--status-chart-succeeded) !important;
+  --color-status-chart-pending: var(--status-chart-pending) !important;
+  --color-status-chart-warning: var(--status-chart-warning) !important;
+  --color-status-chart-failed: var(--status-chart-failed) !important;
+  --color-status-chart-error: var(--status-chart-error) !important;
+  --color-status-chart-unknown: var(--status-chart-unknown) !important;
+  --color-status-chart-etc: var(--status-chart-etc) !important;
+
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-ring: var(--sidebar-ring);
+  --animate-accordion-down: accordion-down 0.2s ease-out;
+  --animate-accordion-up: accordion-up 0.2s ease-out;
+
+  @keyframes accordion-down {
+    from {
+      height: 0;
+    }
+    to {
+      height: var(--radix-accordion-content-height);
+    }
+  }
+  @keyframes accordion-up {
+    from {
+      height: var(--radix-accordion-content-height);
+    }
+    to {
+      height: 0;
+    }
+  }
+}
+
+@layer base {
+  /* Layout class */
+  body {
+    @apply !bg-site text-foreground;
+    /* 맥 마우스, 트랙패드 swipe 방지 */
+    overscroll-behavior-x: contain;
+  }
+  .bg-primary {
+    background-color: var(--primary) !important;
+  }
+
+  .text-primary {
+    color: var(--primary) !important;
+  }
+
+  .border-primary {
+    border-color: var(--primary) !important;
+  }
+
+
+  /* LNB icon dark모드 색상 지정 */
+  .main-nav svg.lucide * {
+    @apply dark:stroke-white
+  }
+  .main-nav .child-2nd {
+    @apply !gap-0 items-center
+  }
+
+  /* breadcrumb shadcn 컴포넌트 UI 스타일이어서 css에서 조정함 */
+  nav[aria-label="breadcrumb"] ol > li > a {
+    @apply text-muted-foreground hover:text-secondary-foreground
+  }
+  nav[aria-label="breadcrumb"] ol > li:last-child > a,
+  nav[aria-label="breadcrumb"] ol > li:last-child > span[role="link"] {
+    @apply text-secondary-foreground hover:text-secondary-foreground cursor-text
+  }
+
+  /************ common 요소 공통 적용 **********************/
+  /* shadcnSelect trigger common style */
+  [data-slot="select-trigger"] {
+    @apply hover:!border-foreground focus-within:!border-foreground data-[state=open]:!border-foreground !transition-all !duration-300 !cursor-pointer
+  }
+  [data-slot="select-item"] {
+    @apply !cursor-pointer
+  }
+  [data-slot="input"] {
+    @apply hover:!border-foreground focus-visible:!border-foreground focus:!border-foreground !transition-all !duration-300 focus-visible:!ring-0 focus-visible:!ring-offset-0
+  }
+  [data-slot="select-item"] {
+    @apply !cursor-pointer
+  }
+  /* Lucid icon */
+  .lucide {
+    stroke-width: 1.6px;
+  }
+  .pagination button {
+    @apply bg-background
+  }
+  .text-primary-foreground {
+    @apply dark:text-white
+  }
+  /* shadcn 업그레이드 되면서 버튼내 cursor 손모양이 제거되어 추가 */
+  button[data-slot="button"]{
+    @apply !cursor-pointer !transition-all !duration-300
+  }
+  button[data-slot="button"].border-input {
+    @apply !border-border !shadow-xs
+  }
+
+  /* card shadow */
+  .bg-card {
+    @apply !shadow-none
+  }
+
+  /* TODO: 목록 텍스트 링크 색상 : 변경하지 않기로 해서 주석처리함 : 추후 색상 지정시 사용가능 */
+  .link-text {
+    @apply cursor-pointer hover:underline text-primary dark:text-primary
+  }
+
+  /************ TODO: 테이블 파일에 직접 적용 필요 ************/
+  .table-wrap table thead th > * {
+    @apply text-nowrap
+  }
+  /* table 목록형 tableHead size 생략한 기본사이즈는 w-full이고*/
+  .table-wrap table thead th > div {
+    @apply !w-full
+  }
+  .table-wrap table thead tr th:first-child > div,
+  .table-wrap table tbody tr td:first-child > div {
+    @apply pl-1
+  }
+  /* table 목록형 tableHead size 첫칸에 체크박스 있을 경우 사이즈 지정 */
+  .table-wrap table thead tr th:first-child:has(*[role=checkbox]),
+  .table-wrap table thead tr td:first-child:has(*[role=checkbox]),
+  .table-wrap table thead tr th:last-child:has(svg[class ^="lucide"]),
+  .table-wrap table tbody tr td:last-child:has(svg[class ^="lucide"]) {
+    @apply !w-12
+  }
+  .table-wrap table thead tr th:first-child div:has(*[role=checkbox]),
+  .table-wrap table tbody tr td:first-child div:has(*[role=checkbox]) {
+    @apply !max-w-8 !w-8 !px-1
+  }
+  /* table 목록형 tableHead size 첫칸에 체크박스 있을 경우 사이즈 지정 */
+  .table-wrap table thead tr th:last-child div:has(svg[class ^="lucide"]),
+  .table-wrap table tbody tr td:last-child div:has(svg[class ^="lucide"]) {
+    @apply !max-w-6 !w-6 !mr-0 ml-auto pl-[2px]
+  }
+  /************************************/
+  .table-detail .table-wrap {
+    @apply !shadow-none !border-none
+  }
+  .table-detail.w100 table th > div{
+    width: auto !important
+  }
+
+
+  /* scroll */
+  /*
+   * div, main 항목의 스크롤은 아래 스타일로 커스텀 되어 있음
+   * textarea의 resizer의 사이즈가 스크롤 width에 영향을 받아 작아지는 현상 때문에 textarea는 커스텀 하지 않음
+   * scrollbar-custom 으로 예외적인 스크롤바를 커스텀 한 뒤 각 컴포넌트에 클래스명 삽입 할 수 있다.
+   */
+  /* 공통 scrollbar */
+  div::-webkit-scrollbar,main::-webkit-scrollbar {
+    @apply w-[6px] h-[6px]
+  }
+  div::-webkit-scrollbar-track,main::-webkit-scrollbar-track {
+    @apply bg-transparent;
+  }
+  div::-webkit-scrollbar-thumb,main::-webkit-scrollbar-thumb {
+    @apply bg-neutral-500/40 rounded-full
+  }
+  div::-webkit-scrollbar-thumb:hover,main::-webkit-scrollbar-thumb:hover {
+    @apply bg-neutral-500/30
+  }
+
+  /* data-table scrollbar with background */
+  .scrollbar-table::-webkit-scrollbar {
+    @apply w-[6px] h-[6px]
+  }
+  .scrollbar-table::-webkit-scrollbar-track {
+    @apply bg-muted/50 rounded-md;
+  }
+  .scrollbar-table::-webkit-scrollbar-thumb {
+    @apply bg-neutral-500/50 rounded-full
+  }
+  .scrollbar-table::-webkit-scrollbar-thumb:hover {
+    @apply bg-neutral-500/70
+  }
+
+  /* common selection color */
+  ::selection {
+    @apply bg-primary/20;
+  }
+
+  .react-grid-item.react-grid-placeholder {
+    background: rgba(0, 123, 255, 0.5) !important;
+    border: 1px solid rgba(0, 123, 255, 1) !important;
+  }
+  .react-grid-item > .border {
+    @apply border-border/70
+  }
+
+  /* [임시] FormBuilder "horizontal" 테마 적용 */
+  [data-theme="horizontal"] .field-template {
+    @apply flex-row;
+  }
+  [data-theme="horizontal"] .label {
+    @apply w-1/4 min-w-40 max-w-[240px];
+  }
+  [data-theme="horizontal"] .children {
+    @apply flex-1;
+  }
+  [data-theme="horizontal"] .toolbar {
+    @apply relative ml-2
+  }
+  /* FormBuilder datetime 리스트 정렬 */
+  [for^="root_alternative_alt-"]+.children>.list-inline {
+    @apply flex flex-row gap-2 items-center
+  }
+  [for^="root_alternative_alt-"]+.children>.list-inline>li>button {
+    @apply !w-fit gap-2
+  }
+
+  /* ace editor */
+  .ace_entity.ace_name.ace_tag, .ace-tomorrow .ace_entity.ace_other.ace_attribute-name, .ace-tomorrow .ace_meta.ace_tag, .ace-tomorrow .ace_string.ace_regexp, .ace-tomorrow .ace_variable {
+    color: blue !important;
+  }
+  /* 하단 설정을 사용하지 않을경우 cursor 밀림 현상 발생(https://stackoverflow.com/questions/15183031/ace-editor-cursor-behaves-incorrectly)*/
+  .ace_editor, .ace_editor *{
+    font-family: "Monaco", "Menlo", "Ubuntu Mono", "Droid Sans Mono", "Consolas", monospace !important;
+    font-size: 12px !important;
+    font-weight: 400 !important;
+    letter-spacing: 0 !important;
+  }
+
+  .ace_editor.ace-tomorrow-night {
+    background-color: var(--card) !important;
+    color: var(--foreground) !important;
+  }
+  .ace-tomorrow-night .ace_scroller,
+  .ace-tomorrow-night .ace_print-margin {
+    background-color: var(--card) !important;
+  }
+  .ace-tomorrow-night .ace_gutter {
+    background-color: var(--muted) !important;
+    color: var(--muted-foreground) !important;
+  }
+  .ace_gutter-active-line {
+    @apply !bg-black/10 dark:!bg-white/10
+  }
+  .ace_marker-layer .ace_active-line {
+    @apply !bg-black/10 dark:!bg-white/10
+  }
+  .ace_autocomplete {
+    min-width: 500px;
+  }
+
+  /* chart */
+  .chart-group {
+    @apply flex gap-5 flex-wrap [&>div]:flex-1 md:[&>div]:flex-auto md:flex-nowrap
+  }
+  .chart-pie {
+    @apply md:flex-wrap lg:flex-nowrap
+  }
+
+  /* animation: error, warning blink */
+  @keyframes warning-blink {
+    0% {
+      outline-color: red;
+    }
+    50% {
+      outline-color: transparent;
+    }
+    100% {
+      outline-color: red;
+    }
+  }
+
+  .animate-warning {
+    animation: warning-blink 1s infinite;
+  }
+}

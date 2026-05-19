@@ -1,0 +1,33 @@
+{
+  "type": "object",
+  "required": [
+    "type",
+    "name"
+  ],
+  "properties": {
+    "type": {
+      "type": "string",
+      "title": "Type",
+      "default": "prometheus",
+      "readOnly": true
+    },
+    "name": {
+      "type": "string",
+      "title": "Name",
+      "default": "prometheus-01"
+    },
+    "data": {
+      "type": "object",
+      "required": [
+        "address"
+      ],
+      "properties": {
+        "address": {
+          "type": "string",
+          "title": "Address",
+          "default": "http://localhost:9090"
+        }
+      }
+    }
+  }
+}

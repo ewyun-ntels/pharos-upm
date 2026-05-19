@@ -1,0 +1,63 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://ntels.com/pharos/schemas/BadgeSpec.schema.json",
+  "title": "BadgeSpec",
+  "description": "Schema for badge definition requests",
+  "type": "object",
+  "properties": {
+    "name": {
+      "type": "string",
+      "description": "Unique name of the badge",
+      "minLength": 1
+    },
+    "datasource": {
+      "type": "string",
+      "description": "Name of the datasource to query",
+      "minLength": 1
+    },
+    "query": {
+      "$ref": "#/definitions/QuerySpec"
+    },
+    "column": {
+      "type": "string",
+      "description": "Column name to extract from query result",
+      "minLength": 1
+    },
+    "cache_ttl": {
+      "type": "integer",
+      "description": "Cache time-to-live in seconds",
+      "minimum": 0,
+      "default": 60
+    }
+  },
+  "required": ["name", "datasource", "query", "column"],
+  "additionalProperties": false,
+  "definitions": {
+    "QuerySpec": {
+      "type": "object",
+      "description": "Query specification with variables and metadata",
+      "properties": {
+        "query": {
+          "type": "string",
+          "description": "Template query string",
+          "minLength": 1
+        },
+        "variables": {
+          "type": "object",
+          "description": "Variables for query template",
+          "additionalProperties": true
+        },
+        "time_label": {
+          "type": "string",
+          "description": "Label for time column"
+        },
+        "variable_label": {
+          "type": "string", 
+          "description": "Label for variable column"
+        }
+      },
+      "required": ["query"],
+      "additionalProperties": false
+    }
+  }
+}

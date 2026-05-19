@@ -1,0 +1,345 @@
+<mxfile host="app.diagrams.net" modified="2026-02-09T00:00:00.000Z" agent="5.0" version="24.0.0">
+  <diagram name="제어 시퀀스 다이어그램" id="sequence-diagram">
+    <mxGraphModel dx="1434" dy="844" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1800" pageHeight="2100" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        
+        <!-- 제목 -->
+        <mxCell id="title" value="STB 제어 시퀀스 다이어그램 (v3.0 최적화 - 실제 코드 기반)" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=24;fontStyle=1" vertex="1" parent="1">
+          <mxGeometry x="40" y="20" width="800" height="40" as="geometry" />
+        </mxCell>
+        
+        <!-- 참여자들 (Lifelines) -->
+        <!-- 관리자 -->
+        <mxCell id="actor-admin" value="관리자" style="shape=umlActor;verticalLabelPosition=bottom;verticalAlign=top;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;" vertex="1" parent="1">
+          <mxGeometry x="80" y="100" width="40" height="80" as="geometry" />
+        </mxCell>
+        <mxCell id="lifeline-admin" value="" style="endArrow=none;dashed=1;html=1;strokeWidth=2;strokeColor=#6c8ebf;" edge="1" parent="1">
+          <mxGeometry width="50" height="50" relative="1" as="geometry">
+            <mxPoint x="100" y="1900" as="sourcePoint" />
+            <mxPoint x="100" y="180" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        
+        <!-- HTTP API -->
+        <mxCell id="comp-api" value="HTTP API&#xa;(handler.go)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=12;fontStyle=1" vertex="1" parent="1">
+          <mxGeometry x="240" y="100" width="140" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="lifeline-api" value="" style="endArrow=none;dashed=1;html=1;strokeWidth=2;strokeColor=#d6b656;" edge="1" parent="1">
+          <mxGeometry width="50" height="50" relative="1" as="geometry">
+            <mxPoint x="310" y="1900" as="sourcePoint" />
+            <mxPoint x="310" y="160" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        
+        <!-- ClickHouse -->
+        <mxCell id="comp-db" value="ClickHouse&#xa;(dist_stb_information&#xa;dist_stb_control_job)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontSize=11;fontStyle=1" vertex="1" parent="1">
+          <mxGeometry x="460" y="100" width="140" height="80" as="geometry" />
+        </mxCell>
+        <mxCell id="lifeline-db" value="" style="endArrow=none;dashed=1;html=1;strokeWidth=2;strokeColor=#9673a6;" edge="1" parent="1">
+          <mxGeometry width="50" height="50" relative="1" as="geometry">
+            <mxPoint x="530" y="1900" as="sourcePoint" />
+            <mxPoint x="530" y="180" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        
+        <!-- K8s API -->
+        <mxCell id="comp-k8s" value="Kubernetes API&#xa;(Jobs)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=12;fontStyle=1" vertex="1" parent="1">
+          <mxGeometry x="680" y="100" width="140" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="lifeline-k8s" value="" style="endArrow=none;dashed=1;html=1;strokeWidth=2;strokeColor=#82b366;" edge="1" parent="1">
+          <mxGeometry width="50" height="50" relative="1" as="geometry">
+            <mxPoint x="750" y="1900" as="sourcePoint" />
+            <mxPoint x="750" y="160" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        
+        <!-- Worker Pod -->
+        <mxCell id="comp-worker" value="Worker Pod&#xa;(StbControlHandler)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontSize=12;fontStyle=1" vertex="1" parent="1">
+          <mxGeometry x="900" y="100" width="160" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="lifeline-worker" value="" style="endArrow=none;dashed=1;html=1;strokeWidth=2;strokeColor=#b85450;" edge="1" parent="1">
+          <mxGeometry width="50" height="50" relative="1" as="geometry">
+            <mxPoint x="980" y="1900" as="sourcePoint" />
+            <mxPoint x="980" y="160" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        
+        <!-- STB Device -->
+        <mxCell id="comp-stb" value="STB&#xa;(TCP:8801)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d79b00;fontSize=12;fontStyle=1" vertex="1" parent="1">
+          <mxGeometry x="1140" y="100" width="140" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="lifeline-stb" value="" style="endArrow=none;dashed=1;html=1;strokeWidth=2;strokeColor=#d79b00;" edge="1" parent="1">
+          <mxGeometry width="50" height="50" relative="1" as="geometry">
+            <mxPoint x="1210" y="1900" as="sourcePoint" />
+            <mxPoint x="1210" y="160" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        
+        <!-- Phase 1: 제어 요청 (HTTP POST) -->
+        <mxCell id="phase1-label" value="Phase 1: 제어 요청 접수" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#666666;strokeColor=#666666;fontColor=#ffffff;fontSize=14;fontStyle=1" vertex="1" parent="1">
+          <mxGeometry x="40" y="200" width="1240" height="30" as="geometry" />
+        </mxCell>
+        
+        <!-- 1. POST 요청 -->
+        <mxCell id="msg1" value="1. POST /catv/stb/control&#xa;{type:&quot;so&quot;, ids:[...], work_type:&quot;limitAge&quot;, work_value:&quot;3&quot;}" style="edgeStyle=orthogonalEdgeStyle;html=1;align=left;spacingLeft=2;endArrow=block;rounded=0;entryX=0;entryY=0;strokeWidth=2;" edge="1" parent="1">
+          <mxGeometry x="0.2" y="10" relative="1" as="geometry">
+            <mxPoint x="100" y="250" as="sourcePoint" />
+            <mxPoint x="310" y="250" as="targetPoint" />
+            <Array as="points">
+              <mxPoint x="205" y="250" />
+            </Array>
+            <mxPoint as="offset" />
+          </mxGeometry>
+        </mxCell>
+        
+        <!-- 2. DB 조회 (장비 IP) -->
+        <mxCell id="msg2" value="2. GetStbInformations(area, ids)&#xa;SELECT * FROM dist_stb_information FINAL&#xa;WHERE {조건: SCRBR_SO_NM | L3_EQUIP_TID_VAL | CCELL_NUM | CM_MAC_ADDR}&#xa;ORDER BY {조건 컬럼} ASC" style="edgeStyle=orthogonalEdgeStyle;html=1;align=left;spacingLeft=2;endArrow=block;rounded=0;strokeWidth=2;" edge="1" parent="1">
+          <mxGeometry x="0.2" y="10" relative="1" as="geometry">
+            <mxPoint x="310" y="300" as="sourcePoint" />
+            <mxPoint x="530" y="300" as="targetPoint" />
+            <mxPoint as="offset" />
+          </mxGeometry>
+        </mxCell>
+        
+        <!-- 3. 장비 정보 반환 -->
+        <mxCell id="msg3" value="3. []StbInformation (50,000대)&#xa;[{CM_MAC_ADDR, CM_IP_ADDR, STB_MAC_ADDR, SRC_IP_ADDR, ...}, ...]" style="edgeStyle=orthogonalEdgeStyle;html=1;align=left;spacingLeft=2;endArrow=open;rounded=0;strokeWidth=2;dashed=1;endFill=0;" edge="1" parent="1">
+          <mxGeometry x="0.2" y="10" relative="1" as="geometry">
+            <mxPoint x="530" y="330" as="sourcePoint" />
+            <mxPoint x="310" y="330" as="targetPoint" />
+            <mxPoint as="offset" />
+          </mxGeometry>
+        </mxCell>
+        
+        <!-- Phase 2: 메모리 준비 -->
+        <mxCell id="phase2-label" value="Phase 2: 메모리 준비 (v3.0 최적화 - DB 삽입 없음)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#666666;strokeColor=#666666;fontColor=#ffffff;fontSize=14;fontStyle=1" vertex="1" parent="1">
+          <mxGeometry x="40" y="370" width="1240" height="30" as="geometry" />
+        </mxCell>
+        
+        <!-- 4. 메모리에 Job 데이터 생성 -->
+        <mxCell id="note1" value="4. executionSubTaskMakeData()&#xa;jobID = UUID.New()&#xa;taskIDs = []string{jobID-0, jobID-1, ..., jobID-(count-1)}&#xa;&#xa;round-robin 분배:&#xa;for index, device := range stbInformations:&#xa;  taskID := taskIDs[index % len(taskIDs)]&#xa;  taskData := {&#xa;    CmMacAddr: device.CM_MAC_ADDR,&#xa;    CmIpAddr: device.CM_IP_ADDR,&#xa;    StbMacAddr: device.STB_MAC_ADDR,&#xa;    SrcIpAddr: device.SRC_IP_ADDR,&#xa;    StbControlRequestRaw: {...}&#xa;  }&#xa;  stbControlJobTables[taskID] += {&#xa;    task_status: &quot;pending&quot;,&#xa;    result_code: &quot;&quot; (빈 문자열),&#xa;    task_data: JSON(taskData),&#xa;    ...&#xa;  }&#xa;&#xa;⚠️ DB 삽입 없음 (메모리에만 저장)" style="shape=note;whiteSpace=wrap;html=1;backgroundOutline=1;darkOpacity=0.05;fillColor=#fff2cc;strokeColor=#d6b656;align=left;fontSize=10;fontFamily=Courier New;" vertex="1" parent="1">
+          <mxGeometry x="200" y="420" width="320" height="260" as="geometry" />
+        </mxCell>
+        
+        <!-- Phase 3: K8s Job 생성 -->
+        <mxCell id="phase3-label" value="Phase 3: K8s Job 생성 및 상태 업데이트" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#666666;strokeColor=#666666;fontColor=#ffffff;fontSize=14;fontStyle=1" vertex="1" parent="1">
+          <mxGeometry x="40" y="620" width="1240" height="30" as="geometry" />
+        </mxCell>
+        
+        <!-- 5. K8s Job 생성 -->
+        <mxCell id="msg5" value="5. createKubernetesJob(taskIDs[0])&#xa;POST /apis/batch/v1/namespaces/.../jobs" style="edgeStyle=orthogonalEdgeStyle;html=1;align=left;spacingLeft=2;endArrow=block;rounded=0;strokeWidth=2;" edge="1" parent="1">
+          <mxGeometry x="0.2" y="10" relative="1" as="geometry">
+            <mxPoint x="310" y="670" as="sourcePoint" />
+            <mxPoint x="750" y="670" as="targetPoint" />
+            <mxPoint as="offset" />
+          </mxGeometry>
+        </mxCell>
+        
+        <!-- 6. Job 생성 성공 -->
+        <mxCell id="msg6" value="6. Job Created (성공)" style="edgeStyle=orthogonalEdgeStyle;html=1;align=left;spacingLeft=2;endArrow=open;rounded=0;strokeWidth=2;dashed=1;endFill=0;" edge="1" parent="1">
+          <mxGeometry x="0.2" y="10" relative="1" as="geometry">
+            <mxPoint x="750" y="700" as="sourcePoint" />
+            <mxPoint x="310" y="700" as="targetPoint" />
+            <mxPoint as="offset" />
+          </mxGeometry>
+        </mxCell>
+        
+        <!-- 7. Job 생성 실패 케이스 -->
+        <mxCell id="msg7" value="7. createKubernetesJob(taskIDs[1]) - 실패&#xa;POST /apis/batch/v1/namespaces/.../jobs" style="edgeStyle=orthogonalEdgeStyle;html=1;align=left;spacingLeft=2;endArrow=block;rounded=0;strokeWidth=2;strokeColor=#b85450;" edge="1" parent="1">
+          <mxGeometry x="0.2" y="10" relative="1" as="geometry">
+            <mxPoint x="310" y="740" as="sourcePoint" />
+            <mxPoint x="750" y="740" as="targetPoint" />
+            <mxPoint as="offset" />
+          </mxGeometry>
+        </mxCell>
+        
+        <!-- 8. Job 생성 실패 응답 -->
+        <mxCell id="msg8" value="8. Error: Unauthorized (실패)" style="edgeStyle=orthogonalEdgeStyle;html=1;align=left;spacingLeft=2;endArrow=open;rounded=0;strokeWidth=2;dashed=1;endFill=0;strokeColor=#b85450;" edge="1" parent="1">
+          <mxGeometry x="0.2" y="10" relative="1" as="geometry">
+            <mxPoint x="750" y="770" as="sourcePoint" />
+            <mxPoint x="310" y="770" as="targetPoint" />
+            <mxPoint as="offset" />
+          </mxGeometry>
+        </mxCell>
+        
+        <!-- 9. 메모리에서 상태 변경 -->
+        <mxCell id="note2" value="9. executionSubTaskMakeJob() - 메모리 상태 업데이트&#xa;&#xa;for device in stbControlJobTables[taskID]:&#xa;  device.task_status = &quot;failed&quot;&#xa;  device.task_error_message = err.Error()&#xa;  // &quot;Failed to create Kubernetes job&quot; 등&#xa;&#xa;⚠️ K8s Job 생성 실패 시 해당 Task의 모든 장비 failed 처리" style="shape=note;whiteSpace=wrap;html=1;backgroundOutline=1;darkOpacity=0.05;fillColor=#f8cecc;strokeColor=#b85450;align=left;fontSize=10;fontFamily=Courier New;" vertex="1" parent="1">
+          <mxGeometry x="200" y="800" width="400" height="120" as="geometry" />
+        </mxCell>
+        
+        <!-- Phase 4: DB 배치 삽입 -->
+        <mxCell id="phase4-label" value="Phase 4: DB 배치 삽입 (최종 상태)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#666666;strokeColor=#666666;fontColor=#ffffff;fontSize=14;fontStyle=1" vertex="1" parent="1">
+          <mxGeometry x="40" y="910" width="1240" height="30" as="geometry" />
+        </mxCell>
+        
+        <!-- 10. 배치 삽입 -->
+        <mxCell id="msg10" value="10. executionSubTaskInsert() - 배치 삽입&#xa;INSERT INTO dist_stb_control_job&#xa;(task_status='pending' 또는 'failed', result_code='', ...)&#xa;&#xa;배치 크기: MaxCount 또는 MaxSize&#xa;⚠️ 단일 삽입 (중복 제거)" style="edgeStyle=orthogonalEdgeStyle;html=1;align=left;spacingLeft=2;endArrow=block;rounded=0;strokeWidth=2;" edge="1" parent="1">
+          <mxGeometry x="0.2" y="10" relative="1" as="geometry">
+            <mxPoint x="310" y="960" as="sourcePoint" />
+            <mxPoint x="530" y="960" as="targetPoint" />
+            <mxPoint as="offset" />
+          </mxGeometry>
+        </mxCell>
+        
+        <!-- 11. 삽입 완료 -->
+        <mxCell id="msg11" value="11. Insert OK" style="edgeStyle=orthogonalEdgeStyle;html=1;align=left;spacingLeft=2;endArrow=open;rounded=0;strokeWidth=2;dashed=1;endFill=0;" edge="1" parent="1">
+          <mxGeometry x="0.2" y="10" relative="1" as="geometry">
+            <mxPoint x="530" y="990" as="sourcePoint" />
+            <mxPoint x="310" y="990" as="targetPoint" />
+            <mxPoint as="offset" />
+          </mxGeometry>
+        </mxCell>
+        
+        <!-- 12. Job ID 반환 -->
+        <mxCell id="msg12" value="12. 200 OK&#xa;{job_id: &quot;550e8400-...&quot;, task_ids: [...]}&#xa;&#xa;✅ 단일 삽입 완료 (중복 제거)" style="edgeStyle=orthogonalEdgeStyle;html=1;align=left;spacingLeft=2;endArrow=open;rounded=0;strokeWidth=2;dashed=1;endFill=0;" edge="1" parent="1">
+          <mxGeometry x="0.2" y="10" relative="1" as="geometry">
+            <mxPoint x="310" y="1040" as="sourcePoint" />
+            <mxPoint x="100" y="1040" as="targetPoint" />
+            <mxPoint as="offset" />
+          </mxGeometry>
+        </mxCell>
+        
+        <!-- Phase 5: Worker 실행 -->
+        <mxCell id="phase5-label" value="Phase 5: Worker Pod 실행 (K8s Job)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#666666;strokeColor=#666666;fontColor=#ffffff;fontSize=14;fontStyle=1" vertex="1" parent="1">
+          <mxGeometry x="40" y="1090" width="1240" height="30" as="geometry" />
+        </mxCell>
+        
+        <!-- 13. K8s Job 실행 -->
+        <mxCell id="msg13" value="13. K8s Job 실행 (Pod 생성)&#xa;/opt/pharos/bin/pharos controller-job \&#xa;  --config=/path/to/config.yaml \&#xa;  --task-id=jobID-0" style="edgeStyle=orthogonalEdgeStyle;html=1;align=left;spacingLeft=2;endArrow=block;rounded=0;strokeWidth=2;" edge="1" parent="1">
+          <mxGeometry x="0.2" y="10" relative="1" as="geometry">
+            <mxPoint x="750" y="1140" as="sourcePoint" />
+            <mxPoint x="980" y="1140" as="targetPoint" />
+            <mxPoint as="offset" />
+          </mxGeometry>
+        </mxCell>
+        
+        <!-- 14. pending 작업 조회 -->
+        <mxCell id="msg14" value="14. SelectUnprocessedSTBs(taskID)&#xa;SELECT * FROM dist_stb_control_job FINAL&#xa;WHERE task_id=? AND task_status IN ('pending', 'failed', 'running')" style="edgeStyle=orthogonalEdgeStyle;html=1;align=left;spacingLeft=2;endArrow=block;rounded=0;strokeWidth=2;" edge="1" parent="1">
+          <mxGeometry x="0.2" y="10" relative="1" as="geometry">
+            <mxPoint x="980" y="1190" as="sourcePoint" />
+            <mxPoint x="530" y="1190" as="targetPoint" />
+            <mxPoint as="offset" />
+          </mxGeometry>
+        </mxCell>
+        
+        <!-- 15. pending 목록 반환 -->
+        <mxCell id="msg15" value="15. []StbControlJobTable (20,000개)" style="edgeStyle=orthogonalEdgeStyle;html=1;align=left;spacingLeft=2;endArrow=open;rounded=0;strokeWidth=2;dashed=1;endFill=0;" edge="1" parent="1">
+          <mxGeometry x="0.2" y="10" relative="1" as="geometry">
+            <mxPoint x="530" y="1220" as="sourcePoint" />
+            <mxPoint x="980" y="1220" as="targetPoint" />
+            <mxPoint as="offset" />
+          </mxGeometry>
+        </mxCell>
+        
+        <!-- 16. Running 상태 업데이트 -->
+        <mxCell id="msg16" value="16. BatchWriteRequest (async)&#xa;task_status='running', task_updated_at=NOW()&#xa;&#xa;⚠️ 비동기 배치 처리 (channel 전송)&#xa;10초 timeout 후 fallback: direct INSERT" style="edgeStyle=orthogonalEdgeStyle;html=1;align=left;spacingLeft=2;endArrow=block;rounded=0;strokeWidth=2;" edge="1" parent="1">
+          <mxGeometry x="0.2" y="10" relative="1" as="geometry">
+            <mxPoint x="980" y="1260" as="sourcePoint" />
+            <mxPoint x="530" y="1260" as="targetPoint" />
+            <mxPoint as="offset" />
+          </mxGeometry>
+        </mxCell>
+        
+        <!-- Phase 6: TCP 제어 실행 -->
+        <mxCell id="phase6-label" value="Phase 6: TCP 제어 실행 (각 STB별)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#666666;strokeColor=#666666;fontColor=#ffffff;fontSize=14;fontStyle=1" vertex="1" parent="1">
+          <mxGeometry x="40" y="1300" width="1240" height="30" as="geometry" />
+        </mxCell>
+        
+        <!-- 17. TCP 연결 및 명령 전송 -->
+        <mxCell id="msg17" value="17. Direct TCP Dial + Send&#xa;DialTimeout(tcp, cm_ip:8801, 3s)&#xa;Write({work_type:&quot;limitAge&quot;, work_value:&quot;3&quot;})&#xa;&#xa;⚠️ Connection Pool 사용 안함 (각 장비 IP 고유)" style="edgeStyle=orthogonalEdgeStyle;html=1;align=left;spacingLeft=2;endArrow=block;rounded=0;strokeWidth=2;" edge="1" parent="1">
+          <mxGeometry x="0.2" y="10" relative="1" as="geometry">
+            <mxPoint x="980" y="1350" as="sourcePoint" />
+            <mxPoint x="1210" y="1350" as="targetPoint" />
+            <mxPoint as="offset" />
+          </mxGeometry>
+        </mxCell>
+        
+        <!-- 18. STB 응답 -->
+        <mxCell id="msg18" value="18. Response&#xa;{code:&quot;1&quot;, message:&quot;success&quot;}" style="edgeStyle=orthogonalEdgeStyle;html=1;align=left;spacingLeft=2;endArrow=open;rounded=0;strokeWidth=2;dashed=1;endFill=0;" edge="1" parent="1">
+          <mxGeometry x="0.2" y="10" relative="1" as="geometry">
+            <mxPoint x="1210" y="1380" as="sourcePoint" />
+            <mxPoint x="980" y="1380" as="targetPoint" />
+            <mxPoint as="offset" />
+          </mxGeometry>
+        </mxCell>
+        
+        <!-- 19. 결과 업데이트 -->
+        <mxCell id="msg19" value="19. BatchWriteRequest (async) - 결과 업데이트&#xa;task_status='completed',&#xa;result_code='1' (ResponseCodeSuccess),&#xa;result_message='success',&#xa;control_executed_at=NOW(),&#xa;task_updated_at=NOW()&#xa;&#xa;⚠️ ReplacingMergeTree: ver 컬럼으로 최신 상태 유지" style="edgeStyle=orthogonalEdgeStyle;html=1;align=left;spacingLeft=2;endArrow=block;rounded=0;strokeWidth=2;" edge="1" parent="1">
+          <mxGeometry x="0.2" y="10" relative="1" as="geometry">
+            <mxPoint x="980" y="1440" as="sourcePoint" />
+            <mxPoint x="530" y="1440" as="targetPoint" />
+            <mxPoint as="offset" />
+          </mxGeometry>
+        </mxCell>
+        
+        <!-- 20. ReplacingMergeTree 병합 -->
+        <mxCell id="note3" value="20. ReplacingMergeTree 병합 동작&#xa;&#xa;ORDER BY (request_received_at, job_id, task_id, task_data)&#xa;→ 동일 키의 레코드는 ver 컬럼으로 최신 상태 결정&#xa;&#xa;FINAL 절: 병합 완료된 최종 데이터만 반환&#xa;&#xa;예: pending(ver=1) → running(ver=2) → completed(ver=3)&#xa;FINAL 조회 시 completed(ver=3)만 반환" style="shape=note;whiteSpace=wrap;html=1;backgroundOutline=1;darkOpacity=0.05;fillColor=#e1d5e7;strokeColor=#9673a6;align=left;fontSize=10;fontFamily=Courier New;" vertex="1" parent="1">
+          <mxGeometry x="380" y="1470" width="400" height="150" as="geometry" />
+        </mxCell>
+        
+        <!-- Phase 7: 결과 조회 -->
+        <mxCell id="phase7-label" value="Phase 7: 결과 조회 (HTTP GET)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#666666;strokeColor=#666666;fontColor=#ffffff;fontSize=14;fontStyle=1" vertex="1" parent="1">
+          <mxGeometry x="40" y="1610" width="1240" height="30" as="geometry" />
+        </mxCell>
+        
+        <!-- 21. 결과 조회 요청 -->
+        <mxCell id="msg21" value="21. GET /results/{job_id}?status=all" style="edgeStyle=orthogonalEdgeStyle;html=1;align=left;spacingLeft=2;endArrow=block;rounded=0;strokeWidth=2;" edge="1" parent="1">
+          <mxGeometry x="0.2" y="10" relative="1" as="geometry">
+            <mxPoint x="100" y="1660" as="sourcePoint" />
+            <mxPoint x="310" y="1660" as="targetPoint" />
+            <mxPoint as="offset" />
+          </mxGeometry>
+        </mxCell>
+        
+        <!-- 22. FINAL 절로 조회 -->
+        <mxCell id="msg22" value="22. SELECT * FROM dist_stb_control_job FINAL&#xa;WHERE job_id=? AND filters...&#xa;ORDER BY task_created_at ASC LIMIT ? OFFSET ?" style="edgeStyle=orthogonalEdgeStyle;html=1;align=left;spacingLeft=2;endArrow=block;rounded=0;strokeWidth=2;" edge="1" parent="1">
+          <mxGeometry x="0.2" y="10" relative="1" as="geometry">
+            <mxPoint x="310" y="1710" as="sourcePoint" />
+            <mxPoint x="530" y="1710" as="targetPoint" />
+            <mxPoint as="offset" />
+          </mxGeometry>
+        </mxCell>
+        
+        <!-- 23. 최종 상태 반환 -->
+        <mxCell id="msg23" value="23. []JobResultItem (최종 상태만)&#xa;completed: 49,750, failed: 150, pending: 100" style="edgeStyle=orthogonalEdgeStyle;html=1;align=left;spacingLeft=2;endArrow=open;rounded=0;strokeWidth=2;dashed=1;endFill=0;" edge="1" parent="1">
+          <mxGeometry x="0.2" y="10" relative="1" as="geometry">
+            <mxPoint x="530" y="1750" as="sourcePoint" />
+            <mxPoint x="310" y="1750" as="targetPoint" />
+            <mxPoint as="offset" />
+          </mxGeometry>
+        </mxCell>
+        
+        <!-- 24. 결과 화면 표시 -->
+        <mxCell id="msg24" value="24. 200 OK - 결과 목록 표시" style="edgeStyle=orthogonalEdgeStyle;html=1;align=left;spacingLeft=2;endArrow=open;rounded=0;strokeWidth=2;dashed=1;endFill=0;" edge="1" parent="1">
+          <mxGeometry x="0.2" y="10" relative="1" as="geometry">
+            <mxPoint x="310" y="1790" as="sourcePoint" />
+            <mxPoint x="100" y="1790" as="targetPoint" />
+            <mxPoint as="offset" />
+          </mxGeometry>
+        </mxCell>
+        
+        <!-- 주요 최적화 포인트 설명 -->
+        <mxCell id="optimization" value="✅ v3.0 주요 최적화 포인트&#xa;&#xa;1️⃣ 중복 삽입 제거: 메모리 → K8s → DB (단일 삽입)&#xa;   ❌ 이전: pending 삽입 → failed 업데이트 = 2회 DB 작업&#xa;   ✅ 현재: K8s Job 생성 후 최종 상태만 삽입 (1회)&#xa;   💡 executionSubTaskMakeJob()에서 메모리 상태 변경&#xa;&#xa;2️⃣ 배치 삽입 최적화:&#xa;   - MaxCount 또는 MaxSize에 도달하거나 마지막 항목 시 삽입&#xa;   - 조건: (index+1) % MaxCount == 0 || batch.Len() >= MaxSize || 마지막&#xa;   - ClickHouse 배치 API 활용 (clickhouse_interface.ClickhouseBatch)&#xa;&#xa;3️⃣ 메모리 안전성: defer로 자동 리소스 정리 (메모리 누수 방지)&#xa;&#xa;4️⃣ 직접 TCP 연결: Connection Pool overhead 제거&#xa;   - 각 장비 IP가 고유 → 재사용률 0%&#xa;   - net.DialTimeout 직접 사용 (50-100μs overhead 제거)&#xa;&#xa;5️⃣ FINAL 절 사용: ReplacingMergeTree 최종 상태 조회&#xa;   - ver 컬럼으로 최신 레코드만 반환&#xa;   - 중복 레코드 자동 제거" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;align=left;verticalAlign=top;spacingLeft=10;spacingTop=5;fontSize=11;fontFamily=Courier New;" vertex="1" parent="1">
+          <mxGeometry x="1320" y="200" width="440" height="360" as="geometry" />
+        </mxCell>
+        
+        <!-- 성능 지표 -->
+        <mxCell id="performance" value="📊 성능 지표 (실제 코드 기반)&#xa;&#xa;• Rate Limit: 300 연결/초 (MaxConnectionsPerSecond 기본값)&#xa;  - Port exhaustion 방지 (TIME_WAIT 관리)&#xa;  - Per-service rate limiter (다중 서비스 시 곱셈)&#xa;  - Steady state: 1,500 active + 18,000 TIME_WAIT ≈ 19,500 ports&#xa;&#xa;• Worker Pool: config.Pool.Workers.WorkerCount&#xa;  - JobQueueSize, BatchSize 설정 가능&#xa;  - EnableMetrics로 모니터링&#xa;&#xa;• Retry 정책:&#xa;  - Total: Retry.Total.Count회 (기본 5초 delay)&#xa;  - Port Exhaustion: Retry.PortExhaustion.Count회 (기본 20초 delay)&#xa;  - Progressive backoff: attempt × delay&#xa;&#xa;• Timeout:&#xa;  - Connection: Timeout.Connection (기본 3초)&#xa;  - Send: Timeout.Send (기본 5초)&#xa;&#xa;• 배치 처리:&#xa;  - MaxCount: Batch.MaxCount&#xa;  - MaxSize: Batch.MaxSize&#xa;  - FlushInterval: Batch.FlushInterval" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;align=left;verticalAlign=top;spacingLeft=10;spacingTop=5;fontSize=10;fontFamily=Courier New;" vertex="1" parent="1">
+          <mxGeometry x="1320" y="580" width="440" height="320" as="geometry" />
+        </mxCell>
+        
+        <!-- 상태 코드 설명 -->
+        <mxCell id="codes" value="📖 result_code 의미 (실제 코드 상수)&#xa;&#xa;• ResponseCodeSuccess = &quot;1&quot;: 성공&#xa;  - Command executed successfully&#xa;  - STB가 명령을 정상 수행&#xa;&#xa;• ResponseCodeFailure = &quot;0&quot;: 장비 에러 (device-side error)&#xa;  - wrong parameter&#xa;  - wrong work type&#xa;  - not supported&#xa;  - no data, no action&#xa;&#xa;• ResponseCodeError = &quot;-1&quot;: 시스템 에러 (network, validation, etc.)&#xa;  - connection timeout&#xa;  - connection refused&#xa;  - network unreachable&#xa;  - failed to send command&#xa;  - communication error&#xa;&#xa;• &quot;&quot; (빈 문자열): 초기 상태&#xa;  - K8s Job 생성 실패 (task_error_message 확인)&#xa;  - Worker 실행 전 (pending 상태)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;align=left;verticalAlign=top;spacingLeft=10;spacingTop=5;fontSize=10;fontFamily=Courier New;" vertex="1" parent="1">
+          <mxGeometry x="1320" y="920" width="440" height="320" as="geometry" />
+        </mxCell>
+        
+        <!-- task_status 설명 -->
+        <mxCell id="task-status" value="📋 task_status 의미 (실제 코드 상수)&#xa;&#xa;• ControlJobStatusPending = &quot;pending&quot;&#xa;  - executionSubTaskMakeData()에서 초기 상태로 설정&#xa;  - K8s Job 생성 성공, Worker 실행 대기 중&#xa;  - SelectUnprocessedSTBs() 조회 대상&#xa;&#xa;• ControlJobStatusRunning = &quot;running&quot;&#xa;  - StbControlHandler.Handle()에서 설정&#xa;  - Worker가 TCP 통신 중&#xa;  - BatchWriteRequest로 async 업데이트&#xa;&#xa;• ControlJobStatusCompleted = &quot;completed&quot;&#xa;  - TCP 통신 완료 (성공/실패)&#xa;  - result_code와 함께 확인 필수:&#xa;    * completed + code=&quot;1&quot;: 성공&#xa;    * completed + code=&quot;0&quot;/&quot;-1&quot;: 실패 (장비/시스템 에러)&#xa;&#xa;• ControlJobStatusFailed = &quot;failed&quot;&#xa;  - executionSubTaskMakeJob()에서 설정&#xa;  - K8s Job 생성 실패&#xa;  - task_error_message에 에러 내용 저장&#xa;  - result_code = &quot;&quot; (빈 문자열)&#xa;  - SelectUnprocessedSTBs() 조회 대상 (retry 가능)&#xa;&#xa;⚠️ 주의: SelectUnprocessedSTBs()는 pending, failed, running 모두 조회" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;align=left;verticalAlign=top;spacingLeft=10;spacingTop=5;fontSize=10;fontFamily=Courier New;" vertex="1" parent="1">
+          <mxGeometry x="1320" y="1260" width="440" height="420" as="geometry" />
+        </mxCell>
+        
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

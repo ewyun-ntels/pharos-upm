@@ -1,0 +1,38 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "RoleMetadata",
+  "description": "Metadata for a role (for UI display purposes). Supports both atomic roles and composite roles",
+  "type": "object",
+  "properties": {
+    "key": {
+      "type": "string",
+      "description": "Role key (e.g., 'role:user_read', 'extension:catv:view_quality')"
+    },
+    "displayName": {
+      "type": "string",
+      "description": "User-friendly display name (e.g., '사용자 조회', '품질 지표 조회')"
+    },
+    "description": {
+      "type": "string",
+      "description": "Description of what this role allows"
+    },
+    "group": {
+      "type": "string",
+      "description": "Role group type for categorization (recommended: role, attribute, permission, or custom category)"
+    },
+    "hide": {
+      "type": "boolean",
+      "description": "Whether to hide this role from UI selection (e.g., internal or system roles). If false or nil, the role is visible and selectable in UI",
+      "default": false
+    },
+    "roles": {
+      "type": "object",
+      "description": "Composite role definition: map of sub-roles this role includes. If nil or empty, this is an atomic role. If non-empty, this is a composite role that expands to included roles",
+      "additionalProperties": {
+        "type": "boolean"
+      }
+    }
+  },
+  "required": ["key", "displayName", "description", "group"],
+  "additionalProperties": false
+}

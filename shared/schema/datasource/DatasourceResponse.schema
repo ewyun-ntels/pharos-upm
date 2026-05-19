@@ -1,0 +1,44 @@
+{
+  "title": "Datasource Response",
+  "description": "Standard response schema for all datasource queries (database, external APIs, etc.)",
+  "type": "object",
+  "properties": {
+    "meta": {
+      "type": "array",
+      "description": "Column metadata",
+      "items": {
+        "type": "object",
+        "additionalProperties": {
+          "type": "string"
+        }
+      }
+    },
+    "data": {
+      "type": "array",
+      "description": "Result rows",
+      "items": {
+        "type": "object",
+        "additionalProperties": true
+      }
+    },
+    "rows": {
+      "type": "integer",
+      "description": "Number of rows returned"
+    },
+    "sql": {
+      "type": "string",
+      "description": "Query executed (SQL, API call, etc.)"
+    },
+    "statistics": {
+      "type": "object",
+      "properties": {
+        "elapsed": {
+          "type": "number",
+          "description": "Query execution time in seconds"
+        }
+      }
+    }
+  },
+  "required": ["meta", "data", "rows"],
+  "additionalProperties": false
+}

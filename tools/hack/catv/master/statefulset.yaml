@@ -1,0 +1,102 @@
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: catv-master
+  namespace: catv
+  labels:
+    app: catv-master
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: catv-master
+  template:
+    metadata:
+      labels:
+        app: catv-master
+    spec:
+      volumes:
+        - name: catv-store
+          persistentVolumeClaim:
+            claimName: catv-store
+        - name: cert
+          secret:
+            secretName: master-cert
+            defaultMode: 420
+        - name: catv-master-credentials
+          secret:
+            secretName: catv-master-credentials
+            defaultMode: 420
+      containers:
+        - name: server
+          image: ntels.harbor.core/pharos/pharos-catv-dev:latest
+          command:
+            - /opt/pharos/bin/pharos
+            - serve
+            - '--config'
+            - /opt/pharos/config/master_config.toml
+          env:
+            - name: SERVE_TYPE
+              value: master
+            - name: AUTH_KEY_FILE
+              value: '/opt/pharos/config/jwt.key'
+            - name: SERVE_SERVER_SCHEMA
+              value: http
+            - name: DATABASE_SQLITE_PATH
+              value: /store/catv.db
+            - name: STATISTICS_DATABASE_DRIVER
+              value: clickhouse
+            - name: STATISTICS_DATABASE_CLICKHOUSE_HOST
+              value: 192.168.15.102
+            - name: STATISTICS_DATABASE_CLICKHOUSE_PORT
+              value: '9000'
+            - name: STATISTICS_DATABASE_CLICKHOUSE_USERNAME
+              value: default
+            - name: STATISTICS_DATABASE_CLICKHOUSE_PASSWORD
+              value: default
+            - name: STATISTICS_DATABASE_CLICKHOUSE_DATABASE
+              value: default
+            - name: CATV_CONTROLLER_K8S_JOB_NAMESPACE
+              value: catv
+            - name: CATV_DATABASE_CLICKHOUSE_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: catv-master-credentials
+                  key: clickhouse-password
+            - name: CATV_COLLECT_WEATHER_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: catv-master-credentials
+                  key: weather-password
+          ports:
+            - name: http
+              containerPort: 8080
+              protocol: TCP
+            - name: https
+              containerPort: 8443
+              protocol: TCP
+            - name: tx-daily
+              containerPort: 50001
+              protocol: UDP
+            - name: tx-diagnostic
+              containerPort: 50003
+              protocol: UDP
+            - name: tx-n-q-t
+              containerPort: 50004
+              protocol: UDP
+            - name: tx-periodic
+              containerPort: 50000
+              protocol: UDP
+            - name: tx-q-m
+              containerPort: 50005
+              protocol: UDP
+          volumeMounts:
+            - name: catv-store
+              mountPath: /store
+            - name: cert
+              readOnly: true
+              mountPath: /catv/cert
+          imagePullPolicy: Always
+      restartPolicy: Always
+      serviceAccountName: catv-master

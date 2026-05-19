@@ -1,0 +1,7 @@
+{
+  "data": {
+    "password": {
+      "ui:widget": "password"
+    }
+  }
+}

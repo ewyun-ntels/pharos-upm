@@ -1,0 +1,9 @@
+{
+  "type": "string",
+  "description": "Type of alert rule",
+  "enum": [
+    "query",
+    "event-status",
+    "event-history"
+  ]
+}

@@ -1,0 +1,14 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://ntels.com/pharos/schemas/user/GetUserResponse.schema.json",
+  "title": "GetUserResponse",
+  "description": "Response body for getting a single user (GET /user/{username})",
+  "type": "object",
+  "properties": {
+    "user": {
+      "$ref": "User.schema"
+    }
+  },
+  "required": ["user"],
+  "additionalProperties": false
+}

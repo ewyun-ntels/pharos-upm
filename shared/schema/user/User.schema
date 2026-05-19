@@ -1,0 +1,82 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://ntels.com/pharos/schemas/User.schema.json",
+  "title": "User",
+  "description": "User information from Backend GET /me API (core/pkg/userhandler/resources.go - Details struct)",
+  "type": "object",
+  "properties": {
+    "name": {
+      "type": "string",
+      "description": "User's unique identifier (username)"
+    },
+    "created_at": {
+      "type": ["string", "null"],
+      "format": "date-time",
+      "description": "User creation timestamp"
+    },
+    "attributes": {
+      "$ref": "Attributes.schema"
+    },
+    "roles": {
+      "type": "array",
+      "description": "List of user's roles (both atomic and composite)",
+      "items": {
+        "type": "object",
+        "properties": {
+          "role": {
+            "type": "string",
+            "description": "Composite role key (e.g., 'role:tarzan_admin_role')"
+          },
+          "display_name": {
+            "type": "string",
+            "description": "Display name of the composite role (e.g., 'Admin')"
+          },
+          "group": {
+            "type": "string",
+            "description": "Role group type for categorization (e.g., 'composite', 'role', 'permission')"
+          },
+          "description": {
+            "type": "string",
+            "description": "Description of what this role allows"
+          }
+        },
+        "required": ["role", "display_name"],
+        "additionalProperties": false
+      }
+    },
+    "is_me": {
+      "type": "boolean",
+      "description": "Whether this user is the currently authenticated user (only in user list)"
+    },
+    "blocked": {
+      "type": ["boolean", "null"],
+      "description": "Whether the user is blocked"
+    },
+    "prepare": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "Preparation steps required (e.g., password_change)"
+    },
+    "prepare_labels": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "Display labels for each prepare step, computed by the backend"
+    },
+    "password_expired_at": {
+      "type": ["string", "null"],
+      "format": "date-time",
+      "description": "Password expiration timestamp"
+    },
+    "temporary_blocked_expires_at": {
+      "type": ["string", "null"],
+      "format": "date-time",
+      "description": "Temporary block expiration timestamp"
+    }
+  },
+  "required": ["name"],
+  "additionalProperties": false
+}

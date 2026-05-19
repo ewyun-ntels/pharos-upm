@@ -1,0 +1,24 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "DataProvider",
+  "description": "Data source configuration for panels",
+  "type": "object",
+  "properties": {
+    "chartQuery": {
+      "type": "array",
+      "description": "Array of chart queries",
+      "items": {
+        "$ref": "ChartQuery.schema"
+      }
+    },
+    "dataProviderName": {
+      "type": "string",
+      "description": "Name of the data provider"
+    },
+    "resource": {
+      "type": "string",
+      "description": "Resource identifier"
+    }
+  },
+  "additionalProperties": false
+}

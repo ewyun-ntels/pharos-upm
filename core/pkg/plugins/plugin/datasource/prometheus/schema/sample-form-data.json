@@ -1,0 +1,7 @@
+{
+  "type": "prometheus",
+  "name": "sample-prometheus",
+  "data": {
+    "address": "http://192.168.15.101:30090"
+  }
+}

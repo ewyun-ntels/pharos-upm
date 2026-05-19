@@ -1,0 +1,1 @@
+export { NotificationTableTabs } from './NotificationTableTabs';

@@ -1,0 +1,7 @@
+{
+  "type": "string",
+  "description": "Severity level of the event",
+  "minLength": 1,
+  "maxLength": 50,
+  "examples": ["Critical", "Warning", "Normal"]
+}

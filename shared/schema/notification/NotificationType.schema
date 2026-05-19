@@ -1,0 +1,11 @@
+{
+  "type": "string",
+  "description": "Type of notification rule",
+  "enum": [
+    "webhook",
+    "email",
+    "slack",
+    "teams",
+    "snmp"
+  ]
+}

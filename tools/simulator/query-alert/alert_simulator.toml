@@ -1,0 +1,10 @@
+# Alert simulator configuration
+# You can override this path via --config or ALERT_SIM_CONFIG environment variable.
+
+clickhouse_url = "http://192.168.15.101:31478"
+database = "tarzan"
+table = "cpu"
+username = "default"
+password = "B8i4G17XrC"
+# host_name to be used in payload
+host_name = "host_alert"

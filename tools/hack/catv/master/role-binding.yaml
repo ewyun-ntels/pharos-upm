@@ -1,0 +1,15 @@
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: catv-master
+  namespace: catv
+  labels:
+    app: catv-master
+subjects:
+  - kind: ServiceAccount
+    name: catv-master
+    namespace: catv
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: catv-master

@@ -1,0 +1,42 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "EventHistoryAlertRule",
+  "description": "Schema for event-history alert rules that store events and manage retention periods",
+  "type": "object",
+  "properties": {
+    "id": {
+      "type": "string",
+      "description": "Unique identifier for the alert rule",
+      "format": "uuid"
+    },
+    "alert_type": {
+      "const": "event-history"
+    },
+    "name": {
+      "type": "string",
+      "description": "Name of the alert rule",
+      "minLength": 1
+    },
+    "description": {
+      "type": "string",
+      "description": "Description shown when alert is triggered"
+    },
+    "notifications": {
+      "type": "array",
+      "description": "List of notification destinations",
+      "items": {
+        "type": "string"
+      },
+      "default": []
+    },
+    "retention_period": {
+      "type": "integer",
+      "description": "Retention period in seconds for historical events",
+      "minimum": 1
+    }
+  },
+  "required": [
+    "retention_period"
+  ],
+  "additionalProperties": false
+}

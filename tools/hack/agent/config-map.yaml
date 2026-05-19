@@ -1,0 +1,480 @@
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: vector-config
+  labels:
+    app: vector
+data:
+
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: metric-entries
+  labels:
+    app: vector
+data:
+  metric-entries.json: |
+    [
+        {
+            "name": "Cache Sizes",
+            "description": "PostgreSQL 데이터베이스의 설정 정보(pg_settings) 중에서 캐시, 메모리 및 버퍼 관련 설정 값을 조회",
+            "sql": "SELECT name, setting, unit, category, short_desc\nFROM pg_settings \nWHERE name IN (\n    -- Buffer Cache\n    'shared_buffers', \n    -- Shared Pool\n    'work_mem', 'effective_cache_size', 'maintenance_work_mem', 'plan_cache_mode',\n    -- Block Size\n    'block_size',\n    -- WAL (Redo Log Buffer)\n    'wal_buffers',\n    -- ETC\n    'temp_buffers',         -- 각 세션이 사용하는 임시 버퍼\n    'default_statistics_target', -- 통계 정보 캐싱 관련\n    'autovacuum_work_mem',  -- AutoVacuum이 사용하는 메모리\n    'wal_writer_delay'      -- WAL Writer의 동작 주기 (로그 플러시 속도에 영향)\n)\nORDER BY name;"
+        },
+        {
+            "name": "Load Profile",
+            "description": "PostgreSQL 데이터베이스의 통계 정보를 조회\n각 데이터베이스의 트랜잭션 및 캐시 히트 비율(cache hit ratio) 을 분석",
+            "sql": "SELECT\n    read_stats.datname,\n    txn_stats.num_commits,\n    txn_stats.num_rollbacks,\n    txn_stats.num_transactions,\n    read_stats.logical_read,\n    read_stats.physical_read,\n    (CASE \n        WHEN (read_stats.logical_read + read_stats.physical_read) \u003e 0\n        THEN round((read_stats.logical_read / (1.0 + (read_stats.logical_read + read_stats.physical_read))) * 100, 5)\n        ELSE 0\n    END) AS cache_hit_ratio\nFROM (\n    -- logical read \u0026 physical read\n    SELECT datname, sum(blks_hit) as logical_read, sum(blks_read) as physical_read\n    FROM pg_stat_database\n    GROUP BY datname\n) AS read_stats\nJOIN (\n    -- commit, rollback, transaction counts\n    SELECT datname, sum(xact_commit) as num_commits, \n           sum(xact_rollback) as num_rollbacks, \n           sum(xact_commit + xact_rollback) as num_transactions\n    FROM pg_stat_database\n    GROUP BY datname\n) AS txn_stats\nON read_stats.datname = txn_stats.datname;"
+        },
+        {
+            "name": "Instance Efficiency Percentages (Target 100%)",
+            "description": "PostgreSQL 데이터베이스의 성능 및 효율성을 평가하는 주요 지표를 조회",
+            "sql": "SELECT \n    (SELECT round((buffers_backend_fsync::numeric / NULLIF(buffers_alloc, 0)) * 100, 5) \n     FROM pg_stat_bgwriter) AS buffer_nowait_ratio,\n\n    (SELECT round((buffers_checkpoint::numeric / NULLIF(checkpoints_req + checkpoints_timed, 0)) * 100, 5) \n     FROM pg_stat_bgwriter) AS redo_nowait_ratio,\n\n    (SELECT round((sum(blks_hit)::numeric / NULLIF(sum(blks_hit + blks_read), 0)) * 100, 5) \n     FROM pg_stat_database) AS buffer_hit_ratio,\n\n    (SELECT round((sum(shared_blks_hit)::numeric / NULLIF(sum(shared_blks_hit + shared_blks_read), 0)) * 100, 5) \n     FROM pg_stat_statements) AS library_hit_ratio,\n\n    (SELECT round((sum(plans) * 100.0 / NULLIF(sum(calls), 0)), 5) \n     FROM pg_stat_statements) AS soft_parse_ratio,\n\n    (SELECT round(count(*) FILTER (WHERE wait_event IS NULL) * 100.0 / count(*), 5) \n     FROM pg_stat_activity) AS latch_hit_ratio,\n\n    (SELECT round((sum(total_plan_time) * 100.0 / NULLIF(sum(total_exec_time), 0))::numeric, 5) \n     FROM pg_stat_statements) AS parse_cpu_to_parse_elapsed_ratio,\n\n    (SELECT round((sum(total_exec_time - total_plan_time) * 100.0 / NULLIF(sum(total_exec_time), 0))::numeric, 5) \n     FROM pg_stat_statements) AS non_parse_cpu_ratio;"
+        },
+        {
+            "name": "Shared Pool Statistics",
+            "description": "데이터베이스의 SQL 실행 및 메모리 사용 통계 조회",
+            "sql": "SELECT \n    -- Memory Usage %\n    round(\n        (sum(shared_blks_hit + shared_blks_read + shared_blks_written)::numeric \n        / NULLIF((\n            SELECT setting::bigint \n            FROM pg_settings \n            WHERE name = 'shared_buffers'\n        ) * 8, 0)) * 100, 5\n    ) AS memory_usage_ratio,\n\n    -- % SQL with executions \u003e 1\n    round((count(*) FILTER (WHERE calls \u003e 1) * 100.0 / count(*)), 5) AS sql_with_executions_gt_1,\n\n    -- % Memory for SQL w/exec \u003e 1 (메모리는 없어서 실행시간으로 대신함)\n    round((sum(total_exec_time) FILTER (WHERE calls \u003e 1) * 100.0 / NULLIF(sum(total_exec_time), 0))::numeric, 5) AS memory_for_sql_exec_gt_1\nFROM pg_stat_statements;"
+        },
+        {
+            "name": "Top 5 Timed Foreground Events",
+            "description": "PostgreSQL 데이터베이스의 현재 세션에서 대기(wait) 상태인 프로세스(쿼리) 상위 5개 정보를 조회",
+            "sql": "SELECT \n    wait_event_type,\n    wait_event,\n    state,\n    state_change,\n    round(extract(epoch FROM (now() - state_change))) AS wait_time_seconds\nFROM pg_stat_activity\nWHERE wait_event IS NOT null and state IS NOT null\nORDER BY wait_time_seconds DESC\nLIMIT 5;"
+        },
+        {
+            "name": "Host CPU\nInstance CPU",
+            "description": "호스트 및 인스턴스 CPU 정보",
+            "sql": ""
+        },
+        {
+            "name": "Memory Statistics",
+            "description": "PostgreSQL 데이터베이스의 메모리 사용량(SGA 및 PGA) 정보를 조회",
+            "sql": "SELECT \n    s.sga_use_mb, \n    p.pga_use_mb,\n    round(s.sga_use_mb + p.pga_use_mb, 5) AS sga_pga_total_mb\nFROM\n    (\n        SELECT round(setting::numeric / 1024 * 8, 5) AS sga_use_mb\n        FROM pg_settings\n        WHERE name = 'shared_buffers'\n    ) AS s\nCROSS JOIN\n    (\n        SELECT round(\n            ( (SELECT round(setting::numeric / 1024, 5) FROM pg_settings WHERE name = 'work_mem')\n            + (SELECT round(setting::numeric / 1024, 5) FROM pg_settings WHERE name = 'maintenance_work_mem')\n            + (SELECT round(setting::numeric / 1024 * 8, 5) FROM pg_settings WHERE name = 'temp_buffers')\n            ), 5) AS pga_use_mb\n    ) AS p;"
+        },
+        {
+            "name": "Time Model Statistics",
+            "description": "성능 관련 정보 조회\n(쿼리 실행 시간)",
+            "sql": "SELECT \n    round(sum(total_exec_time)::numeric / 3600, 5) AS db_time_hours,\n    round(sum(total_plan_time)::numeric / 3600, 5) AS parse_time_elapsed_hours\nFROM pg_stat_statements;"
+        },
+        {
+            "name": "Operating System Statistics",
+            "description": "운영 체제 통계",
+            "sql": ""
+        },
+        {
+            "name": "Foreground Wait Class",
+            "description": "PostgreSQL 데이터베이스의 현재 세션에서 대기(wait) 이벤트 클래스(카테고리)별로 얼마나 오래 대기하고 있는지를 조회",
+            "sql": "SELECT\n    wait_event_type,\n\tcount(*) as counts,\n    round(sum(extract(epoch FROM (now() - state_change))) / 3600, 5) AS total_waits_hours,\n    round(avg(extract(epoch FROM (now() - state_change))) / 3600, 5) as average_waits_hours\nFROM pg_stat_activity\ngroup by wait_event_type;"
+        },
+        {
+            "name": "Foreground Wait Events",
+            "description": "PostgreSQL 데이터베이스의 현재 세션에서 대기(wait) 이벤트별로 얼마나 오래 대기하고 있는지를 조회",
+            "sql": "SELECT\n    wait_event,\n    count(*) as counts,\n    round(sum(extract(epoch FROM (now() - state_change))) / 3600, 5) AS total_waits_hours,\n    round(avg(extract(epoch FROM (now() - state_change))) / 3600, 5) as average_waits_hours\nFROM pg_stat_activity\ngroup by wait_event;"
+        },
+        {
+            "name": "Background Wait Events",
+            "description": "PostgreSQL의 pg_stat_activity 뷰에서 백엔드 프로세스 대기 관련 정보를 조회",
+            "sql": "SELECT pid, backend_type, wait_event_type, wait_event, round(extract(epoch FROM (now() - state_change)) / 3600, 5) AS total_waits_hours\nFROM pg_stat_activity\nWHERE backend_type NOT IN ('client backend');"
+        },
+        {
+            "name": "Absolute Values\nElapsed Time",
+            "description": "스냅샷 Begin과 End 시점에서의 절대값을 난타낸다. 변화를 보기보단 그 시점의 상태를 나타내는 값. ",
+            "sql": "-- [1] 커서 수 및 세션 수\nSELECT count(*) AS opened_cursors_current FROM pg_cursors;\nSELECT count(*) AS session_cursor_cache_count FROM pg_prepared_statements;\nSELECT count(*) AS logons_current FROM pg_stat_activity;\n\n-- [2] 정렬/해시 작업 메모리 (Workarea 대응)\nSELECT name AS memory_context_name, total_bytes / 1024 AS total_kb FROM pg_backend_memory_contexts WHERE name ILIKE '%Sort%' OR name ILIKE '%Hash%';\n\n-- [3] 전체 백엔드 메모리 사용량 (TopMemoryContext 기준)\nSELECT total_bytes / 1024 / 1024 AS top_memory_context_mb FROM pg_backend_memory_contexts WHERE name = 'TopMemoryContext';\n\n-- [4] 세션 상태별 개수\nSELECT state, count(*) AS session_count FROM pg_stat_activity GROUP BY state;\n"
+        },
+        {
+            "name": "Thread Activity",
+            "description": "Redo 로그 그룹간 전환이 발생한 횟수\n트랜잭션 활발도, 백업 타이밍, 아카이브 설정 등에 대한 판단 가능",
+            "sql": "WITH wal_by_hour AS (\n  SELECT\n    date_trunc('hour', now() - (i * interval '1 hour')) AS hour\n  FROM generate_series(0, 23) AS i\n),\nwal_stats AS (\n  SELECT\n    date_trunc('hour', stats_reset) AS stats_reset_time,\n    now() AS current_time,\n    wal_bytes\n  FROM pg_stat_wal\n),\narchived_wal AS (\n  SELECT\n    date_trunc('hour', archived_time) AS hour,\n    COUNT(*) AS archived_count\n  FROM pg_stat_archiver\n  WHERE archived_time \u003e now() - interval '24 hours'\n  GROUP BY 1\n)\nSELECT\n  w.hour,\n  COALESCE(a.archived_count, 0) AS wal_archived_files,\n  pg_size_pretty(COALESCE(s.wal_bytes, 0)) AS total_wal_written\nFROM wal_by_hour w\nLEFT JOIN archived_wal a ON w.hour = a.hour\nLEFT JOIN wal_stats s ON date_trunc('hour', s.current_time) = w.hour\nORDER BY w.hour DESC;\n"
+        },
+        {
+            "name": "Function Summary",
+            "description": "I/O 기능(Function)별로 읽기/쓰기량과 요청 수,\n대기 시간 등을 분석해주는 I/O 부하 분포 리포트",
+            "sql": "WITH \nbuffer_io AS (\n  SELECT \n    sum(blks_hit) AS cache_hits,\n    sum(blks_read) AS disk_reads,\n    round(100.0 * sum(blks_hit) / nullif(sum(blks_hit) + sum(blks_read), 0), 2) AS hit_ratio\n  FROM pg_stat_database\n),\nbgwriter_io AS (\n  SELECT \n    buffers_clean AS dbwr_writes,\n    buffers_backend AS backend_writes,\n    checkpoints_timed,\n    checkpoints_req\n  FROM pg_stat_bgwriter\n),\nwal_io AS (\n  SELECT \n    wal_records,\n    wal_fpi,\n    pg_size_pretty(wal_bytes) AS wal_written\n  FROM pg_stat_wal\n)\nSELECT \n  now() AS snapshot_time,\n  -- Buffer Cache Reads\n  b.cache_hits AS buffer_cache_hits,\n  b.disk_reads AS buffer_disk_reads,\n  b.hit_ratio AS buffer_hit_pct,\n\n  -- DBWR Equivalent\n  w.checkpoints_timed,\n  w.checkpoints_req,\n  w.dbwr_writes AS dbwr_flushes,\n  w.backend_writes AS backend_flushes,\n\n  -- LGWR Equivalent\n  l.wal_records,\n  l.wal_fpi,\n  l.wal_written AS wal_written_total\n\nFROM buffer_io b, bgwriter_io w, wal_io l;\n"
+        },
+        {
+            "name": "Filetype Summary",
+            "description": "파일 종류별로 발생한 읽기/쓰기 I/O 부하와 응답 시간을 보여주는 리포트",
+            "sql": "WITH \ndb_io AS (\n  SELECT \n    sum(blks_hit) AS cache_hits,\n    sum(blks_read) AS disk_reads,\n    sum(temp_files) AS temp_file_creates,\n    sum(temp_bytes) AS temp_bytes_written\n  FROM pg_stat_database\n),\nwal_io AS (\n  SELECT \n    wal_records,\n    wal_fpi,\n    pg_size_pretty(wal_bytes) AS wal_written\n  FROM pg_stat_wal\n),\nbgwriter_io AS (\n  SELECT \n    buffers_clean,\n    buffers_backend\n  FROM pg_stat_bgwriter\n)\nSELECT\n  now() AS snapshot_time,\n\n  -- Data File (Heap, Index 등)\n  d.disk_reads AS data_file_reads,\n  d.cache_hits AS data_file_hits,\n  d.disk_reads + d.cache_hits AS total_data_access,\n  \n  -- WAL File (Log File)\n  w.wal_records AS log_file_records,\n  w.wal_fpi AS log_file_fpi,\n  w.wal_written AS log_file_written,\n\n  -- Temp File\n  d.temp_file_creates AS temp_file_creations,\n  pg_size_pretty(d.temp_bytes_written) AS temp_file_written,\n\n  -- Backend flushes (Others 느낌)\n  b.buffers_clean AS bgwriter_writes,\n  b.buffers_backend AS backend_writes\n\nFROM db_io d, wal_io w, bgwriter_io b;\n"
+        },
+        {
+            "name": "Function/Filetype summary",
+            "description": "Function과 Filetype으로 교차분류한 고급 I/O 성능요약",
+            "sql": "WITH \ndb_io AS (\n  SELECT \n    sum(blks_read) AS datafile_reads,\n    sum(blks_hit) AS cache_hits,\n    sum(temp_files) AS temp_file_creations,\n    sum(temp_bytes) AS temp_bytes_written\n  FROM pg_stat_database\n),\nbgwriter_io AS (\n  SELECT \n    buffers_clean AS dbwr_datafile_writes,\n    buffers_backend AS backend_datafile_writes\n  FROM pg_stat_bgwriter\n),\nwal_io AS (\n  SELECT \n    wal_records,\n    wal_fpi,\n    pg_size_pretty(wal_bytes) AS wal_written_bytes\n  FROM pg_stat_wal\n)\nSELECT\n  now() AS snapshot_time,\n  -- Buffer Cache Reads (Data File)\n  d.datafile_reads AS data_file_reads,\n  d.cache_hits AS buffer_cache_hits,\n  d.datafile_reads + d.cache_hits AS total_buffer_cache_reads,\n  -- DBWR (Data File)\n  b.dbwr_datafile_writes,\n  b.backend_datafile_writes,\n  -- LGWR (Log File)\n  w.wal_records AS lgwr_records,\n  w.wal_fpi AS wal_fpi_writes,\n  w.wal_written_bytes,\n  -- Temp File (Direct Write 의미)\n  d.temp_file_creations,\n  pg_size_pretty(d.temp_bytes_written) AS temp_file_written\nFROM db_io d, bgwriter_io b, wal_io w;\n"
+        },
+        {
+            "name": "Tablespace IO Stats ",
+            "description": "Tablespace 별 I/O 부하, 응답 시간, 대기 현황 등을 확인할 수 있는 리포트",
+            "sql": "SELECT \n  schemaname,\n  relname AS table_name,\n  seq_scan,\n  idx_scan,\n  seq_tup_read,\n  idx_tup_fetch,\n  n_tup_ins,\n  n_tup_upd,\n  n_tup_del\nFROM pg_stat_user_tables\nORDER BY seq_scan + idx_scan DESC\nLIMIT 20;"
+        },
+        {
+            "name": "File IO Stats",
+            "description": "파일 단위로 발생한 I/O 활동(읽기/쓰기/버퍼 대기 등)을 확인할 수 있는 리포트",
+            "sql": "SELECT \n  n.nspname AS schema,\n  c.relname AS table,\n  pg_relation_filepath(c.oid) AS relpath,\n  pg_size_pretty(pg_relation_size(c.oid)) AS size,\n  s.seq_scan,\n  s.idx_scan,\n  s.n_tup_ins,\n  s.n_tup_upd,\n  s.n_tup_del\nFROM pg_class c\nJOIN pg_namespace n ON n.oid = c.relnamespace\nJOIN pg_stat_user_tables s ON s.relid = c.oid\nWHERE c.relkind = 'r'\nORDER BY pg_relation_size(c.oid) DESC\nLIMIT 20;\n\n-- temp파일 대응\nSELECT \n  datname, temp_files,\n  pg_size_pretty(temp_bytes) AS temp_written\nFROM pg_stat_database\nORDER BY temp_bytes DESC;\n\n"
+        },
+        {
+            "name": "Buffer Pool Statistics",
+            "description": "버퍼 캐시(메모리)에서의 읽기/쓰기 및 경합 통계를 보여주는 리포트",
+            "sql": "WITH dbio AS (\n  SELECT \n    sum(blks_hit) AS hits,\n    sum(blks_read) AS reads\n  FROM pg_stat_database\n),\nbgw AS (\n  SELECT \n    buffers_clean,\n    buffers_backend\n  FROM pg_stat_bgwriter\n)\nSELECT \n  now() AS snapshot_time,\n  current_setting('shared_buffers') AS shared_buffers_setting,\n  d.hits + d.reads AS total_buffer_gets,\n  d.hits AS buffer_hits,\n  d.reads AS physical_reads,\n  ROUND(100.0 * d.hits / NULLIF(d.hits + d.reads, 0), 2) AS pool_hit_pct,\n  b.buffers_clean + b.buffers_backend AS physical_writes,\n  b.buffers_clean AS bgwriter_flushes,\n  b.buffers_backend AS backend_flushes\nFROM dbio d, bgw b;\n"
+        },
+        {
+            "name": "Checkpoint Activity",
+            "description": "데이터베이스의 체크포인트(Checkpoint)가 발생할 때 어떤 조건에 의해 발생했는지를 분석하는 리포트",
+            "sql": "SELECT \n  now() AS snapshot_time,\n  checkpoints_timed,\n  checkpoints_req,\n  checkpoint_write_time,\n  checkpoint_sync_time,\n  buffers_checkpoint,\n  buffers_clean,\n  buffers_backend,\n  buffers_alloc\nFROM pg_stat_bgwriter;\n"
+        },
+        {
+            "name": "Instance Recovery Stats",
+            "description": "인스턴스 장애 발생 시 예상 복구 시간(MTTR) 및 관련된 Redo 로그 처리량 분석 리포트",
+            "sql": "SELECT \n  now() AS snapshot_time,\n  checkpoints_timed,\n  checkpoints_req,\n  checkpoint_write_time,\n  checkpoint_sync_time,\n  wal_records,\n  wal_fpi,\n  wal_bytes,\n  pg_size_pretty(wal_bytes) AS wal_bytes_human\nFROM pg_stat_bgwriter, pg_stat_wal;\n"
+        },
+        {
+            "name": "Buffer Pool Advisory",
+            "description": "SGA 내 Buffer Cache 크기를 변화시켰을 때 예상되는 물리 읽기량과 DB Time 절감 효과를 시뮬레이션한 결과",
+            "sql": "SELECT \n  current_setting('shared_buffers') AS shared_buffers_setting,\n  pg_size_bytes(current_setting('shared_buffers')) / 1024 / 1024 AS shared_buffers_mb,\n  sum(blks_hit) AS buffer_hits,\n  sum(blks_read) AS disk_reads,\n  sum(blks_hit) + sum(blks_read) AS total_requests,\n  ROUND(100.0 * sum(blks_hit) / NULLIF(sum(blks_hit) + sum(blks_read), 0), 2) AS hit_ratio_pct\nFROM pg_stat_database;\n"
+        },
+        {
+            "name": "PGA Aggr Summary",
+            "description": "PGA (Program Global Area) 내에서 수행되는 정렬(sort), 해시 조인(hash join) 등 WorkArea 작업의 효율을 보여주는 중요한 메모리 성능 지표",
+            "sql": "SELECT \n  calls,\n  rows,\n  shared_blks_hit,\n  shared_blks_read,\n  temp_blks_written,\n  query\nFROM pg_stat_statements\nWHERE temp_blks_written \u003e 0\nORDER BY temp_blks_written DESC\nLIMIT 10;\n\nSELECT\n  datname,\n  temp_files,\n  pg_size_pretty(temp_bytes) AS temp_bytes\nFROM pg_stat_database\nORDER BY temp_bytes DESC;\n"
+        },
+        {
+            "name": "PGA Aggr Target Histogram",
+            "description": "PGA(Program Global Area)를 사용하는 정렬/해시/집계 같은 WorkArea 기반 연산들이 메모리 내에서 효율적으로 수행되었는지 여부를 메모리 범위별로 분석한 리포트",
+            "sql": "SELECT\n  queryid,\n  calls,\n  temp_blks_written,\n  temp_blks_read,\n  query\nFROM pg_stat_statements\nWHERE temp_blks_written \u003e 0\nORDER BY temp_blks_written DESC\nLIMIT 10;"
+        },
+        {
+            "name": "PGA Memory Advisory",
+            "description": "pga_aggregate_target 값을 변경했을 때 WorkArea 처리 효율, 디스크 I/O, 캐시 히트율, 수행 시간 등이 어떻게 바뀌는지를 시뮬레이션한 결과",
+            "sql": "SELECT \n  current_setting('work_mem') AS current_work_mem,\n  sum(calls) AS total_calls,\n  sum(temp_blks_written) AS temp_blocks_written,\n  pg_size_pretty(sum(temp_blks_written) * current_setting('block_size')::int) AS temp_io_size\nFROM pg_stat_statements\nWHERE temp_blks_written \u003e 0;\n"
+        },
+        {
+            "name": "Shared Pool Advisory",
+            "description": "hared Pool 크기를 변경했을 때 Library Cache 성능이 어떻게 달라지는지를 시뮬레이션 한 리포트",
+            "sql": "SELECT \n  queryid,\n  calls,\n  total_plan_time,\n  total_exec_time,\n  ROUND((total_plan_time / NULLIF(total_exec_time, 0))::numeric * 100, 2) AS plan_ratio_pct,\n  LEFT(query, 100) AS sample_query\nFROM pg_stat_statements\nWHERE calls \u003e 10\nORDER BY plan_ratio_pct DESC\nLIMIT 10;\n"
+        },
+        {
+            "name": "SGA Target Advisory",
+            "description": "SGA 전체 크기를 조정했을 때 **Database Time(DB Time)**과 **물리적 읽기량(Physical Reads)**이 얼마나 변화할지 예측하여 성능 향상 여지를 판단",
+            "sql": "-- 캐시 적중률 (Buffer Cache 효과)\nSELECT\n  sum(blks_read) AS disk_reads,\n  sum(blks_hit) AS cache_hits,\n  ROUND(100.0 * sum(blks_hit) / NULLIF(sum(blks_hit) + sum(blks_read), 0), 2) AS cache_hit_ratio\nFROM pg_stat_database;\n\n'-- DB타임 추정(전체 쿼리 실행시간 합계)\nSELECT\n  ROUND(sum(total_exec_time) / 1000, 2) AS total_db_time_sec\nFROM pg_stat_statements;\n"
+        },
+        {
+            "name": "Streams Pool Advisory",
+            "description": "streams Pool의 크기를 조정했을 때 발생 가능한 spilling 현상(디스크로 넘치는 처리)을 예측해주는 시뮬레이션 결과",
+            "sql": "-- Logical Repl 관련 메모리 또는 큐 사용상태\nSELECT * FROM pg_replication_slots;\n\n'-- Listen / Notify 대기 상태 확인\nSELECT pid, wait_event_type, wait_event\nFROM pg_stat_activity\nWHERE backend_type = 'client backend' AND wait_event_type = 'IPC';\n\n"
+        },
+        {
+            "name": "Buffer Wait Statistics",
+            "description": "데이터베이스가 블록을 읽거나 수정하려고 할 때 버퍼 캐시 상에서 어떤 경합이나 대기가 발생했는지를 보여주는 진단 항목",
+            "sql": "-- 현재 대기중인 세션 [I/O, buffer pin 등]\nSELECT \n  pid,\n  wait_event_type,\n  wait_event,\n  query\nFROM pg_stat_activity\nWHERE wait_event IS NOT NULL;\n\n'-- Lock 대기\nSELECT \n  blocked_locks.pid AS blocked_pid,\n  blocked_activity.query AS blocked_query,\n  blocking_locks.pid AS blocking_pid,\n  blocking_activity.query AS blocking_query\nFROM pg_locks blocked_locks\nJOIN pg_stat_activity blocked_activity\n  ON blocked_activity.pid = blocked_locks.pid\nJOIN pg_locks blocking_locks\n  ON blocking_locks.locktype = blocked_locks.locktype\n  AND blocking_locks.database IS NOT DISTINCT FROM blocked_locks.database\n  AND blocking_locks.relation IS NOT DISTINCT FROM blocked_locks.relation\n  AND blocking_locks.page IS NOT DISTINCT FROM blocked_locks.page\n  AND blocking_locks.tuple IS NOT DISTINCT FROM blocked_locks.tuple\n  AND blocking_locks.pid != blocked_locks.pid\nJOIN pg_stat_activity blocking_activity\n  ON blocking_activity.pid = blocking_locks.pid\nWHERE NOT blocked_locks.granted;\n"
+        },
+        {
+            "name": "Enqueue Activity",
+            "description": "Enqueue는 Oracle에서 **락(Lock)**과 유사한 동기화 메커니즘으로, 리소스에 대한 상호 배타적 접근을 조정할 때 사용, 여러 세션이 같은 데이터에 접근할 때 경합을 방지하기 위한 대기(Lock Wait)의 종류와 심각도를 분석하는 지표",
+            "sql": "SELECT\n  blocked.pid AS blocked_pid,\n  blocked.query AS blocked_query,\n  blocking.pid AS blocking_pid,\n  blocking.query AS blocking_query,\n  now() - blocked.query_start AS blocked_duration\nFROM pg_locks blocked_locks\nJOIN pg_stat_activity blocked ON blocked.pid = blocked_locks.pid\nJOIN pg_locks blocking_locks ON blocking_locks.locktype = blocked_locks.locktype\n  AND blocking_locks.database IS NOT DISTINCT FROM blocked_locks.database\n  AND blocking_locks.relation IS NOT DISTINCT FROM blocked_locks.relation\n  AND blocking_locks.page IS NOT DISTINCT FROM blocked_locks.page\n  AND blocking_locks.tuple IS NOT DISTINCT FROM blocked_locks.tuple\n  AND blocking_locks.pid != blocked_locks.pid\nJOIN pg_stat_activity blocking ON blocking.pid = blocking_locks.pid\nWHERE NOT blocked_locks.granted;\n"
+        },
+        {
+            "name": "Undo Segment Summary",
+            "description": "Oracle의 Undo는 트랜잭션 복구, 롤백, 읽기 일관성 유지, Flashback 등의 기능을 위해\n필요한 중요한 메커니즘이며, Undo의 효율성 및 경합 상황을 보여주는 리포트",
+            "sql": "-- 가장 오래된 쿼리 (초)\nSELECT\n  pid,\n  now() - query_start AS query_duration,\n  state,\n  query\nFROM pg_stat_activity\nWHERE state \u003c\u003e 'idle'\nORDER BY query_duration DESC\nLIMIT 5;\n\n'-- 현재 활성 트랜잭션 수\nSELECT count(*) AS active_txns\nFROM pg_stat_activity\nWHERE state = 'active' AND backend_xid IS NOT NULL;\n"
+        },
+        {
+            "name": "Undo Segment Stats",
+            "description": "시간 순으로 Undo 세그먼트의 사용 현황을 10분 간격으로 수집한 이력 데이터",
+            "sql": "-- 최근 10분간 실행된 쿼리조회\nSELECT\n  date_trunc('minute', now() - (now() - backend_start)) AS start_min,\n  count(*) AS active_txns\nFROM pg_stat_activity\nWHERE state = 'active'\n  AND now() - backend_start \u003c= interval '10 minutes'\nGROUP BY 1\nORDER BY 1 DESC;\n\n'-- 오래 실행된 쿼리 확인\nSELECT\n  pid,\n  now() - query_start AS duration,\n  query\nFROM pg_stat_activity\nWHERE state = 'active'\nORDER BY duration DESC\nLIMIT 5;\n\n"
+        },
+        {
+            "name": "Latch Activity",
+            "description": "Oracle 내부의 메모리 자원 접근 경합 현황",
+            "sql": "-- 현재 대기중인 경합 확인\nSELECT\n  pid,\n  wait_event_type,\n  wait_event,\n  query\nFROM pg_stat_activity\nWHERE wait_event IS NOT NULL;\n\n'--  IO, Lock, Buffer wait 세분화 [pg 16+]\nSELECT * FROM pg_stat_io WHERE backend_type = 'background writer';\n\n'-- Buffer pin 경합 확인 [pg 13+]\nSELECT\n  pid,\n  wait_event_type,\n  wait_event,\n  query\nFROM pg_stat_activity\nWHERE wait_event = 'BufferPin';"
+        },
+        {
+            "name": "Latch Sleep Breakdown",
+            "description": "각 Latch에서 **실제 경합(Miss) 및 슬립(Sleep)**이 발생한 횟수와 종류를 분석하는 성능 진단 지표",
+            "sql": "select * from pg_wait_sampling_history;"
+        },
+        {
+            "name": "Latch Miss Sources",
+            "description": "경합이 발생한 Latch별로, 그 경합이 어떤 코드(함수, 모듈)에서 발생했는지를 보여주는 지표",
+            "sql": "SELECT\n  event_type,\n  event,\n  COUNT(*) AS count\nFROM pg_wait_sampling_history\nGROUP BY event_type, event\nORDER BY count DESC;\n\n'-- 시간까지 상세하게 보고 싶다면\npg_wait_sampling_profile 사용\n"
+        },
+        {
+            "name": "Mutex Sleep Summary",
+            "description": "Mutex에서 발생한 Sleep 대기 현황",
+            "sql": "-- Mutex like 경합 보기 [wait_event 추적]\nSELECT\n  wait_event_type,\n  wait_event,\n  COUNT(*) AS count\nFROM pg_stat_activity\nWHERE wait_event IS NOT NULL\nGROUP BY wait_event_type, wait_event\nORDER BY count DESC;\n\n'-- 쿼리 계획 및 파싱 병목 분석\nSELECT\n  queryid,\n  calls,\n  total_plan_time,\n  total_exec_time,\n  ROUND((100.0 * total_plan_time / NULLIF(total_exec_time, 0))::numeric, 2) AS plan_pct,\n  LEFT(query, 100) AS short_query\nFROM pg_stat_statements\nWHERE calls \u003e 10\nORDER BY plan_pct DESC\nLIMIT 10;\n"
+        },
+        {
+            "name": "Segments by Logical Reads",
+            "description": "데이터베이스에서 논리적 읽기(Logical Reads, 즉 버퍼 캐시 접근)가 가장 많이 발생한 오브젝트(테이블/인덱스)를 보여주는 리포트",
+            "sql": "-- 인덱스 단독 Top 10\nSELECT\n  schemaname,\n  indexrelname AS index_name,\n  relname AS table_name,\n  idx_scan,\n  idx_tup_read AS logical_reads\nFROM pg_stat_user_indexes\nORDER BY logical_reads DESC\nLIMIT 10;\n\n'-- 테이블과 인덱스를 통합해서 논리 읽기 기준 상위 10개 오브젝트 조회\nSELECT * FROM (\n  SELECT\n    schemaname AS schema,\n    relname AS object_name,\n    'TABLE' AS object_type,\n    pg_total_relation_size(relid) AS size_bytes,\n    seq_scan AS total_scans,\n    seq_tup_read AS logical_reads\n  FROM pg_stat_user_tables\n  UNION ALL\n  SELECT\n    schemaname AS schema,\n    indexrelname AS object_name,\n    'INDEX' AS object_type,\n    pg_total_relation_size(indexrelid) AS size_bytes,\n    idx_scan AS total_scans,\n    idx_tup_read AS logical_reads\n  FROM pg_stat_user_indexes\n) AS combined\nORDER BY logical_reads DESC\nLIMIT 10;\n"
+        },
+        {
+            "name": "Segments by Physical Reads",
+            "description": "디스크 I/O가 집중된 테이블 또는 인덱스를 찾아내기 위한 리포트",
+            "sql": "SELECT * FROM (\n  -- 테이블에 대한 Physical Reads\n  SELECT\n    schemaname AS schema,\n    relname AS object_name,\n    'TABLE' AS object_type,\n    pg_total_relation_size(relid) AS size_bytes,\n    heap_blks_read AS physical_reads\n  FROM pg_statio_user_tables\n  UNION ALL\n  -- 인덱스에 대한 Physical Reads\n  SELECT\n    schemaname AS schema,\n    indexrelname AS object_name,\n    'INDEX' AS object_type,\n    pg_total_relation_size(indexrelid) AS size_bytes,\n    idx_blks_read AS physical_reads\n  FROM pg_statio_user_indexes\n) AS all_reads\nWHERE physical_reads \u003e 0\nORDER BY physical_reads DESC\nLIMIT 10;\n"
+        },
+        {
+            "name": "Segments by Physical Read Requests",
+            "description": "디스크 I/O가 집중된 테이블/인덱스를 식별해 튜닝 대상으로 삼기 위함.\n\n단순히 몇 개 블록이 읽혔는가가 아니라, 얼마나 자주 읽기 요청이 발생했는지를 보여줌.",
+            "sql": "SELECT * FROM (\n  -- 테이블에 대한 디스크 읽기 요청\n  SELECT\n    schemaname AS schema,\n    relname AS object_name,\n    'TABLE' AS object_type,\n    pg_total_relation_size(relid) AS size_bytes,\n    heap_blks_read AS phys_read_requests\n  FROM pg_statio_user_tables\n  UNION ALL\n  -- 인덱스에 대한 디스크 읽기 요청\n  SELECT\n    schemaname AS schema,\n    indexrelname AS object_name,\n    'INDEX' AS object_type,\n    pg_total_relation_size(indexrelid) AS size_bytes,\n    idx_blks_read AS phys_read_requests\n  FROM pg_statio_user_indexes\n) AS combined\nWHERE phys_read_requests \u003e 0\nORDER BY phys_read_requests DESC\nLIMIT 10;"
+        },
+        {
+            "name": "Segments by UnOptimized Reads",
+            "description": "멀티블록 I/O 대신 싱글블록으로 디스크를 자주 읽는 경우에 발생하는 읽기현상\n이는 인덱스 스캔 또는 비효율적인 쿼리로 인해 캐시 미스를 자주 유발하는 오브젝트를 의미",
+            "sql": "SELECT * FROM (\n  SELECT\n    schemaname AS schema,\n    relname AS object_name,\n    'TABLE' AS object_type,\n    pg_total_relation_size(relid) AS size_bytes,\n    heap_blks_read AS unoptimized_reads\n  FROM pg_statio_user_tables\n  UNION ALL\n  SELECT\n    schemaname AS schema,\n    indexrelname AS object_name,\n    'INDEX' AS object_type,\n    pg_total_relation_size(indexrelid) AS size_bytes,\n    idx_blks_read AS unoptimized_reads\n  FROM pg_statio_user_indexes\n) AS stats\nWHERE unoptimized_reads \u003e 0\nORDER BY unoptimized_reads DESC\nLIMIT 10;\n"
+        },
+        {
+            "name": "Segments by Physical Writes",
+            "description": "데이터 변경(INSERT, UPDATE, DELETE, VACUUM 등) 시 발생하는 디스크 쓰기 요청을 보여줌\n쓰기 부하가 큰 테이블이나 인덱스를 식별하여 튜닝 대상 선정\n예: HOT → COLD 업데이트, Bloat 유발, 빈번한 체크포인트 대상 등",
+            "sql": "SELECT * FROM (\n  SELECT\n    schemaname AS schema,\n    relname AS object_name,\n    'TABLE' AS object_type,\n    pg_total_relation_size(relid) AS size_bytes,\n    heap_blks_read AS physical_reads\n  FROM pg_statio_user_tables\n  UNION ALL\n  SELECT\n    schemaname AS schema,\n    indexrelname AS object_name,\n    'INDEX' AS object_type,\n    pg_total_relation_size(indexrelid) AS size_bytes,\n    idx_blks_read AS physical_reads\n  FROM pg_statio_user_indexes\n) AS stats\nWHERE physical_reads \u003e 0\nORDER BY physical_reads DESC\nLIMIT 10;\n"
+        },
+        {
+            "name": "Segments by Physical Write Requests",
+            "description": "데이터베이스에서 디스크로 데이터를 가장 많이 쓴 테이블 또는 인덱스를 식별하여 I/O 병목 지점을 분석",
+            "sql": "SELECT \n  schemaname AS schema,\n  relname AS object_name,\n  'TABLE' AS object_type,\n  pg_total_relation_size(relid) AS size_bytes,\n  n_tup_ins + n_tup_upd + n_tup_del AS estimated_writes\nFROM pg_stat_user_tables\nORDER BY estimated_writes DESC\nLIMIT 10;"
+        },
+        {
+            "name": "Segments by Direct Physical Writes",
+            "description": "특정 세그먼트(테이블 또는 인덱스 등)가 직접 I/O 쓰기(Direct Write)를 수행한 양을 보여주는 지표",
+            "sql": "SELECT * FROM (\n  SELECT\n    schemaname AS schema,\n    relname AS object_name,\n    'TABLE' AS object_type,\n    pg_total_relation_size(relid) AS size_bytes\n  FROM pg_statio_user_tables\n  UNION ALL\n  SELECT\n    schemaname AS schema,\n    indexrelname AS object_name,\n    'INDEX' AS object_type,\n    pg_total_relation_size(indexrelid) AS size_bytes\n  FROM pg_statio_user_indexes\n) AS stats\nLIMIT 10;"
+        },
+        {
+            "name": "Segments by Table Scans",
+            "description": "테이블 또는 인덱스에 대해 수행된 전체 스캔(Full Table Scan 또는 Fast Full Index Scan) 횟수",
+            "sql": "SELECT\n  schemaname AS schema,\n  relname AS object_name,\n  'TABLE' AS object_type,\n  seq_scan AS table_scans,\n  ROUND(100.0 * seq_scan / NULLIF(total.total_seq_scan, 0), 2) AS percent_total\nFROM pg_stat_user_tables,\n  (SELECT SUM(seq_scan) AS total_seq_scan FROM pg_stat_user_tables) total\nWHERE seq_scan \u003e 0\nORDER BY seq_scan DESC\nLIMIT 10;\n"
+        },
+        {
+            "name": "Segments by DB Blocks Changes",
+            "description": "특정 오브젝트(테이블 또는 인덱스)에서 DB 블록 변경이 얼마나 많이 발생했는지를 보여주는 지표\n해당 오브젝트가 얼마나 자주 변경[Insert/Update/Delete] 되었는지 나타냄",
+            "sql": "WITH table_changes AS (\n  SELECT\n    schemaname AS schema,\n    relname AS object_name,\n    'TABLE' AS object_type,\n    heap_blks_read + heap_blks_hit AS block_changes\n  FROM pg_statio_user_tables\n),\nindex_changes AS (\n  SELECT\n    schemaname AS schema,\n    indexrelname AS object_name,\n    'INDEX' AS object_type,\n    idx_blks_read + idx_blks_hit AS block_changes\n  FROM pg_statio_user_indexes\n),\nall_changes AS (\n  SELECT * FROM table_changes\n  UNION ALL\n  SELECT * FROM index_changes\n),\ntotal AS (\n  SELECT SUM(block_changes) AS total_blocks FROM all_changes\n)\nSELECT\n  schema,\n  object_name,\n  object_type,\n  block_changes,\n  ROUND(100.0 * block_changes / NULLIF(total.total_blocks, 0), 2) AS percent_of_capture\nFROM all_changes, total\nWHERE block_changes \u003e 0\nORDER BY block_changes DESC\nLIMIT 10;\n"
+        },
+        {
+            "name": "Segments by Row Lock Waits",
+            "description": "세그먼트 단위에서의 행 잠금(Row Lock) 대기 통계",
+            "sql": "-- 현재 Row-level Lock이 발생한 테이블별 분석\nSELECT \n  n.nspname AS schema,\n  c.relname AS table_name,\n  COUNT(*) AS lock_count\nFROM pg_locks l\nJOIN pg_class c ON l.relation = c.oid\nJOIN pg_namespace n ON c.relnamespace = n.oid\nWHERE l.mode LIKE '%RowExclusiveLock%' -- 또는 '%Exclusive%'\n  AND l.granted = false -- 대기 중인 잠금\nGROUP BY n.nspname, c.relname\nORDER BY lock_count DESC\nLIMIT 10;\n\ngranted = false: 실제로 대기 상태인 잠금만 필터링\nRowExclusiveLock: 일반적인 DML 작업에서 발생하는 Row-Level Lock\n\n'-- pg_stat_activity +pg_locks 조인하여, 대기중인 쿼리와 객체 추적\nSELECT \n  sa.datname,\n  sa.usename,\n  sa.query,\n  c.relname AS locked_relation,\n  l.mode,\n  l.granted\nFROM pg_stat_activity sa\nJOIN pg_locks l ON sa.pid = l.pid\nLEFT JOIN pg_class c ON l.relation = c.oid\nWHERE l.mode LIKE '%RowExclusiveLock%'\n  AND l.granted = false;\n"
+        },
+        {
+            "name": "Segments by Buffer Busy Waits",
+            "description": "특정 테이블 또는 인덱스 단위에서 Buffer Busy Wait이 얼마나 많이 발생했는지를 보여주는 성능 병목 지표",
+            "sql": "SELECT \n  schemaname,\n  relname,\n  heap_blks_read,\n  heap_blks_hit,\n  heap_blks_read + heap_blks_hit AS total_accesses,\n  ROUND(100.0 * heap_blks_hit / NULLIF(heap_blks_read + heap_blks_hit, 0), 2) AS hit_ratio\nFROM pg_statio_user_tables\nORDER BY total_accesses DESC\nLIMIT 10;\n"
+        },
+        {
+            "name": "Dictionary Cache Stats",
+            "description": "메타데이터(객체 정의, 사용자, 테이블스페이스 정보 등)에 대한 정보를 캐시하여, \n매번 디스크에서 읽지 않고 빠르게 액세스할 수 있도록 해주는 영역",
+            "sql": "-- 캐시히트율 확인\nSELECT\n  sum(blks_hit) AS hits,\n  sum(blks_read) AS reads,\n  round(100 * sum(blks_hit)::numeric / nullif(sum(blks_hit) + sum(blks_read), 0), 2) AS hit_ratio\nFROM pg_stat_database;\n\n-- 시스템 카탈로그 조회 패턴\nSELECT\n  queryid,\n  calls,\n  total_exec_time,\n  LEFT(query, 100) AS short_query\nFROM pg_stat_statements\nWHERE query LIKE '%pg_class%' OR query LIKE '%pg_namespace%' OR query LIKE '%pg_catalog%'\nORDER BY total_exec_time DESC\nLIMIT 10;\n\n"
+        },
+        {
+            "name": "Library Cache Activity",
+            "description": "Oracle SGA의 Shared Pool 내 구성 요소로, SQL 문, PL/SQL 코드, 커서, 실행 계획, 객체 정의 등\n 파싱된 결과를 저장해 반복 실행 시 성능을 향상시켜주는 영역",
+            "sql": ""
+        },
+        {
+            "name": "Memory Dynamic Components",
+            "description": "Oracle 인스턴스의 메모리 구성요소별 동적 크기 변화를 보여주는 항목\nPostgreSQL에서는 동일한 구조는 없지만 유사하게 추적 가능한 메모리 구성 정보가 있음",
+            "sql": "-- 현재 메모리 설정값 조회\nSHOW shared_buffers;\nSHOW work_mem;\nSHOW maintenance_work_mem;\nSHOW temp_buffers;\nSHOW wal_buffers;\n\n-- 메모리 캐시 히트율 / 사용량 확인\n-- Buffer cache hit ratio\nSELECT\n  ROUND(100 * SUM(blks_hit) / NULLIF(SUM(blks_hit + blks_read), 0), 2) AS cache_hit_ratio_pct\nFROM pg_stat_database;\n\n--process local memory 사용량 추정 [리눅스 명령어]\nps -u postgres -o pid,%mem,cmd --sort=-%mem\n\n"
+        },
+        {
+            "name": "Process Memory Summary",
+            "description": "각 스냅샷 시점에서 프로세스들이 얼마나 많은 PGA(Program Global Area)를 사용했는지를 카테고리별로 요약한 정보",
+            "sql": "SELECT *\nFROM pg_backend_memory_contexts\nORDER BY total_bytes DESC;"
+        },
+        {
+            "name": "SGA Memory Summary",
+            "description": "Shared Global Area(SGA)의 주요 구성 요소가 각각 얼마나 메모리를 사용하는지를 보여주는 요약 정보\n인스턴스의 메모리 구조를 이해하고, SGA 조정을 위한 기초자료로 사용",
+            "sql": "-- postgres 설정값 확인\nSHOW shared_buffers;     -- Database Buffers\nSHOW wal_buffers;        -- Redo Buffers\nSHOW work_mem;           -- 쿼리별 워크 메모리\nSHOW maintenance_work_mem;\n\n-- 전체 메모리 추정 [Oracle과 달리, OS에서 직접 메모리할당]\nSELECT\n  name,\n  setting,\n  unit\nFROM pg_settings\nWHERE name IN (\n  'shared_buffers', 'work_mem', 'maintenance_work_mem', 'wal_buffers'\n);\n\n"
+        },
+        {
+            "name": "SGA breakdown difference",
+            "description": "SGA 구성 요소(Pool/Name) 별로 스냅샷 사이의 메모리 사용량 변화, PG에는 SGA기능이 없기때문에 대응 기능없음.\nWAL LOG등으로 추정할 순 있으나 중복되어서 쿼리 넣지 않음.",
+            "sql": ""
+        },
+        {
+            "name": "Streams CPU/IO Usage",
+            "description": "Oracle Streams 또는 Advanced Queuing 관련 백그라운드 프로세스(QMON 등)가 사용한 리소스(CPU, I/O 시간 등)를 보여주는 정보",
+            "sql": ""
+        },
+        {
+            "name": "Rule Set",
+            "description": "Rule Set 섹션은 Oracle AQ (Advanced Queuing) 및 Streams 환경에서 규칙 기반 평가(Rule-Based Evaluation)가 수행된 내용을 보여주는 영역",
+            "sql": "-- Rule 테이블\nCREATE TABLE rule_set (\n  id SERIAL PRIMARY KEY,\n  event_type TEXT,\n  rule_condition TEXT, -- 예: 'payload-\u003e\u003e''type'' = ''ALERT'''\n  action TEXT           -- 예: 'RAISE NOTICE ''ALERT!'''\n);\n"
+        },
+        {
+            "name": "Persistent Queues",
+            "description": "Advanced Queuing (AQ) 시스템에서 사용되는 큐들의 상태 및 동작 성능을 요약한 항목\n메시지 기반의 비동기 처리 흐름에서 주요한 지표들이 기록",
+            "sql": ""
+        },
+        {
+            "name": "Persistent Queues Rate",
+            "description": " Oracle AQ (Advanced Queue) 기반의 큐들에 대해, Snap 구간 동안 발생한 메시지 인큐/디큐 속도를 요약",
+            "sql": ""
+        },
+        {
+            "name": "Persistent Queue Subscribers",
+            "description": "Advanced Queue (AQ) 기능을 사용하는 **큐와 구독자(Subscriber)**의 활동을 모니터링하는 영역으로\n메시지 기반 아키텍처나 이벤트 기반 프로세싱에서 활용",
+            "sql": "-- 현재 세션이 구독 중인 채널 확인\nSELECT * FROM pg_listening_channels();\n"
+        },
+        {
+            "name": "Shared Servers Activity",
+            "description": "Shared Servers Activity 섹션에 대한 상세 분석",
+            "sql": ""
+        },
+        {
+            "name": "Shared Servers Rates",
+            "description": "Shared Server 환경의 처리량(Throughput)을 초당 단위로 요약한 통계",
+            "sql": ""
+        },
+        {
+            "name": "Shared Servers Utilization",
+            "description": "Shared Server 환경에서 서버 프로세스들이 얼마나 바쁘게 일하고 있는지, 그리고 네트워크 IO 비중은 어느 정도인지를 나타내는 지표",
+            "sql": ""
+        },
+        {
+            "name": "Shared Servers Dispatchers",
+            "description": "hared Server 환경에서 Dispatcher 프로세스의 부하 상태와 큐 지연 상태를 보여주는 부분.\n이 정보를 통해 Dispatcher가 얼마나 바쁘고, 요청이 큐에서 얼마나 기다렸는지 등을 확인 가능",
+            "sql": "-- 현재 연결된 세션 수 (대기포함)\nSELECT state, count(*) \nFROM pg_stat_activity \nGROUP BY state;\n\n-- postgres가 busy한 정도 확인\nSELECT\n  COUNT(*) FILTER (WHERE state = 'active') AS active_sessions,\n  COUNT(*) AS total_sessions,\n  ROUND(100.0 * COUNT(*) FILTER (WHERE state = 'active') / NULLIF(COUNT(*), 0), 2) AS active_pct\nFROM pg_stat_activity;\n\n"
+        },
+        {
+            "name": "init.ora Parameters",
+            "description": "인스턴스 초기화 파라미터(Init Parameters)의 현재 값을 보여주는 부분. 이 정보는 시스템 설정, 성능 조정, 문제 해결에 있어서 매우 중요",
+            "sql": "SELECT name, setting, unit, context, source\nFROM pg_settings\nORDER BY name;\n"
+        },
+        {
+            "name": "init.ora Multi-Valued Parameters",
+            "description": "하나 이상의 값을 가지는 초기화 파라미터. 파라미터들은 주로 파일 경로나 디렉터리, 목록 형태로 사용되는 설정 항목",
+            "sql": "SHOW config_file;\n"
+        },
+        {
+            "name": "Wait Event Histogram",
+            "description": "대기 이벤트의 지속 시간 분포를 파악",
+            "sql": "WITH query_times AS (\n    SELECT \n        queryid,\n        substring(query, 1, 100) AS query_sample,\n        calls,\n        total_exec_time / 1000 AS total_exec_time_ms,\n        min_exec_time / 1000 AS min_exec_time_ms,\n        max_exec_time / 1000 AS max_exec_time_ms,\n        mean_exec_time / 1000 AS mean_exec_time_ms\n    FROM pg_stat_statements\n)\nSELECT \n    queryid,\n    query_sample,\n    calls,\n    ROUND(total_exec_time_ms::numeric, 1) AS total_exec_time_ms,\n    ROUND(min_exec_time_ms::numeric, 1) AS min_exec_time_ms,\n    ROUND(max_exec_time_ms::numeric, 1) AS max_exec_time_ms,\n    ROUND(mean_exec_time_ms::numeric, 1) AS avg_exec_time_ms,\n    -- 시간대별 분포를 백분율로 표시\n    ROUND(100.0 * (CASE WHEN mean_exec_time_ms \u003c 1 THEN 1 ELSE 0 END)::numeric, 1) AS \"% \u003c 1ms\",\n    ROUND(100.0 * (CASE WHEN mean_exec_time_ms \u003e= 1 AND mean_exec_time_ms \u003c 2 THEN 1 ELSE 0 END)::numeric, 1) AS \"% \u003c 2ms\",\n    ROUND(100.0 * (CASE WHEN mean_exec_time_ms \u003e= 2 AND mean_exec_time_ms \u003c 4 THEN 1 ELSE 0 END)::numeric, 1) AS \"% \u003c 4ms\",\n    ROUND(100.0 * (CASE WHEN mean_exec_time_ms \u003e= 4 AND mean_exec_time_ms \u003c 8 THEN 1 ELSE 0 END)::numeric, 1) AS \"% \u003c 8ms\",\n    ROUND(100.0 * (CASE WHEN mean_exec_time_ms \u003e= 8 AND mean_exec_time_ms \u003c 16 THEN 1 ELSE 0 END)::numeric, 1) AS \"% \u003c 16ms\",\n    ROUND(100.0 * (CASE WHEN mean_exec_time_ms \u003e= 16 AND mean_exec_time_ms \u003c 32 THEN 1 ELSE 0 END)::numeric, 1) AS \"% \u003c 32ms\",\n    ROUND(100.0 * (CASE WHEN mean_exec_time_ms \u003e= 32 AND mean_exec_time_ms \u003c 1000 THEN 1 ELSE 0 END)::numeric, 1) AS \"% \u003c 1s\",\n    ROUND(100.0 * (CASE WHEN mean_exec_time_ms \u003e= 1000 THEN 1 ELSE 0 END)::numeric, 1) AS \"% \u003e 1s\"\nFROM query_times\nORDER BY total_exec_time_ms DESC\nLIMIT 20;"
+        },
+        {
+            "name": "Service Statistics",
+            "description": "각 서비스 단위로 Database 자원 사용량을 분리해서 보여주는 중요한 부분",
+            "sql": "-- DB별 자원 사용량 조회\nSELECT\n  datname AS database_name,\n  SUM(blks_read) * current_setting('block_size')::int / 1024 / 1024 AS physical_reads_mb,\n  SUM(blks_hit) * current_setting('block_size')::int / 1024 / 1024 AS logical_reads_mb,\n  SUM(xact_commit + xact_rollback) AS total_txn,\n  ROUND(SUM(blk_read_time + blk_write_time)::numeric / 1000, 2) AS io_time_sec\nFROM pg_stat_database\nGROUP BY datname\nORDER BY io_time_sec DESC;"
+        },
+        {
+            "name": "Service Wait Class Stats",
+            "description": "서비스 단위로 Wait Class 별 대기 횟수 및 대기 시간",
+            "sql": "-- pg_stat_activity기반 현재 대기조회\nSELECT \n  application_name,\n  wait_event_type,\n  wait_event,\n  COUNT(*) AS total_waits\nFROM pg_stat_activity\nWHERE state = 'active' AND wait_event IS NOT NULL\nGROUP BY application_name, wait_event_type, wait_event\nORDER BY total_waits DESC;\n\n'--  pg_wait_sampling을 이용한 wait time 추적\nSELECT\n  event_type,\n  event,\n  COUNT(*) AS wait_count\nFROM pg_wait_sampling_history\nGROUP BY event_type, event\nORDER BY wait_count DESC;"
+        },
+        {
+            "name": "SQL ordered by\nElapsed Time",
+            "description": "스냅샷 기간 내에 쿼리 누적 \n실행시간  내림차순 SQL 통계",
+            "sql": "SELECT\n    queryid AS sql_id,\n    substring(query, 1, 100) AS sql_text, \n    calls AS executions, \n    total_exec_time / 1000 AS elapsed_time_seconds,  \n    (total_exec_time / calls) / 1000 AS elapsed_per_exec, \n    100 * (total_exec_time / SUM(total_exec_time) OVER ()) AS pct_total,  \n    100 * (blk_read_time + blk_write_time) / NULLIF(total_exec_time, 0) AS pct_io, \n    100 * (total_exec_time - blk_read_time - blk_write_time) / NULLIF(total_exec_time, 0) AS pct_cpu \nFROM pg_stat_statements\nORDER BY total_exec_time DESC\nLIMIT 20;"
+        },
+        {
+            "name": "SQL ordered by\nUser I/O Wait Time\n\n(User I/O =\u003e 세션,\n세션 대기시간 내림차순 SQL 통계 )",
+            "description": "스냅샷 기간 내에 세션 대기 시간\n내림차순 통계",
+            "sql": "WITH total_io AS (\n    SELECT SUM(blk_read_time + blk_write_time) AS total_io_time\n    FROM pg_stat_statements\n    WHERE blk_read_time + blk_write_time \u003e 0\n)\nSELECT\n    queryid AS \"SQL ID\",\n    ROUND((blk_read_time + blk_write_time)::numeric / 1000, 2) AS \"User I/O Time (s)\",\n    calls AS \"Executions\",\n    CASE \n        WHEN calls \u003e 0 THEN ROUND(((blk_read_time + blk_write_time) / calls)::numeric / 1000, 6)\n        ELSE 0 \n    END AS \"UIO per Exec (s)\",\n    ROUND(((blk_read_time + blk_write_time) * 100.0 / NULLIF(t.total_io_time, 0))::numeric, 2) AS \"%Total\",\n    ROUND((total_time / 1000)::numeric, 2) AS \"Elapsed Time (s)\",\n    ROUND(((total_time - (blk_read_time + blk_write_time)) * 100.0 / NULLIF(total_time, 0))::numeric, 2) AS \"%CPU\",\n    ROUND(((blk_read_time + blk_write_time) * 100.0 / NULLIF(total_time, 0))::numeric, 2) AS \"%IO\",\n    LEFT(COALESCE(application_name, ''), 30) AS \"SQL Module\",\n    LEFT(query, 1000) AS \"SQL Text\"\nFROM \n    pg_stat_statements\n    CROSS JOIN total_io t\nWHERE \n    blk_read_time + blk_write_time \u003e 0\nORDER BY \n    \"User I/O Time (s)\" DESC\nLIMIT 100;"
+        },
+        {
+            "name": "SQL ordered by Gets\n\nTotal Buffer Gets : 쿼리가 실행될때 메모리에서 읽은(DB 버퍼 캐시) I/O 횟수,\nsession logical reads칼럼 참조함 \n",
+            "description": "스냅샷 기간 내에 메모리에서 \n읽은 I/O \n횟수 기준 내림차순 통계 ",
+            "sql": "WITH total_stats AS (\n    SELECT\n        SUM(shared_blks_hit + local_blks_hit) AS total_buffer_gets\n    FROM\n        pg_stat_statements\n    WHERE\n        shared_blks_hit + local_blks_hit \u003e 0\n)\nSELECT\n    s.shared_blks_hit + s.local_blks_hit AS \"Buffer Gets\",\n    s.calls AS \"Executions\",\n    ROUND((s.shared_blks_hit + s.local_blks_hit)::numeric / NULLIF(s.calls, 0), 2) AS \"Gets Per Exec\",\n    ROUND(((s.shared_blks_hit + s.local_blks_hit)::numeric / NULLIF(t.total_buffer_gets, 0)) * 100, 2) AS \"%Total\",\n    ROUND((s.total_exec_time / 1000)::numeric, 2) AS \"Elapsed Time (s)\",\n    ROUND(((s.total_exec_time - (s.blk_read_time + s.blk_write_time)) / NULLIF(s.total_exec_time, 0))::numeric * 100, 2) AS \"%CPU\",\n    ROUND(((s.blk_read_time + s.blk_write_time) / NULLIF(s.total_exec_time, 0))::numeric * 100, 2) AS \"%IO\",\n    s.queryid AS \"SQL ID\",\n    COALESCE(\n        (SELECT application_name \n         FROM pg_stat_activity \n         WHERE pg_stat_activity.query = s.query \n         LIMIT 1),\n        'N/A'\n    ) AS \"SQL Module\",\n    s.query AS \"SQL Text\"\nFROM\n    pg_stat_statements s\n    CROSS JOIN total_stats t\nWHERE\n    s.shared_blks_hit + s.local_blks_hit \u003e 0\nORDER BY\n    (s.shared_blks_hit + s.local_blks_hit) DESC\nLIMIT 100;\n\n"
+        },
+        {
+            "name": "SQL ordered by Reads",
+            "description": "스냅샷 구간 중 수행된 SQL을\n 디스크\n I/O발생량 순으로 내림차순 정렬",
+            "sql": "SELECT\n    s.queryid AS \"SQL id\",\n    COALESCE(\n        SUBSTRING(\n            s.query FROM 1 FOR 50\n        ) || CASE WHEN LENGTH(s.query) \u003e 50 THEN '...' ELSE '' END,\n        'N/A'\n    ) AS \"SQL Text\",\n    COALESCE(a.application_name, 'N/A') AS \"SQL Module\",\n    s.shared_blks_hit + s.shared_blks_read + s.shared_blks_written AS \"Physical I/O Requests\",\n    s.calls AS \"Executions\",\n    CASE \n        WHEN s.calls \u003e 0 THEN ROUND(\n            (s.shared_blks_hit + s.shared_blks_read + s.shared_blks_written)::numeric / s.calls::numeric, \n            2\n        )\n        ELSE 0 \n    END AS \"I/O Requests per Exec\",\n    ROUND(\n        ((s.shared_blks_read + s.shared_blks_written)::numeric * 100.0) / \n        NULLIF((SELECT SUM(shared_blks_read + shared_blks_written)::numeric FROM pg_stat_statements), 0::numeric),\n        2\n    ) AS \"%Total\",\n    (s.total_exec_time / 1000)::numeric AS \"Elapsed Time (s)\",\n    ROUND(\n        ((s.total_exec_time - (s.blk_read_time + s.blk_write_time))::numeric * 100.0) / \n        NULLIF(s.total_exec_time::numeric, 0::numeric),\n        2\n    ) AS \"%CPU\",\n    ROUND(\n        ((s.blk_read_time + s.blk_write_time)::numeric * 100.0) / \n        NULLIF(s.total_exec_time::numeric, 0::numeric),\n        2\n    ) AS \"%IO\",\n    s.query AS \"Full SQL Text\"\nFROM \n    pg_stat_statements s\nLEFT JOIN \n    pg_stat_activity a ON s.userid = a.usesysid\nWHERE \n    (s.shared_blks_read + s.shared_blks_written) \u003e 0\n    AND s.query NOT LIKE '%pg_stat_statements%'  -- 이 쿼리 자체는 제외\nORDER BY \n    (s.shared_blks_read + s.shared_blks_written) DESC\nLIMIT 20;\n\n"
+        },
+        {
+            "name": "SQL ordered by\n Physical Reads \n(UnOptimized)\n\n",
+            "description": "Physical이 붙으면 I/O단위!\n\n최적화 되지않은 요청 계산 \nUnOptimized Read Reqs = Physical Read Requests - Optimized Read Requests",
+            "sql": "SELECT\n    s.calls AS \"Executions\",\n    s.shared_blks_read AS \"Physical Read Reqs\",\n    s.shared_blks_read AS \"UnOptimized Read Reqs\",\n    ROUND(s.shared_blks_read::numeric / NULLIF(s.calls, 0), 2) AS \"UnOptimized Read Reqs per Exec\",\n    ROUND(0.0, 2) AS \"%Opt\",\n    ROUND(s.shared_blks_read * 100.0 / SUM(s.shared_blks_read) OVER (), 2) AS \"%Total\",\n    a.application_name AS \"SQL Module\",\n    s.query AS \"SQL Text\"\nFROM\n    pg_stat_statements s\nLEFT JOIN\n    pg_stat_activity a ON s.userid = a.usesysid\nWHERE\n    s.shared_blks_read \u003e 0\nORDER BY\n    s.shared_blks_read DESC\nLIMIT 100;"
+        },
+        {
+            "name": "SQL ordered by\nExecutions",
+            "description": "스냅샷 기간 내 쿼리 실행횟수 기준\n내림차순 정렬 ",
+            "sql": "SELECT \n    calls AS \"Executions\",\n    rows AS \"Row Processed\",\n    ROUND(rows::numeric / NULLIF(calls, 0), 2) AS \"Rows per Exec\",\n    ROUND((mean_exec_time * calls / 1000.0)::numeric, 2) AS \"Elapsed Time (s)\",\n    ROUND(0.0::numeric, 2) AS \"%CPU\",\n    ROUND(0.0::numeric, 2) AS \"%IO\",\n    queryid::text AS \"SQL ID\",\n    substr(query, 1, 100) AS \"SQL Module\",\n    query AS \"SQL Text\"\nFROM \n    pg_stat_statements\nWHERE \n    calls \u003e 0\nORDER BY \n    calls DESC\nLIMIT 100;"
+        },
+        {
+            "name": "SQL ordered by\nParse Calls",
+            "description": "Parse Call을 발생시킨 쿼리를\nCall횟수기준 내림차순 정렬",
+            "sql": "SELECT \n    queryid::text AS sql_id,\n    query,\n    calls,\n    total_exec_time,\n    ROUND(calls * 100.0 / (SUM(calls) OVER ()), 2) AS percent_total_calls,\n    rows,\n    mean_exec_time,\n    max_exec_time,\n    shared_blks_hit,\n    shared_blks_read\nFROM \n    pg_stat_statements\nWHERE \n    calls \u003e 0\nORDER BY \n    calls DESC\nLIMIT 20;\n\n"
+        },
+        {
+            "name": "SQL ordered by\nsharable Memory",
+            "description": "공유 메모리 사용량이 많은 \nSQL문 내림차순 정렬",
+            "sql": "SELECT \n    queryid::text AS sql_id,\n    calls AS executions_total,\n    total_exec_time,\n    ROUND(calls * 100.0 / (SUM(calls) OVER ()), 2) AS percent_total_calls,\n    COALESCE(substr(query, 1, 200), 'N/A') AS query_text\nFROM \n    pg_stat_statements\nWHERE \n    calls \u003e 0\nORDER BY \n    calls DESC\nLIMIT 20;\n\n"
+        },
+        {
+            "name": "SQL ordered by\nVersion Count",
+            "description": "재사용 되지 않은 쿼리 \n통계",
+            "sql": "SELECT\n    queryid::text AS sql_id,\n    COUNT(*) AS version_count,\n    SUM(calls) AS total_executions,\n    ROUND(COUNT(*) * 100.0 / (SELECT COUNT(*) FROM pg_stat_statements), 2) AS percent_total_versions\nFROM\n    pg_stat_statements\nGROUP BY\n    queryid, query\nORDER BY\n    version_count DESC\nLIMIT 20;\n\n"
+        },
+        {
+            "name": "Complete List of\nSQL Text",
+            "description": "스냅샷 기간내에 실행된 SQL문\n전체 테이블 ",
+            "sql": "SELECT \n    pid, \n    datname, \n    usename, \n    state, \n    query, \n    query_start,\n    now() - query_start AS query_duration\nFROM pg_stat_activity\nWHERE query != '\u003cIDLE\u003e' AND query NOT LIKE 'autovacuum%'\nORDER BY query_start DESC\nLIMIT 100;"
+        },
+        {
+            "name": "Instance Activity\nStats",
+            "description": "데이터베이스 연결 및 활동 통계\n",
+            "sql": "SELECT\n    datname AS database_name,\n    numbackends AS active_connections,\n    xact_commit AS committed_transactions,\n    xact_rollback AS rolled_back_transactions,\n    blks_read AS disk_blocks_read,\n    blks_hit AS buffer_hits,\n    tup_returned AS rows_returned,\n    tup_fetched AS rows_fetched,\n    tup_inserted AS rows_inserted,\n    tup_updated AS rows_updated,\n    tup_deleted AS rows_deleted,\n    conflicts AS conflicts,\n    temp_files AS temp_files_created,\n    temp_bytes AS temp_bytes_written,\n    deadlocks AS deadlocks,\n    checksum_failures AS checksum_failures,\n    checksum_last_failure AS last_checksum_failure_time,\n    blk_read_time AS time_spent_reading,\n    blk_write_time AS time_spent_writing\nFROM pg_stat_database\nWHERE datname IS NOT NULL;\n"
+        },
+        {
+            "name": "Instance Activity\nStats",
+            "description": "버퍼 캐시 통계 ",
+            "sql": "SELECT\n    buffers_checkpoint AS buffers_written_during_checkpoint,\n    buffers_clean AS buffers_written_by_bgwriter,\n    buffers_backend AS buffers_written_by_backends,\n    buffers_backend_fsync AS backend_fsync_calls,\n    buffers_alloc AS buffers_allocated,\n    checkpoint_write_time AS ms_spent_writing_checkpoints,\n    checkpoint_sync_time AS ms_spent_syncing_checkpoints,\n    checkpoints_timed AS scheduled_checkpoints,\n    checkpoints_req AS requested_checkpoints,\n    stats_reset AS statistics_reset_time\nFROM pg_stat_bgwriter;"
+        },
+        {
+            "name": "Instance Activity\nStats",
+            "description": "WAL 생성 통계",
+            "sql": "SELECT\n    file_name,\n    file_offset,\n    pg_size_pretty(pg_current_wal_lsn() - '0/0'::pg_lsn) AS total_wal_volume,\n    pg_walfile_name(pg_current_wal_lsn()) AS current_wal_file,\n    pg_walfile_name_offset(pg_current_wal_lsn()) AS current_wal_file_offset,\n    pg_size_pretty(pg_wal_lsn_diff(pg_current_wal_lsn(), pg_last_wal_receive_lsn())) AS receive_lag,\n    pg_size_pretty(pg_wal_lsn_diff(pg_last_wal_receive_lsn(), pg_last_wal_replay_lsn())) AS replay_lag\nFROM pg_current_wal_insert_lsn() AS file_offset,\n     pg_walfile_name(pg_current_wal_insert_lsn()) AS file_name;"
+        },
+        {
+            "name": "Instance Activity\nStats",
+            "description": "Lock, Deadlock\n 현황 통계",
+            "sql": "SELECT \n    pid,\n    locktype,\n    relation::regclass AS locked_relation,\n    mode,\n    granted,\n    waitstart,\n    now() - waitstart AS wait_duration\nFROM pg_locks\nJOIN pg_stat_activity USING (pid)\nWHERE NOT granted;"
+        },
+        {
+            "name": "Instance Activity\nStats",
+            "description": "Replication\n Activity현황 통계",
+            "sql": "SELECT \n    pid,\n    client_addr,\n    state,\n    sent_lsn,\n    write_lsn,\n    flush_lsn,\n    replay_lsn,\n    pg_size_pretty(pg_wal_lsn_diff(pg_current_wal_lsn(), sent_lsn)) AS replication_lag\nFROM pg_stat_replication;"
+        },
+        {
+            "name": "Instance Activity\nStats",
+            "description": "Session \u0026\n Connection",
+            "sql": "SELECT \n    state,\n    count(*) AS count\nFROM pg_stat_activity\nGROUP BY state;\n\nSELECT \n    datname,\n    count(*) AS connections\nFROM pg_stat_activity\nGROUP BY datname;"
+        },
+        {
+            "name": "Instance Activity\nStats",
+            "description": "Parallel \u0026 Background Worker\n (병렬 처리/워크 프로세스)",
+            "sql": "SELECT \n    backend_type,\n    count(*) \nFROM pg_stat_activity \nWHERE backend_type LIKE '%worker%'\nGROUP BY backend_type;\n\nSELECT \n    backend_type,\n    datname,\n    state,\n    count(*) AS count\nFROM pg_stat_activity\nWHERE backend_type IN (\n    'parallel worker', 'logical replication worker', 'autovacuum worker'\n)\nGROUP BY backend_type, datname, state;\n\n"
+        },
+        {
+            "name": "Instance Activity\nStats",
+            "description": "Autovacuum Activity",
+            "sql": "SELECT \n    pid,\n    relid::regclass AS table_name,\n    phase,\n    heap_blks_total,\n    heap_blks_scanned,\n    heap_blks_vacuumed\nFROM pg_stat_progress_vacuum;\n\nSELECT \n    schemaname,\n    relname,\n    last_autovacuum,\n    n_dead_tup\nFROM pg_stat_user_tables\nORDER BY last_autovacuum DESC NULLS LAST\nLIMIT 10;"
+        },
+        {
+            "name": "Instance Activity\nStats",
+            "description": "IO Timing",
+            "sql": "SELECT \n    datname,\n    blk_read_time AS total_read_time_ms,\n    blk_write_time AS total_write_time_ms\nFROM pg_stat_database\nWHERE blk_read_time \u003e 0 OR blk_write_time \u003e 0;"
+        },
+        {
+            "name": "Instance Activity\nStats",
+            "description": "Cache Efficiency\n데이터 베이스별 캐시 효율 ",
+            "sql": "SELECT \n    datname,\n    blks_hit,\n    blks_read,\n    ROUND(100 * blks_hit::numeric / NULLIF(blks_hit + blks_read, 0), 2) AS cache_hit_ratio\nFROM pg_stat_database;"
+        },
+        {
+            "name": "Instance Activity\nStats",
+            "description": " Conflicts\n\nHot Standby 환경에서 주로 발생하는 리커버리 충돌 상황을 확인",
+            "sql": "SELECT \n    datname,\n    confl_tablespace,\n    confl_lock,\n    confl_snapshot,\n    confl_bufferpin,\n    confl_deadlock\nFROM pg_stat_database_conflicts;"
+        },
+        {
+            "name": "Instance Activity\nStats",
+            "description": "Error \u0026 Failures",
+            "sql": "SELECT\n    datname,\n    checksum_failures,\n    checksum_last_failure\nFROM pg_stat_database\nWHERE checksum_failures \u003e 0;"
+        },
+        {
+            "name": "Instance Activity Stats - \nAbsolute Values",
+            "description": "메모리 사용량 \n관련 통계",
+            "sql": "SELECT \n    count(*) AS total_connections,\n    count(*) FILTER (WHERE state = 'active') AS active_connections,\n    count(*) FILTER (WHERE state = 'idle') AS idle_connections,\n    count(*) FILTER (WHERE state = 'idle in transaction') AS idle_in_transaction,\n    pg_size_pretty(sum(CASE WHEN state = 'active' THEN (SELECT setting::bigint FROM pg_settings WHERE name = 'work_mem') ELSE 0 END)) AS estimated_active_work_mem\nFROM pg_stat_activity;"
+        },
+        {
+            "name": "Instance Activity Stats - \nThread Activity",
+            "description": "세션 및 커서\n 관련 통계",
+            "sql": "SELECT\n    -- 백엔드 타입별 집계\n    (SELECT COUNT(*) FROM pg_stat_activity WHERE backend_type = 'client backend') AS client_backends,\n    (SELECT COUNT(*) FROM pg_stat_activity WHERE backend_type = 'background worker') AS background_workers,\n    (SELECT COUNT(*) FROM pg_stat_activity WHERE backend_type = 'autovacuum worker') AS autovacuum_workers,\n    (SELECT COUNT(*) FROM pg_stat_activity WHERE backend_type = 'logical replication launcher') AS logical_repl_launcher,\n    (SELECT COUNT(*) FROM pg_stat_activity WHERE backend_type = 'parallel worker') AS parallel_workers,\n    \n    -- 상태별 집계\n    (SELECT COUNT(*) FROM pg_stat_activity WHERE state = 'active') AS active_processes,\n    (SELECT COUNT(*) FROM pg_stat_activity WHERE state = 'idle') AS idle_processes,\n    (SELECT COUNT(*) FROM pg_stat_activity WHERE state = 'idle in transaction') AS idle_in_transaction,\n    (SELECT COUNT(*) FROM pg_stat_activity WHERE state = 'fastpath function call') AS fastpath_function_calls,\n    \n    -- 대기 이벤트 분석\n    (SELECT COUNT(*) FROM pg_stat_activity WHERE wait_event IS NOT NULL) AS waiting_processes,\n    \n    -- 오래 실행 중인 쿼리\n    (SELECT COUNT(*) FROM pg_stat_activity \n     WHERE state = 'active' AND query_start \u003c NOW() - INTERVAL '5 minutes') AS long_running_queries,\n    \n    -- 실행 중인 쿼리 중 가장 오래된 쿼리의 지속 시간(초)\n    (SELECT COALESCE(EXTRACT(EPOCH FROM (NOW() - MIN(query_start))), 0)\n     FROM pg_stat_activity WHERE state = 'active') AS oldest_query_seconds,\n    \n    -- 총 프로세스 수\n    (SELECT COUNT(*) FROM pg_stat_activity) AS total_processes,\n    \n    -- DB 연결 정보\n    (SELECT COUNT(DISTINCT datname) FROM pg_stat_activity WHERE datname IS NOT NULL) AS connected_databases\nFROM\n    pg_catalog.pg_database\nLIMIT 1;"
+        }
+    ]

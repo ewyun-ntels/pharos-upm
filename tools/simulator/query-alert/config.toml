@@ -1,0 +1,34 @@
+# Simulator configuration for alert query rule
+
+[server]
+# Tarzan server base URL
+base = "http://127.0.0.1:8080"
+# OAuth client credentials (should match config/master_config.toml)
+client_id = "test"
+client_secret = ""
+username =  "admin"
+password = "admin"
+
+[clickhouse]
+database = "tarzan"
+schema = "http"
+host = "192.168.15.101"
+http_port = 31478
+username = "default"
+password = "B8i4G17XrC"
+
+[simulator]
+# Rule name to create; any string.
+rule_name = "sim-query"
+# Total run duration (Go duration format)
+duration = "1m"
+# Query/evaluation interval in seconds
+interval = 10
+# Poll frequency for /alert/status (Go duration format)
+poll = "10s"
+# Label key to use for multi-check (column name in the query)
+label_key = "host"
+# Multiple label values to generate and verify simultaneously
+labels = ["sim-a", "sim-b", "sim-c"]
+# Datasource name to use when creating the rule (must match configured datasource)
+datasource = "clickhouse-01"

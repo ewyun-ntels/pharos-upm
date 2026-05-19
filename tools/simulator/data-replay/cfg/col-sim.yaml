@@ -1,0 +1,20 @@
+
+writer:
+  stdout:
+    type: console
+  kaf1:
+    type: kafka
+    bootstrap-servers:
+      - 192.168.15.99:30300
+    topic: st
+
+collector:
+  simulator:
+    - writers:
+        - stdout
+        - kaf1
+      data-file: cfg/sim-data
+      repeat: true
+      repeat-interval: 10m
+      time-field: timestamp
+      time-format: 2006-01-02T15:04:05Z07:00

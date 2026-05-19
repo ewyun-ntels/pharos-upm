@@ -1,0 +1,36 @@
+{
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "title": "DashboardData",
+    "description": "API response type for dashboard GET requests",
+    "type": "object",
+    "properties": {
+        "id": {
+            "type": "string",
+            "description": "Unique identifier for the dashboard"
+        },
+        "folderId": {
+            "type": "string",
+            "description": "Folder this dashboard belongs to (optional)"
+        },
+        "permission": {
+            "description": "User permission level for this dashboard",
+            "$ref": "DashboardPermission.schema#/definitions/Action"
+        },
+        "config": {
+            "description": "Dashboard configuration",
+            "$ref": "DashboardConfig.schema"
+        },
+        "annotations": {
+            "description": "Annotations stored separately from config",
+            "type": "array",
+            "items": {
+                "$ref": "Annotation.schema"
+            }
+        }
+    },
+    "required": [
+        "id",
+        "permission",
+        "config"
+    ]
+}

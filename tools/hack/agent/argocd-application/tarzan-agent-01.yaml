@@ -1,0 +1,157 @@
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: pharos-agent-01
+  namespace: infra-deploy
+spec:
+  project: default
+  sources:
+    - repoURL: registry-1.docker.io
+      chart: bitnamicharts/postgresql
+      targetRevision: 16.7.27
+      helm:
+        parameters:
+          - name: image.tag
+            value: 16.6.0
+          - name: primary.persistence.size
+            value: 100Mi
+        valuesObject:
+          global:
+            postgresql:
+              auth:
+                postgresPassword: postgres
+          primary:
+            extendedConfiguration: |-
+              log_destination = jsonlog
+              logging_collector = on
+              log_min_duration_statement = 1
+              log_duration = off
+              log_statement = none
+              #shared_preload_libraries = 'pg_stat_statements,pg_stat_kcache,auto_explain'
+              shared_preload_libraries = 'pg_stat_statements,auto_explain'
+              auto_explain.log_min_duration = 1s
+              auto_explain.log_format = json
+            service:
+              type: NodePort
+            extraVolumes:
+              - name: vector-config
+                configMap:
+                  name: vector-config
+              - name: cert
+                secret:
+                  defaultMode: 420
+                  secretName: agent-cert
+            sidecars:
+              - name: vector
+                image: timberio/vector:0.49.0-alpine
+                imagePullPolicy: Always
+                args:
+                  - --config
+                  - /etc/vector/vector.toml
+                resources: {}
+                volumeMounts:
+                  - name: vector-config
+                    mountPath: /etc/vector
+                  - name: cert
+                    mountPath: /pharos/cert
+                    readOnly: true
+                  - name: data
+                    mountPath: /bitnami/postgresql
+    - repoURL: http://192.168.10.111/pharosdb/pharos.git
+      targetRevision: master
+      path: hack/agent/
+      kustomize:
+        namespace: pharos-agent-01
+        patches:
+          - target:
+              kind: Service
+            patch: |-
+              - op: replace
+                path: /metadata/name
+                value: pharos-agent-01
+          - target:
+              kind: ConfigMap
+              name: vector-config
+            patch: |-
+              - op: add
+                path: /data
+                value:
+                  vector.toml: |
+                    [sources.postgresql_logs]
+                    type = "file"
+                    include = ["/bitnami/postgresql/data/log/*.json"]
+                  
+                    [sinks.nats]
+                    type = "nats"
+                    inputs = [ "postgresql_logs" ]
+                    encoding.codec = "json"
+                    uri = "nats://${master_ip}:4222" # tls://ip:4222
+                    tls.enabled = false
+                    tls.ca_file = "/pharos/cert/ca.crt"
+                    tls.crt_file = "/pharos/cert/tls.crt"
+                    tls.key_file = "/pharos/cert/tls.key"
+          - target:
+              kind: StatefulSet
+            patch: |-
+              - op: replace
+                path: /metadata/name
+                value: pharos-agent-01
+              - op: add
+                path: /spec/template/spec/containers/0/env/-
+                value:
+                  name: AGENT_COLLECT_SERVICE_DATABASE_POSTGRESQL_HOST
+                  value: pharos-agent-01-postgresql.pharos-agent-01
+              - op: add
+                path: /spec/template/spec/containers/0/env/-
+                value:
+                  name: AGENT_COLLECT_SERVICE_DATABASE_POSTGRESQL_USERNAME
+                  value: postgres
+              - op: add
+                path: /spec/template/spec/containers/0/env/-
+                value:
+                  name: AGENT_COLLECT_SERVICE_DATABASE_POSTGRESQL_PASSWORD
+                  value: postgres
+              - op: add
+                path: /spec/template/spec/containers/0/env/-
+                value:
+                  name: AGENT_COLLECT_SERVICE_DATABASE_POSTGRESQL_VERSION
+                  value: '16'
+              - op: add
+                path: /spec/template/spec/containers/0/env/-
+                value:
+                  name: CLIENTS_NATS_URL
+                  value: nats://${master_ip}:4222
+              - op: add
+                path: /spec/template/spec/containers/0/env/-
+                value:
+                  name: CLIENTS_NATS_KEY_FILE
+                  value: /pharos/cert/tls.key
+              - op: add
+                path: /spec/template/spec/containers/0/env/-
+                value:
+                  name: CLIENTS_NATS_CERT_FILE
+                  value: /pharos/cert/tls.crt
+              - op: add
+                path: /spec/template/spec/containers/0/env/-
+                value:
+                  name: CLIENTS_NATS_CA_FILE
+                  value: /pharos/cert/ca.crt
+  destination:
+    name: in-cluster
+    namespace: pharos-agent-01
+  syncPolicy:
+    retry:
+      limit: -1
+    syncOptions:
+      - ApplyOutOfSyncOnly=true
+      - CreateNamespace=true
+      - RespectIgnoreDifferences=true
+      - ServerSideApply=true
+  ignoreDifferences:
+    - kind: Secret
+      name: master-cert
+      jsonPointers:
+        - /data/ca.crt
+        - /data/tls.crt
+        - /data/tls.key

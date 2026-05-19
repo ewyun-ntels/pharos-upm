@@ -1,0 +1,144 @@
+{
+  "actions": {
+    "show": "Show"
+  },
+  "label": {
+    "login": {
+      "sign_in": "로그인"
+    },
+    "menu": {
+      "home": "Home",
+      "favorites": "Monitoring",
+      "reports": "Reports",
+      "dataSources": "Data sources",
+      "settings": "Settings",
+      "users": "Users",
+      "teams": "Teams",
+      "preferences": "Preferences",
+      "dashboard": "Dashboard",
+      "dashboards": "Dashboards",
+      "queryMonitoring": "Query analytics",
+      "dbMonitoring": "DB monitoring",
+      "dataStatus": "Data Analytics",
+      "report": "Report",
+      "chartEditor": "Chart editor",
+      "alert": "Alerting"
+    },
+    "common": {
+      "nwdaf": "NWDAF",
+      "kubernetes": "kubernetes",
+      "profile": "Profile",
+      "setting": "Setting",
+      "menu": "메뉴",
+      "theme": "테마",
+      "fullScreen": "전체 화면",
+      "export": "내보내기",
+      "delete": "삭제",
+      "view": "보기",
+      "cancel": "취소",
+      "done": "적용",
+      "logout": "로그아웃",
+      "rows": "개",
+      "selected": "개 선택"
+    },
+    "monitoring": {
+      "monitoring": "Monitoring",
+      "refresh_interval": "새로고침 간격",
+      "step": "챠트 데이터 간격",
+      "cpu_utilisation": "CPU 사용률",
+      "cpu_requests_commitment": "허용된 CPU 최대 사용량",
+      "cpu_limits_commitment": "CPU 최대 용량",
+      "memory_utilisation": "Memory 사용률",
+      "memory_requests_commitment": "허용된 Memory 최대 사용량",
+      "memory_limits_commitment": "Memory 최대 용량",
+      "kubernetes_namespace_cpu_utilisation": "Namespace CPU 사용률",
+      "kubernetes_pod_status": "Pod 상태",
+      "kubernetes_node_cpu_statistics": "CPU 통계",
+      "kubernetes_node_cpu_avg_statistics": "CPU 평균 통계",
+      "kubernetes_memory_statistics": "Memory 통계",
+      "kubernetes_disk_statistics": "Disk 통계",
+      "kubernetes_event_types_overview": "Event 상태"
+    },
+    "user_management": {
+      "user_management": "User management",
+      "user_create": "사용자 등록",
+      "email": "이메일",
+      "email_input_empty_desc": "이메일을 입력해 주세요.",
+      "email_already_exist": "이메일이 이미 존재합니다.",
+      "user_name": "사용자 이름",
+      "user_name_input_empty_desc": "사용자 이름을 입력해 주세요.",
+      "role": "역할",
+      "cancle": "취소",
+      "create": "등록",
+      "view_detail": "상세 정보",
+      "user_view_detail": "사용자 상세 정보",
+      "password_reset": "비밀번호 초기화",
+      "password_reset_desc": "사용자의 비밀번호를 초기 세팅 값으로 변경할 수 있습니다",
+      "password_change": "비밀번호 변경",
+      "new_password": "신규 비밀번호",
+      "new_password_desc": "신규 비밀번호를 입력해 주세요.",
+      "new_password_confirm": "신규 비밀번호 확인",
+      "new_password_confirm_desc": "신규 비밀번호 확인 입력해 주세요.",
+      "password_not_match": "비밀번호가 일치하지 않습니다.",
+      "edit": "수정",
+      "user_edit": "사용자 수정",
+      "delete": "삭제",
+      "cofirm": "확인",
+      "regdate": "등록일",
+      "email_input_validation_desc": "이메일 형식에 맞지 않습니다.",
+      "user_delete": "사용자 삭제",
+      "page_not_permission": "접근 권한이 없는 페이지 입니다.",
+      "password": "비밀번호",
+      "password_confirm": "비밀번호 확인",
+      "password_desc": "비밀번호를 입력해 주세요.",
+      "master_password": "비밀번호 확인",
+      "incorrect_password": "비밀번호가 틀렸습니다."
+    },
+    "chart": {
+      "data_not_exists": "No data"
+    }
+  },
+  "msg": {
+    "login": {
+      "user_not_found": "아이디 또는 비밀번호가 올바르지 않습니다.",
+      "user_is_blocked": "계정이 비활성화되었습니다. 관리자에게 문의하세요.",
+      "user_is_temporarily_blocked": "계정이 일시적으로 차단되었습니다. 나중에 다시 시도해 주세요.",
+      "password_expired": "비밀번호가 만료되었습니다. 새 비밀번호로 변경해 주세요.",
+      "password_mismatch": "아이디 또는 비밀번호가 올바르지 않습니다.",
+      "user_first_login": "처음 로그인할 때 비밀번호를 변경해야 합니다. 계정에 접속하려면 새 비밀번호를 설정해 주세요.",
+      "password_expired_change": "비밀번호가 만료되었습니다. 로그인하기 전에 새 비밀번호를 생성해 주세요.",
+      "password_successfully_changed": "비밀번호가 성공적으로 변경되었습니다",
+      "password_successfully_description": "이제 새 비밀번호로 로그인할 수 있습니다."
+    },
+    "common": {
+      "delete": "삭제하시겠습니까?",
+      "no_events": "이벤트가 없습니다.",
+      "exit_fullScreen": "ESC 키를 누르면 전체화면 모드가 종료됩니다."
+    },
+    "monitoring": {},
+    "user_management": {
+      "delete_selected_user": "선택한 사용자를 삭제하시겠습니까?",
+      "create_success": "사용자 등록 성공",
+      "user_create_successfully": "사용자 등록이 성공했습니다.",
+      "create_failed": "사용자 등록 실패",
+      "user_create_failed": "사용자 등록이 실패했습니다.",
+      "edit_success": "수정 성공",
+      "user_edit_successfully": "사용자 수정이 성공했습니다.",
+      "edit_failed": "수정 실패",
+      "user_edit_failed": "사용자 수정이 실패했습니다.",
+      "password_change_success": "비밀번호 변경 성공",
+      "password_change_successfully": "비밀번호 변경이 성공했습니다.",
+      "password_change_failed": "비밀번호 변경 실패",
+      "user_password_change_failed": "비밀번호 변경이 성공했습니다.",
+      "delete_success": "삭제 성공",
+      "user_delete_successfully": "사용자 삭제가 성공했습니다.",
+      "delete_failed": "삭제 실패",
+      "user_delete_failed": "사용자 삭제가 실패했습니다."
+    }
+  },
+  "persistentvolumes": {
+    "sheets": {
+      "title": "안녕"
+    }
+  }
+}

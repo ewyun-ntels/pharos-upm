@@ -1,0 +1,59 @@
+{
+  "title": "PHAROS",
+  "description": "PHAROS",
+  "icon": "default/images/favicon.svg",
+  "login-extension": "default/login",
+  "extensions": ["dashboard/datasources/clickhouse", "demo"],
+  "menu-order": [
+    {
+      "label": "Dashboard",
+      "items": [
+        {
+          "extension": "core",
+          "name": "starred-tree",
+          "display_name": "Favorites",
+          "flat": true
+        },
+        {"extension": "core", "name": "starred", "display_name": "Favorites", "hidden": true}
+      ]
+    },
+    {
+      "label": "Management",
+      "items": [
+        {"extension": "core", "name": "dashboard", "display_name": "Dashboard"},
+        {"extension": "core", "name": "users", "display_name": "Users"},
+        {"extension": "core", "name": "alert", "display_name": "Alert"},
+        {"extension": "core", "name": "notification", "display_name": "Notification"},
+        {
+          "extension": "core",
+          "name": "settings",
+          "display_name": "Settings",
+          "items": [
+            {"extension": "core", "name": "roles", "display_name": "Role Configuration"},
+            {"extension": "core", "name": "userFields", "display_name": "User Fields"}
+          ]
+        }
+      ]
+    },
+    {
+      "label": "Demo",
+      "hidden": true,
+      "separator": true,
+      "items": [
+        {
+          "extension": "demo",
+          "name": "demo",
+          "display_name": "Demo",
+          "items": [
+            {"extension": "demo", "name": "table-tabs"},
+            {"extension": "demo", "name": "single-table"},
+            {"extension": "demo", "name": "table-select"},
+            {"extension": "demo", "name": "realtime-menu"},
+            {"extension": "demo", "name": "select-components"},
+            {"extension": "demo", "name": "data-provider"}
+          ]
+        }
+      ]
+    }
+  ]
+}

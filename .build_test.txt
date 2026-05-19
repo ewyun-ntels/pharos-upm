@@ -1,0 +1,865 @@
+# Pharos 빌드 / 테스트 가이드
+
+## 1. 빌드 (Compile)
+
+산출물 위치: ./bin/
+
+### 전체 빌드 (pharos + 모든 plugin)
+make build
+
+### pharos 본체만 (빠름, plugin 제외)
+make build_without_plugin
+
+### plugin 개별 빌드
+# Makefile 수정 적용 후 (각 build_plugin_* 타겟에 `export BIN_PATH ?= ./bin` 추가됨)
+# BIN_PATH 환경변수 없이도 호출 가능. 명시하면 그 값으로 덮어쓰기 됨.
+make build_plugin_postgresql
+make build_plugin_clickhouse
+make build_plugin_altibase
+make build_plugin_http-receiver
+
+# 모든 plugin 한 번에
+make build_plugin
+
+# (참고) 출력 경로를 ./bin 이외로 바꾸고 싶을 때
+BIN_PATH=/tmp/out make build_plugin_postgresql
+
+# (히스토리) 이전에는 단독 호출 시 BIN_PATH 가 비어서 /plugins/ 로 평가되어
+#   `mkdir /plugins/: permission denied` 에러가 발생했음.
+# Makefile 의 build_plugin / build_plugin_altibase / build_plugin_clickhouse /
+#   build_plugin_http-receiver / build_plugin_postgresql 타겟에
+#   `export BIN_PATH ?= ./bin` 한 줄씩 추가하여 해결.
+
+### SITE_MODE 지정 (기본: demo)
+# meta/site-config.json 의 매핑에 따라 포함되는 extension이 달라짐
+SITE_MODE=catv  make build
+SITE_MODE=demo  make build
+SITE_MODE=upm   make build
+
+### 크로스 컴파일
+GOOS=linux GOARCH=amd64 make build
+
+### Docker 이미지 빌드 (사내 registry push 포함)
+SITE_MODE=catv make docker
+
+### Go 직접 빌드 (Makefile 없이)
+go build -o ./bin/pharos ./core/cmd/pharos
+
+
+## 2. 실행 (Run)
+
+# master_config.toml 사용해서 기동
+./bin/pharos serve --config ./core/config/master_config.toml
+
+# 백그라운드 daemon 모드
+./bin/pharos start --config ./core/config/master_config.toml
+./bin/pharos stop
+./bin/pharos status
+
+
+## 3. 테스트 (Test)
+
+### Go 단위 테스트 - 전체
+go test ./...
+
+### 패키지 단위
+go test ./core/...
+go test ./core/pkg/metrics/...
+go test ./core/external/orm/...
+
+### 상세 출력 + race detector
+go test -v -race ./core/...
+
+### 특정 테스트 함수만
+go test -v -run TestXxx ./core/pkg/metrics/
+
+### 커버리지
+go test -coverprofile=coverage.out ./core/...
+go tool cover -html=coverage.out
+
+
+## 4. 변경 설정 검증 체크리스트
+
+### (a) PostgreSQL 접속 사전 확인
+PGPASSWORD=upmems psql -h 10.255.254.22 -p 30432 -U upmems -d upmems -c '\l'
+
+### (b) catv DB 설정 확인 포인트 (master_config.toml)
+- [database] driver = "postgresql"
+- [statistics.database] driver = "postgresql"
+- [catv.migration.database] driver = "postgresql"
+- [catv.database] driver = "postgresql"
+- 각 *.postgresql 섹션의 host/port/credentials 확인
+
+### (c) 마이그레이션 실행 여부
+- [migration] disable = true   → 마이그레이션 자동 실행 안 함
+- 필요 시 false 로 변경 후 기동
+
+### (d) catv 기능 테스트가 필요하면
+- core/cmd/pharos/import_extensions.go 에
+    _ "ntels.com/pharos/extensions/catv/business"
+  import 가 포함되어 있는지 확인 (현재 제거된 상태)
+
+### (e) 기동 후 확인
+- log/pharos.log 에서 driver/host 로그 확인
+- /metrics 엔드포인트 (Prometheus 노출) 응답 확인:
+    curl http://localhost:8080/metrics | head
+
+
+## 5. UPM 개발 환경
+
+### 최초 빌드 (처음 한 번만)
+pnpm install
+make build SITE_MODE=upm
+
+### 서버 실행 (터미널 1)
+./bin/pharos serve -c ./core/config/master_config.toml
+
+### 프론트엔드 개발 서버 (터미널 2)
+cd core/frontend
+SITE_MODE=upm pnpm dev
+# 브라우저: http://localhost:3002/ui/
+# 처음 실행 시 bundling dependencies... 완료까지 1~2분 소요
+# .tsx 파일 저장 시 HMR 즉시 반영 (새로고침 불필요)
+
+### Go 백엔드 수정 시만 재빌드
+make build SITE_MODE=upm
+./bin/pharos serve -c ./core/config/master_config.toml
+
+
+## 6. extensions/log 개발 현황 (2026-05-14)
+
+### 개요
+OpenSearch 로그 뷰어 extension. app-*, node-* 인덱스 지원.
+
+### 수정된 파일 (extensions/log/ 내부만)
+- extensions/log/api.go
+- extensions/log/frontend/src/routes/log-dashboard.tsx
+
+### 주요 버그 수정 내역
+1. [백엔드] indexSchema/filterDef 구조체에 JSON 태그 누락
+   → Go 필드명 대문자(Pattern, Filters...)로 직렬화되어 프론트에서 schema.pattern이 undefined
+   → findSchemaForIndex()에서 TypeError 발생 → currentSchema null → 필터 안 나옴 + 인덱스/시간 변경 시 무한 로딩
+   → 수정: json:"pattern", json:"filters" 등 태그 추가
+
+2. [백엔드] case_insensitive 필터가 대/소문자 2가지(lower/upper)만 처리
+   → "Info", "WARNING" 등 mixed case 미처리
+   → 수정: wildcard + case_insensitive:true 방식으로 변경
+
+3. [백엔드] extractBucketKeys가 숫자 키(float64) 버킷 무시
+   → PRIORITY 같은 숫자 저장 필드 aggregation 결과 누락
+   → 수정: string/float64/기타 타입 모두 처리
+
+4. [백엔드] findSchemaForIndex 첫 번째 매칭 반환
+   → "app-debug-*"보다 "app-*"가 먼저 매칭되는 문제
+   → 수정: 가장 긴 prefix 우선(best-match) 방식으로 변경
+
+5. [백엔드] 인덱스 이름 미검증 (isValidIndex 추가)
+   → 임의 경로로 OpenSearch 요청 가능했던 보안 취약점 수정
+
+6. [프론트] selectedNamespace/Pod/Level 등 미선언 변수 참조
+   → 동적 필터 마이그레이션 절반만 진행된 상태 → 컴파일 불가
+   → 수정: filterValues(Record<string,string>), filterOptions(Record<string,string[]>)로 완전 동적화
+
+7. [프론트] fetchLogs가 구 API 포맷(namespace/pod/level 개별 필드) 사용
+   → 백엔드 searchRequest.Filters(map[string]string) 미매칭
+   → 수정: filters: filterValues 맵으로 전송
+
+8. [프론트] 테이블 컬럼 하드코딩(Namespace/Pod/Level)
+   → 인덱스 스키마 변경 시 테이블도 자동 반영되도록 useMemo로 동적 생성
+
+### master_config.toml 현재 필터 설정
+app-*: namespace(kubernetes.namespace_name.keyword), pod(kubernetes.pod_name.keyword)
+node-*: hostname(_HOSTNAME.keyword), unit(_SYSTEMD_UNIT.keyword)
+→ node-* 필드 타입: text + keyword 서브필드 구조 (OpenSearch 매핑 확인 완료)
+
+### 남은 작업
+- extensions/log 프론트엔드 pnpm install 미실행 상태 (빌드 전 필요)
+- custom range datetime-local 달력 아이콘 invert 적용 (다크모드 대응)
+- node-* 필터 확인 필요: _HOSTNAME.keyword, _SYSTEMD_UNIT.keyword 로 설정했으나
+  실제 aggregation 동작 여부는 재빌드 후 테스트 필요
+
+---
+
+## 7. Dashboard / Prometheus 현황 (2026-05-14)
+
+### 쿼리 저장 구조
+- 패널 에디터 Save → PUT /dashboard/:id → PostgreSQL에 대시보드 전체 config JSON 저장
+- 쿼리 실행 2가지 모드:
+  - Run 모드: 에디터에서 Run Query 클릭 시 query 직접 전송
+  - Panel 모드: 대시보드 보기 시 DB 저장된 패널 쿼리 사용
+
+### 변수 문법
+- PHAROS: {{variableId}} (Pongo2 템플릿)
+- Grafana: $variable → 변환 필요
+- 변수 미등록 시 QueryPipeline.checkReady()가 영원히 대기 → 무한 로딩
+  → 2026-05-18 수정: 미등록 변수는 block 없이 통과 (12절 참고)
+
+### Prometheus 인스턴트 쿼리 한계 (미해결)
+- 현재: v1api.Query(ctx, query, time.Now()) — 항상 지금 이 순간 값 1개만 반환
+- 필요: v1api.QueryRange() — 대시보드 시간 범위로 여러 시점 데이터 반환
+- 영향: increase(metric[2m]) 같은 쿼리가 실행은 되지만
+        Time Series 차트에 점 1개만 찍혀 선이 안 보임
+- 해결책: core/external/orm/config.go의 makeDatabaseResponseForPrometheus()에
+          QueryRange 구현 필요 (미구현 상태)
+
+### 차트 다크모드 버그 수정
+- CSS 변수 --chart-1~5 가 oklch() 포맷 → Recharts SVG stroke 속성에서 미지원
+- 수정: shared/frontend/src/components/charts/utils/color.ts
+        Canvas API로 oklch → rgb() 변환 후 Recharts에 전달
+
+### Prometheus QueryRange 미구현 — 상세 원인 분석 (2026-05-14)
+
+#### 실제 요청 body 확인
+  {
+    "run": { "datasourceName": "prometheus-metric", "query": "sum by ..." },
+    "variables": {
+      "__start_time": 1778737207,   ← Unix 초
+      "__end_time":   1778744407,   ← Unix 초 (차이 = 2시간)
+      "__start_time_ms": ...,
+      "__end_time_ms":   ...,
+      "__step": 300,                ← 5분 간격
+      "__refreshCount": "1"
+    }
+  }
+→ __start_time, __end_time, __step 이 이미 백엔드로 전달되고 있음
+
+#### variables가 버려지는 위치
+  query.go :: getPostResponse()
+    query_builder.GetQuery(query.Run.Query, query.Variables)  ← Pongo2 치환
+    → getDatabaseResponse(ctx, sql)                          ← sql만 전달, variables 이후 버려짐
+      → plugins.DatasourceQuery({ SQL: sql })
+        → makeDatabaseResponseForPrometheus(ctx, query, timeout)
+          → v1api.Query(ctx, query, time.Now())              ← time range 완전 무시
+
+#### 수정 필요 파일 2곳
+  1. core/pkg/dashboard/handler/query.go
+     getDatabaseResponse()에서 Variables의 __start_time/__end_time/__step 추출해 전달
+
+  2. core/external/orm/config.go
+     makeDatabaseResponseForPrometheus()에서
+     start/end/step 있으면 v1api.QueryRange() 호출
+     없으면 기존 v1api.Query() fallback
+
+#### 수정 후 기대 동작
+  QueryRange(query, start=__start_time, end=__end_time, step=__step)
+  → 2시간치 데이터를 5분 간격으로 24개 포인트 반환
+  → Time Series 차트에 선이 그려짐
+
+#### 현재 증상
+  - increase(metric[2m]) 쿼리 실행은 됨
+  - 단, time.Now() 기준 단일 값 1개만 반환
+  - Time Series 차트에 점 1개 → 선 불가, 사실상 데이터 없는 것처럼 보임
+  - hover 시 현재 시각 근처에서 tooltip은 표시됨
+
+
+수정 파일: 2개
+
+core/external/orm/config.go
+
+prometheus_api_v1 import 추가
+PrometheusTimeRange 구조체 + context 헬퍼 추가
+makeDatabaseResponseForPrometheus() — context에 시간 범위 있으면 QueryRange, 없으면 기존 Query(instant) fallback
+core/pkg/dashboard/handler/query.go
+
+extractTimeRange() 메서드 추가 — Variables에서 __start_time, __end_time, __step 추출
+getDatabaseResponse() — 추출된 시간 범위를 context에 주입
+기존 코드 영향 없음 — 시그니처 변경 없음, 테스트 파일 수정 없음, Prometheus 외 다른 DB는 context 무시
+
+빌드 후 increase(metric[2m]) 쿼리가 2시간치 데이터를 5분 간격 24포인트로 반환.
+
+---
+
+## 8. Grafana → PHAROS 쿼리 변환 규칙 (2026-05-14)
+
+### 변환 규칙
+| 원본 (Grafana)         | 변환 (PHAROS)                  |
+|----------------------|-------------------------------|
+| $job                 | {{job\|default:'.*'}}          |
+| $pod                 | {{pod\|default:'.*'}}          |
+| $sys_id              | {{sys_id\|default:'.*'}}       |
+| \"  (JSON 이스케이프) | "  (그대로 사용)               |
+| legendFormat {{변수}} | 단순 텍스트로 변경             |
+| "$1" (regex 캡처그룹) | "$1" 그대로 유지               |
+
+- |default:'.*' : 변수 미등록 시 전체 매칭으로 fallback → 무한 로딩/에러 방지
+- Dashboard Variables 미등록 상태에서도 쿼리 동작
+
+### 변환 예시 (처리완료율 쿼리)
+
+Query 에디터:
+(((sum by (sys_id) (label_replace(increase(tcp_bridge_inbound_outcomes_total{job=~"{{job|default:'.*'}}", pod=~"{{pod|default:'.*'}}", reason="ok"}[2m]), "sys_id", "$1", "pod", ".*(tcp-bridge-[0-9]+).*"))) or on (sys_id) (sum by (sys_id) (label_replace(increase(tcp_bridge_inbound_requests_total{job=~"{{job|default:'.*'}}", pod=~"{{pod|default:'.*'}}"}[2m]), "sys_id", "$1", "pod", ".*(tcp-bridge-[0-9]+).*")) * 0)) / clamp_min(sum by (sys_id) (label_replace(increase(tcp_bridge_inbound_requests_total{job=~"{{job|default:'.*'}}", pod=~"{{pod|default:'.*'}}"}[2m]), "sys_id", "$1", "pod", ".*(tcp-bridge-[0-9]+).*")), 1)) and on (sys_id) max by (sys_id) (tcp_bridge:ready_connection_state:max{job=~"{{job|default:'.*'}}", pod=~"{{pod|default:'.*'}}", sys_id=~"{{sys_id|default:'.*'}}"})
+
+Legend/Label 필드:
+처리완료율
+
+---
+
+## 9. Prometheus 변수 미리보기 / QueryRange step 0 수정 (2026-05-14)
+
+### 이슈
+- 대시보드 변수 미리보기 요청에서 시간 변수와 함께 `__step: 0`이 전달됨.
+- 기존 백엔드는 `__start_time`, `__end_time`, `__step` 값이 존재하기만 하면 Prometheus `QueryRange()`를 호출했음.
+- `step=0` 상태에서는 Prometheus range query가 실패하거나 사용 가능한 결과를 반환하지 않고, 프론트엔드 select 변수는 이 에러를 숨긴 채 `No results found`만 표시했음.
+
+### 수정
+- 파일: `core/pkg/dashboard/handler/query.go`
+- 함수: `extractTimeRange()`
+- `step > 0`일 때만 Prometheus QueryRange context를 주입하도록 guard 추가.
+- `__step`이 `0`이면 변수 미리보기는 기존 Prometheus instant `Query()` 경로로 fallback.
+
+### 참고
+- PromQL range selector인 `[2m]`와 QueryRange의 `step`은 서로 다른 개념.
+- `[2m]`는 각 평가 시점마다 직전 2분 구간을 바라본다는 의미.
+- QueryRange의 `step=300`은 대시보드 시간 범위 전체에서 300초마다 쿼리를 평가한다는 의미.
+- 따라서 `[2m]`를 사용한다고 해서 `__step`이 자동으로 `300`이 되지는 않음.
+
+---
+
+## 10. Dashboard 변수값 포맷 버그 수정 (2026-05-15)
+
+### 증상
+- Prometheus datasource를 사용하는 드롭다운 변수(pod, sys_id 등)를 선택해도 패널에 데이터가 안 나옴
+- 실제 전송되는 variables 확인 시 값에 싱글쿼트 포함: `"pod": "'tcp-bridge-0-xxx'"`
+- PromQL 렌더링 결과: `pod=~"'tcp-bridge-0-xxx'"` → 싱글쿼트가 리터럴 문자로 취급되어 regex 매칭 실패
+
+### 원인
+- `variable-value-transformer.ts`의 `transformArrayValue()`가 배열을 `'val1','val2'` 포맷으로 변환
+- 이 포맷은 SQL `IN ('val1','val2')` 절 전용이며 Prometheus regex에서는 사용 불가
+- Prometheus에서 다중값 regex 포맷은 `val1|val2` (파이프 구분, 쿼트 없음)이어야 함
+- `job` 변수는 string으로 저장되어 배열 변환을 거치지 않아 정상 동작했고,
+  `pod`/`sys_id` 변수는 드롭다운 결과가 배열로 저장되어 이 변환을 거쳐 쿼트가 붙었음
+
+### 수정 파일 2개 (1차)
+
+`core/frontend/src/features/dashboard/variables/variable-value-transformer.ts`
+- `transformArrayValue()`에 `format: 'sql' | 'regex'` 파라미터 추가
+- `transformVariableValue()` options에 `format` 필드 추가
+
+`core/frontend/src/features/dashboard/hooks/QueryPipeline.ts`
+- `buildArgs()`에서 `meta.datasourceName`이 'prometheus'를 포함하면 `format: 'regex'` 전달
+- 그 외 datasource는 기존 `format: 'sql'` 유지 (하위 호환)
+
+### 추가 수정 (2차) — SQL 쿼트 문자열 처리
+
+Inspect로 확인 시 `pod=~"'.*'"`, `sys_id=~"'tcp-bridge-0'"` 처럼 렌더링 결과에
+쿼트가 포함되는 2차 문제 발견.
+
+**원인**: 변수의 `customAllValue`가 `'.*'` (SQL 포맷, 쿼트 포함) 문자열로 저장되어
+배열이 아닌 문자열로 스토어에 저장됨. 문자열 브랜치는 format 옵션을 무시하고 그대로 반환.
+
+**추가 수정**: `variable-value-transformer.ts`
+- `stripSqlQuotes()` 헬퍼 추가 — `'.*'` → `.*` 변환
+- `transformArrayValue()` regex 모드에서 각 원소에 `stripSqlQuotes` 적용
+- `transformVariableValue()` 문자열 브랜치에서 regex 포맷이면 `stripSqlQuotes` 적용
+
+### 3차 시도 — 패널 datasource 기준으로 변경
+
+`core/frontend/src/features/dashboard/hooks/QueryPipeline.ts`
+- `buildArgs()`에서 변수의 datasourceName 대신 패널 쿼리의 datasourceName으로 isPrometheus 판단
+- `meta.datasourceName`이 비어 있거나 다른 값일 수 있어서 더 신뢰성 있는 체크
+
+### 4차 수정 — Inspector 코드 경로 누락 (2026-05-18, 근본 원인 해결)
+
+#### 문제
+3차까지 패널 렌더링 경로(`QueryPipeline.buildArgs`)만 고쳤는데,
+Query Inspector는 **별도 경로**를 타고 있어서 여전히 따옴표가 들어갔다.
+
+```
+# 패널 렌더링 경로 (3차까지 수정됨, 정상)
+QueryPipeline.buildArgs()
+  → transformVariableValue(format: 'regex')   ← isPanelPrometheus 감지 → 따옴표 없음
+
+# Inspector 경로 (4차에서 발견·수정)
+left-bottom.tsx → usePanelArgs()
+  → buildDynamicArgsFromMap()                 ← format 파라미터 없음, 항상 SQL 포맷
+    → 배열 ['pod-xxx'] → "'pod-xxx'"          ← 따옴표 추가됨
+      → inspectorVariables로 백엔드 전달
+        → Variables 섹션에 "pod": "'pod-xxx'" 표시
+          → PromQL에 'pod-xxx' 리터럴 단일쿼트 포함 → regex 매칭 실패 → 0 rows
+```
+
+#### 수정 파일 3개
+
+`core/frontend/src/utils/chartArgsBuilder.ts`
+- `buildDynamicArgsFromMap()`에 `format: 'sql' | 'regex' = 'sql'` 파라미터 추가
+- `format === 'regex'`이면 배열을 `val1|val2` (파이프 구분, 따옴표 없음) 으로 변환
+
+`core/frontend/src/features/dashboard/hooks/use-panel-args.ts`
+- `usePanelArgs()`에 `format: 'sql' | 'regex' = 'sql'` 파라미터 추가
+- `buildDynamicArgsFromMap()`에 format 전달
+- `useMemo` 의존성 배열에 `format` 추가
+
+`core/frontend/src/features/dashboard/panels/components/PanelEditor/left-bottom.tsx`
+- `firstQuery.datasourceName`에 'prometheus' 포함 여부로 `isPrometheus` 판단
+- `usePanelArgs(..., isPrometheus ? 'regex' : 'sql')` 전달
+
+#### 기존 패널 영향 없음
+- `buildDynamicArgsFromMap` default는 여전히 `'sql'`이므로 SQL 패널은 기존 동작 유지
+- `usePanelArgs`는 `left-bottom.tsx`(Inspector)에서만 사용 중
+
+---
+
+### 프론트엔드 fix 여전히 미동작 시 — 백엔드 접근 (2026-05-16 예정, 안전망으로 검토)
+
+#### 핵심 아이디어
+프론트엔드에서 SQL 포맷(`'val'`)으로 보내든 raw 포맷(`val`)으로 보내든,
+백엔드가 Pongo2에 넘기기 전에 Prometheus datasource인 경우 한 번에 정리.
+
+#### 수정 파일: `core/pkg/dashboard/handler/query.go`
+
+`getPostResponse()` 또는 `getDatabaseResponse()`에서 Pongo2 치환 전 호출:
+
+```go
+// Prometheus datasource인 경우 SQL 포맷 쿼트 제거
+if strings.Contains(strings.ToLower(query.Run.DatasourceName), "prometheus") {
+    query.Variables = sanitizeVarsForPrometheus(query.Variables)
+}
+sql, _ := query_builder.GetQuery(query.Run.Query, query.Variables)
+```
+
+```go
+func sanitizeVarsForPrometheus(vars map[string]any) map[string]any {
+    result := make(map[string]any)
+    for k, v := range vars {
+        if s, ok := v.(string); ok {
+            result[k] = stripPromSqlQuotes(s)
+        } else {
+            result[k] = v
+        }
+    }
+    return result
+}
+
+// 'val1','val2' → val1|val2  (다중값 → Prometheus OR)
+// 'val'         → val         (단일값 → 쿼트 제거)
+// val           → val         (변환 없음)
+func stripPromSqlQuotes(s string) string {
+    if !strings.HasPrefix(s, "'") {
+        return s
+    }
+    parts := strings.Split(s, ",")
+    stripped := make([]string, 0, len(parts))
+    for _, p := range parts {
+        p = strings.TrimSpace(p)
+        if len(p) >= 2 && strings.HasPrefix(p, "'") && strings.HasSuffix(p, "'") {
+            p = p[1 : len(p)-1]
+        }
+        stripped = append(stripped, p)
+    }
+    return strings.Join(stripped, "|")
+}
+```
+
+#### 장점
+- 진입점 한 곳(query.go)에서 처리 → 프론트 수정 불필요
+- 프론트가 SQL/regex 어떤 포맷으로 보내도 무관
+- 다중값 `'v1','v2'` → `v1|v2` 변환까지 동시 처리
+
+#### 주의사항
+- `query.Run.DatasourceName`에 'prometheus' 포함 여부로 판단
+- 백엔드 fix 적용 후 프론트엔드 fix(`transformVariableValue`, `QueryPipeline`) 롤백 가능
+
+---
+
+## 12. 미등록 변수로 인한 패널 무한 로딩 수정 (2026-05-18)
+
+### 증상
+- Inspector에서 쿼리 실행 시 정상적으로 데이터 반환 (예: 13 rows)
+- 그러나 실제 패널 화면은 계속 로딩 상태 유지
+
+### 원인
+
+`{{sys_id|default:'.*'}}` 처럼 `|default:` 필터가 붙어 있어도,
+`extractVariables()`는 `sys_id`를 required 변수로 추출한다.
+
+`QueryPipeline.checkReady()`는 `filterMetas`에서 해당 변수의 메타를 찾는데,
+`sys_id`가 대시보드 변수로 등록되지 않으면 `filterMetas.get('sys_id')` → `undefined`.
+
+```typescript
+// 수정 전 — meta가 undefined이면 isSuccess = false → ready = false → 무한 대기
+const meta = filterMetas.get(varName);
+const isFetching = meta?.isFetching ?? false;   // false
+const isSuccess  = meta?.isQuerySuccess ?? false; // false (문제)
+const ready = !isFetching && isSuccess;           // false → 영원히 waiting
+```
+
+`|default:'.*'`는 백엔드 Pongo2에서만 동작 (미등록 변수 → `.*`로 치환).
+프론트엔드 ready 체크는 이 정보를 알 수 없어 무조건 block.
+
+```
+Inspector 경로 — QueryPipeline 우회, 직접 쿼리 실행 → 데이터 반환됨
+패널 경로     — QueryPipeline.ready = false → execute() 호출 안 됨 → 무한 로딩
+```
+
+### 수정 파일 1개
+
+`core/frontend/src/features/dashboard/hooks/QueryPipeline.ts`
+- `checkReady()` 내에서 `meta`가 `undefined`(미등록 변수)이면 `return`으로 건너뜀
+- 미등록 변수는 Pongo2 `|default:` 폴백이 처리하므로 프론트에서 block 불필요
+
+```typescript
+// 수정 후
+requiredVars.forEach(varName => {
+  const meta = filterMetas.get(varName);
+  if (!meta) return; // 미등록 변수: Pongo2 default 처리 → 대기 불필요
+  const isFetching = meta.isFetching ?? false;
+  const isSuccess  = meta.isQuerySuccess ?? false;
+  const ready = !isFetching && isSuccess;
+  if (!ready) waiting.push(varName);
+});
+```
+
+### 부수효과
+- `|default:` 없이 미등록 변수를 쓴 경우(`{{sys_id}}`만 있고 미등록): 무한 로딩 대신
+  Pongo2가 빈 문자열 렌더링 → PromQL `sys_id=~""` → 빈 결과 반환 (더 나은 동작)
+- 등록된 변수(filterMetas에 있는 변수)는 기존과 동일하게 fetch 완료 후 실행
+
+### 관련 구조 참고
+- `.build_test.txt` 7절 "변수 미등록 시 무한 로딩" 문제의 근본 원인 해결
+- 기존 권장사항(`|default:'.*'` 추가)은 백엔드 폴백 용도로 여전히 유효
+
+---
+
+## 13. Prometheus QueryRange Step — Auto 계산 구현 (2026-05-18)
+
+### 배경
+- Grafana는 `Step: auto` 가 기본값 — 시간범위 / Max data points로 자동 계산
+- PHAROS는 `step = 300`(5분) 하드코딩 → 시간범위에 관계없이 항상 5분 간격
+- 결과: Grafana 대비 데이터 포인트가 10배 성겨서 차트 모양이 달라짐
+
+### Step 흐름 (수정 전)
+```
+대시보드 Step 변수(StepVariable)
+  → usePanelArgs() → buildChartQueryArgs({ step: stepValue })
+  → chartArgsBuilder.ts: const { step = 300 } = options  ← 변수 없으면 300 고정
+  → __step=300 → backend extractTimeRange() → QueryRange(step=300s)
+```
+
+### 수정 파일 1개
+
+`core/frontend/src/utils/chartArgsBuilder.ts`
+- `step = 300` 하드코딩 제거
+- `calcAutoStep()` 추가: `max(15s, ceil(시간범위 / 1000))`
+- `step` 파라미터가 있으면 그 값 우선, 없으면 auto 계산
+
+```typescript
+function calcAutoStep(startTime, endTime): number {
+  const MAX_DATA_POINTS = 1000;
+  const MIN_STEP = 15;  // 최소 15초
+  const rangeSeconds = end - start;
+  return Math.max(MIN_STEP, Math.ceil(rangeSeconds / MAX_DATA_POINTS));
+}
+
+// step 명시 없으면 시간범위 기반 auto 계산
+const resolvedStep = step ?? calcAutoStep(startTime, endTime);
+```
+
+### Auto step 계산 예시
+| 시간범위 | 계산           | 적용 step |
+|---------|----------------|-----------|
+| 1시간   | 3600/1000 = 3.6 → 4s | **15s** (최소값) |
+| 6시간   | 21600/1000 = 21.6 → 22s | **22s** |
+| 24시간  | 86400/1000 = 86.4 → 87s | **87s** |
+| 7일     | 604800/1000 = 604.8 → 605s | **605s** |
+
+### 우선순위
+1. 대시보드에 Step 변수(`StepVariable`) 등록 후 선택한 값 → 그 값 사용
+2. Step 변수 없음 → auto 계산 (시간범위 기반)
+
+### Grafana와의 차이
+- Grafana: 패널 픽셀 너비(실제 px) 기준으로 MD 계산 → 패널 크기마다 다름
+- PHAROS: MD=1000 고정으로 계산 → 패널 크기 무관, 시간범위만 반영
+- 실용적으로 동일한 수준의 밀도 확보
+
+---
+
+## 14. Auto Step MIN_STEP 30s로 상향 (2026-05-19)
+
+### 증상
+- `increase([2m])` 쿼리에서 0%↔100% 직각 스파이크 반복 (Grafana는 매끄러운 선)
+- Grafana 동일 쿼리는 flat 100% 라인으로 표시
+
+### 원인
+- MIN_STEP=15s → 1시간 범위 auto step = 15s
+- Prometheus 스크레이프 간격(보통 15~30s)보다 step이 작거나 같으면 스크레이프 빈 구간 발생
+- 빈 구간에서 `increase()` 데이터 없음 → `or vector(0)` 발동 → 0%
+- 0%와 100% 교차 → 직각 스파이크
+
+### 수정 파일 1개
+
+`core/frontend/src/utils/chartArgsBuilder.ts`
+- `MIN_STEP`: `15` → `30`
+
+### 수정 후 step 변화
+| 시간범위 | 변경 전 (MIN=15) | 변경 후 (MIN=30) |
+|---------|----------------|----------------|
+| 1시간   | 15s | **30s** (Grafana와 동일) |
+| 6시간   | 22s | **30s** |
+| 24시간  | 87s | 87s |
+| 7일     | 605s | 605s |
+
+---
+
+## 15. TimeSeries 범례 클릭 없이 데이터 표시 버그 수정 (2026-05-19)
+
+### 증상
+- 차트가 공백으로 나오고 범례를 클릭해야 데이터가 표시됨
+
+### 원인
+`selectedLegend` 상태가 이전 시리즈 키로 남아있는 상태에서 새 데이터가 로드되면
+새 키와 불일치하여 아무 시리즈도 표시되지 않음.
+
+```
+1. 범례 A 클릭 → selectedLegend = ['A']
+2. 데이터 새로고침 or 시간범위 변경 → 새 키(B, C)로 데이터 수신
+3. selectedLegend = ['A'] 그대로 → B, C 모두 필터링 → 차트 공백
+4. 범례 B 클릭 → selectedLegend = ['A', 'B'] → B만 표시
+```
+
+`buildChartData()` 내부:
+```typescript
+// selectedLegend = ['A'], key = 'B' → false → 시리즈 표시 안 됨
+if (selectedLegend === undefined || selectedLegend.includes(key)) { ... }
+```
+
+### 수정 파일 1개
+
+`shared/frontend/src/components/charts/timeseries/TimeSeries.tsx`
+- `chartData.uniqueKeys` 변경 감지 → `selectedLegend` = `undefined` 으로 리셋
+
+```typescript
+const prevUniqueKeysRef = useRef<string | undefined>(undefined);
+const currentKeysStr = chartData?.uniqueKeys?.slice().sort().join(',');
+if (currentKeysStr !== prevUniqueKeysRef.current) {
+  prevUniqueKeysRef.current = currentKeysStr;
+  if (selectedLegend !== undefined) setSelectedLegend(undefined);
+}
+```
+
+### 동작
+- 초기 로드: `selectedLegend = undefined` → 모든 시리즈 표시 (기존과 동일)
+- 데이터 갱신으로 키 변경 시: `selectedLegend` 자동 리셋 → 모든 시리즈 표시
+- 범례 클릭 동작(시리즈 isolate)은 기존과 동일하게 유지
+
+---
+
+## 11. 미해결 이슈 및 구조 주의사항 (2026-05-15)
+
+### (a) extensions/log 프론트엔드 — 자동새로고침 타이머 리셋
+- 파일: `extensions/log/frontend/src/routes/log-dashboard.tsx`
+- 증상: auto-refresh가 켜진 상태에서 필터를 바꾸면 타이머가 초기화되어 새로고침 간격이 리셋됨.
+- 원인: `useEffect([fetchLogs, refreshInterval])`의 의존성에 `fetchLogs`가 포함되어 있고,
+         `fetchLogs`는 `filterValues`를 deps로 가지므로 필터 변경 시 reference가 바뀜.
+- 수정 방향: `fetchLogs`를 deps에서 제거하고 `useRef`로 최신 함수를 유지하거나,
+             타이머 effect를 `refreshInterval` 단독 deps로 분리한다.
+
+### (b) extensions/log 프론트엔드 — 요청 취소(abort) 없음
+- 파일: `extensions/log/frontend/src/routes/log-dashboard.tsx`
+- 증상: 인덱스 변경이나 빠른 연속 필터 클릭 시 이전 응답이 나중 응답을 덮어쓸 수 있음.
+- 수정 방향: `fetchLogs` / `fetchAggregations` 내에 `AbortController`를 사용하고
+             `useRef`로 이전 controller를 관리해 새 요청 시 abort한다.
+
+### (c) extensions/log 프론트엔드 — 로그 상세 시트 헤더 (node-* 인덱스)
+- 파일: `extensions/log/frontend/src/routes/log-dashboard.tsx`, `LogDetailSheet` 컴포넌트
+- 증상: node-* 인덱스 로그를 클릭하면 시트 제목이 `· <_id>` 형태로만 표시됨.
+- 원인: 헤더에서 `kubernetes.namespace_name` / `kubernetes.pod_name`을 하드코딩으로 읽음.
+- 수정 방향: 현재 `currentSchema`의 첫 번째/두 번째 filterDef의 field 값을 읽어 동적으로 표시한다.
+
+### (d) extensions/log 프론트엔드 — CSV 다운로드 컬럼 하드코딩
+- 파일: `extensions/log/frontend/src/routes/log-dashboard.tsx`, `exportToCSV` 함수
+- 증상: CSV 헤더와 값 추출이 `Namespace/Pod/Level` 기준으로 고정되어 node-* 인덱스에는 맞지 않음.
+- 수정 방향: `currentSchema.filters`를 기반으로 동적으로 컬럼을 생성한다.
+
+### (e) extensions/log 프론트엔드 — pnpm install 및 빌드 미실행
+- `extensions/log/frontend/` 디렉토리에서 `pnpm install`을 한 번 실행해야 빌드 가능.
+- node_modules가 없으면 빌드 시 모듈 not found 에러 발생.
+- 빌드 명령: `pnpm build` (내부적으로 `tsc` 실행, core/frontend의 vite 빌드와 다름)
+- 개발 중 watch 모드: `pnpm dev` (`tsc --watch`)
+
+```bash
+cd extensions/log/frontend
+pnpm install    # 최초 1회
+pnpm build      # tsc 컴파일
+# 개발 중이면
+pnpm dev        # tsc --watch (저장 시 자동 재컴파일)
+```
+
+
+
+max without (pod) (
+  label_replace(
+    label_replace(
+      label_replace(
+        count by (pod) (
+          tcp_bridge_connection_state
+        ),
+        "sys_id", "$1", "pod", ".*(tcp-bridge-[0-9]+).*"
+      ),
+      "value", "$1", "sys_id", "(.+)"
+    ),
+    "label", "$1", "sys_id", "(.+)"
+  )
+)
+
+---
+
+## 16. VariableSelect All 선택 롤백 수정 (2026-05-18)
+
+### 증상
+- 대시보드 변수 바에서 `pod` -> `All`을 클릭하면 잠깐 All이 선택되지만, 곧바로 `tcp-bridge-0-...` 같은 이전/첫 번째 pod로 되돌아감.
+- 의도한 전체 pod 값이 아니라 오래된 단일 pod 값으로 쿼리가 실행되어 패널이 비어 있을 수 있음.
+
+### 원인
+- `shared/frontend/src/components/ui-extension/variable-select.tsx`
+- 외부 `value`를 내부 상태와 동기화하는 `useEffect`가 내부 상태인 `selectedValues`에도 의존하고 있었음.
+- `All` 클릭 시 부모의 `value` prop 갱신이 끝나기 전에 `handleSelect()`가 내부 상태를 먼저 업데이트함.
+- 그 직후 sync effect가 아직 갱신되지 않은 오래된 `value`로 실행되면서 이전 pod 선택을 복원함.
+
+문제 흐름:
+```text
+1. All 클릭
+   -> setSelectedValues({ All, pod-0, pod-1 })
+   -> onChange([pod-0, pod-1]) 호출 후 store/prop 갱신 대기
+
+2. selectedValues가 먼저 변경됨
+   -> sync effect가 오래된 value [pod-0]으로 실행됨
+   -> All이 제거됨
+   -> selectedValues가 { pod-0 }으로 되돌아감
+
+3. 이후 store 갱신이 따라옴
+   -> value가 [pod-0, pod-1]이 됨
+   -> All이 다시 나타나거나 깜빡임/롤백 현상이 발생할 수 있음
+```
+
+### 수정
+- sync effect 의존성 배열에서 `selectedValues` 제거.
+- sync effect는 이제 외부 props인 `value`, `showAllOption`, `customAllValue`, `options`, `multiple`만 따름.
+- cascade auto-select 로직에 guard 추가:
+  - `defaultAllSelected` 초기화 중에는 첫 번째 option을 자동 선택하지 않음.
+  - `customAllValue`(예: `.*`)를 첫 번째 pod로 리셋해야 하는 잘못된 값이 아니라 유효한 All 선택값으로 처리.
+
+### 파일
+- `shared/frontend/src/components/ui-extension/variable-select.tsx`
+
+---
+
+## 17. 최초 대시보드 pod/범례 stale 상태 수정 (2026-05-18)
+
+### 증상
+- 최초 로그인 후 TCP Bridge 대시보드를 열면 `pod`가 `All`이 아니라 `tcp-bridge-0-...` 같은 특정 pod로 초기화됨.
+- TimeSeries 패널에는 축과 범례는 보이지만, 범례 항목을 클릭하기 전까지 선 데이터가 표시되지 않음.
+
+### 추가 원인
+- `core/frontend/src/features/dashboard/variables/plugins/select/SelectVariable.tsx`
+  - `showAllOption + defaultAllSelected`로 설정된 multi-select 변수에서도 `useDashboardQuery`가 첫 번째 반환 option을 자동 선택했음.
+  - 이로 인해 의도한 All/default 선택이 첫 번째 pod 값으로 덮어써짐.
+- `shared/frontend/src/components/charts/timeseries/TimeSeries.tsx`
+  - `selectedLegend`에 이전 쿼리/결과의 오래된 시리즈 키가 남아 있을 수 있음.
+  - 렌더링 시 이 오래된 선택값이 즉시 사용되어, 범례를 클릭해 상태가 바뀌기 전까지 현재 시리즈가 필터링됨.
+
+### 수정
+- select 변수가 multi-select이고 기본값이 All로 설정된 경우 첫 번째 option 자동 선택을 비활성화.
+- `VariableSelect` 자체의 `autoSelectFirstOption`도 실제 auto-select 판단 결과와 동일하게 맞춤.
+- TimeSeries에서 `effectiveSelectedLegend`를 계산:
+  - 현재 선택된 범례 키가 현재 `uniqueKeys`에 존재하지 않으면 범례 필터가 없는 것처럼 렌더링.
+  - 렌더 중 `setState`를 호출하지 않고 effect에서 오래된 `selectedLegend`를 리셋.
+
+### 파일
+- `core/frontend/src/features/dashboard/variables/plugins/select/SelectVariable.tsx`
+- `shared/frontend/src/components/ui-extension/variable-select.tsx`
+- `shared/frontend/src/components/charts/timeseries/TimeSeries.tsx`
+
+---
+
+## 18. TimeSeries 범례 선택 유지로 인한 시리즈 숨김 현상 수정 (2026-05-18)
+
+### 증상
+- pod 필터를 특정 pod로 설정한 상태에서 범례 항목을 클릭해 시리즈를 고립시킨 후,
+  pod 필터를 All로 바꾸면 이전에 선택한 시리즈만 표시되고 나머지 시리즈는 보이지 않음.
+- 범례를 클릭하기 전까지 데이터가 없어 보이는 현상 지속.
+
+### 원인
+- `shared/frontend/src/components/charts/timeseries/TimeSeries.tsx`
+- 이전 리셋 조건: `selectedLegend`의 키가 새 `uniqueKeys`에 하나도 없을 때만 리셋.
+- pod=single에서 선택한 키(예: `tcp-bridge-0`)가 pod=All 결과에도 여전히 포함되면,
+  리셋 조건을 만족하지 못해 나머지 시리즈(tcp-bridge-1 등)가 계속 숨겨짐.
+
+### 수정 내용
+- `uniqueKeys` 집합 자체가 바뀌면 `selectedLegend`를 무조건 리셋하도록 변경.
+- 같은 키 집합으로 auto-refresh된 경우(내용 변경 없음)는 선택 상태 유지.
+- 키 비교 방식을 `join(',')` → `JSON.stringify([...].sort())`로 변경 (Prometheus 라벨에 쉼표가 포함될 경우 충돌 방지).
+- `setSelectedLegend` 호출을 functional update 형태로 변경 (`(prev) => (prev === undefined ? prev : undefined)`), eslint-disable 제거.
+- `effectiveSelectedLegend`는 유지: `uniqueKeys` 변경 직후 effect 실행 전 한 프레임 동안 stale `selectedLegend`가 `buildChartData`로 전달되는 것을 방어.
+
+### 파일
+- `shared/frontend/src/components/charts/timeseries/TimeSeries.tsx`
+
+---
+
+## 19. Prometheus timestamp 타임존 중복 보정 의심 이슈 (2026-05-18)
+
+### 증상
+- Grafana에서는 같은 시간 범위에서 데이터가 정상 표시됨.
+- PHAROS에서는 정상 시간대에서 데이터가 보이지 않거나, 범례를 클릭하면 데이터가 보이지만 시간이 맞지 않음.
+- KST 기준으로 약 9시간 앞으로 밀리는 형태라면 이 이슈 가능성이 높음.
+
+### 원인 추정
+- 백엔드 Go 서버 타임존이 KST인 경우 Prometheus `sample.Timestamp.Time()`이 JSON 직렬화될 때
+  `"2026-05-18T17:50:00+09:00"`처럼 timezone offset이 포함된 문자열로 내려올 수 있음.
+- 프론트 `shared/frontend/src/lib/timestamp.ts`의 `parseTimestampToMs()`는 현재 `Z`로 끝나는 값만 UTC/명시적 타임존으로 보고 있음.
+
+```typescript
+const isUtc = value.includes('T') && value.endsWith('Z');
+return isUtc
+  ? date.getTime()
+  : date.getTime() - new Date().getTimezoneOffset() * 60 * 1000;
+```
+
+- `+09:00`이 이미 포함된 timestamp도 `new Date(value)` 단계에서 올바른 절대 시각으로 파싱됨.
+- 그런데 `Z`로 끝나지 않는다는 이유로 KST offset을 한 번 더 보정하여 약 9시간이 추가로 밀릴 수 있음.
+
+### 수정 후보 1: 백엔드 UTC 직렬화 (Prometheus 경로 직접 해결)
+- 파일: `core/external/orm/config.go`
+- Scalar / Vector / Matrix 응답 생성부 3곳의 timestamp를 UTC로 고정.
+
+```go
+// 기존
+"timestamp": sample.Timestamp.Time(),
+
+// 수정
+"timestamp": sample.Timestamp.Time().UTC(),
+```
+
+- Scalar는 `v.Timestamp.Time()`, Vector/Matrix는 `sample.Timestamp.Time()` 사용 위치 확인.
+- 이렇게 하면 서버 타임존과 무관하게 JSON timestamp가 `...Z` 형태로 내려와 프론트 기존 로직에서도 안전함.
+
+### 수정 후보 2: 프론트 timestamp 파서 방어 보완
+- 파일: `shared/frontend/src/lib/timestamp.ts`
+- `Z`뿐 아니라 `+09:00`, `-05:00` 같은 명시적 timezone offset도 이미 timezone이 있는 값으로 처리.
+
+```typescript
+const hasTimezone = /(?:Z|[+-]\d{2}:\d{2})$/.test(value);
+return hasTimezone
+  ? date.getTime()
+  : date.getTime() - new Date().getTimezoneOffset() * 60 * 1000;
+```
+
+- 백엔드가 UTC로 내려주더라도 다른 datasource/API가 offset 포함 문자열을 줄 수 있으므로 프론트 보완도 권장.
+
+### 내일 확인할 값
+- Query Inspector 또는 네트워크 응답에서 아래 값을 비교.
+
+```text
+__start_time
+__end_time
+응답 data[0].timestamp
+응답 data[last].timestamp
+```
+
+- 응답 timestamp가 `"2026-05-18T..+09:00"` 형태이고 PHAROS 표시 시간이 Grafana 대비 9시간 밀리면 위 원인 가능성이 높음.
+
+### 권장 작업 순서
+1. `core/external/orm/config.go`에서 Prometheus timestamp 3곳을 `.UTC()`로 변경.
+2. `shared/frontend/src/lib/timestamp.ts`에서 명시적 timezone offset 감지 로직 추가.
+3. TCP Bridge 대시보드에서 최근 1시간 범위로 Grafana와 PHAROS 시간축 비교.
+4. 범례 클릭 전/후 데이터 표시와 timestamp tooltip 시간이 모두 맞는지 확인.

@@ -1,0 +1,28 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://ntels.com/pharos/schemas/BadgeValueResponse.schema.json",
+  "title": "BadgeValueResponse", 
+  "description": "Schema for badge value API responses",
+  "type": "object",
+  "properties": {
+    "name": {
+      "type": "string",
+      "description": "Name of the badge"
+    },
+    "value": {
+      "description": "Extracted value from query result"
+    },
+    "last_updated": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Timestamp when value was last updated"
+    },
+    "cache_hit": {
+      "type": "boolean",
+      "description": "Whether the value was served from cache",
+      "default": false
+    }
+  },
+  "required": ["name", "value"],
+  "additionalProperties": false
+}

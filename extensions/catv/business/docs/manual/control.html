@@ -1,0 +1,1318 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>STB 제어 및 모니터링 - 사용자 매뉴얼</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Noto Sans KR', sans-serif;
+      font-size: 15px;
+      line-height: 1.7;
+      color: #1a1a2e;
+      background: #f5f7fa;
+      margin: 0;
+      padding: 0;
+    }
+
+    /* ── Layout ───────────────────────────────────── */
+    .layout {
+      display: flex;
+      min-height: 100vh;
+    }
+
+    nav {
+      position: sticky;
+      top: 0;
+      height: 100vh;
+      width: 240px;
+      flex-shrink: 0;
+      background: #fff;
+      border-right: 1px solid #e8eaf0;
+      overflow-y: auto;
+      padding: 28px 0 28px;
+    }
+
+    nav .nav-title {
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: #8b92a5;
+      padding: 0 20px 12px;
+    }
+
+    nav ol {
+      list-style: none;
+      margin: 0;
+      padding: 0;
+    }
+
+    nav ol li a {
+      display: block;
+      padding: 7px 20px;
+      color: #4a4f6a;
+      text-decoration: none;
+      font-size: 13.5px;
+      border-left: 3px solid transparent;
+      transition: all 0.15s;
+    }
+
+    nav ol li a:hover,
+    nav ol li a.active {
+      color: #3b5bdb;
+      background: #eef2ff;
+      border-left-color: #3b5bdb;
+    }
+
+    main {
+      flex: 1;
+      max-width: 860px;
+      margin: 0 auto;
+      padding: 48px 40px 80px;
+    }
+
+    /* ── Header ───────────────────────────────────── */
+    .page-header {
+      margin-bottom: 40px;
+      padding-bottom: 24px;
+      border-bottom: 2px solid #e8eaf0;
+    }
+
+    .page-header h1 {
+      font-size: 26px;
+      font-weight: 700;
+      color: #1a1a2e;
+      margin: 0 0 10px;
+    }
+
+    .page-header .subtitle {
+      font-size: 15px;
+      color: #5c6380;
+      margin: 0;
+      padding: 12px 16px;
+      background: #f0f4ff;
+      border-left: 4px solid #3b5bdb;
+      border-radius: 0 6px 6px 0;
+    }
+
+    /* ── Sections ─────────────────────────────────── */
+    section {
+      margin-bottom: 52px;
+    }
+
+    h2 {
+      font-size: 20px;
+      font-weight: 700;
+      color: #1a1a2e;
+      margin: 0 0 16px;
+      padding-bottom: 10px;
+      border-bottom: 2px solid #e8eaf0;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    h2 .section-num {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 28px;
+      height: 28px;
+      background: #3b5bdb;
+      color: #fff;
+      border-radius: 50%;
+      font-size: 13px;
+      font-weight: 700;
+      flex-shrink: 0;
+    }
+
+    h3 {
+      font-size: 15px;
+      font-weight: 700;
+      color: #2d3358;
+      margin: 24px 0 10px;
+    }
+
+    h4 {
+      font-size: 13.5px;
+      font-weight: 700;
+      color: #4a4f6a;
+      margin: 18px 0 8px;
+    }
+
+    p { margin: 6px 0 10px; }
+
+    ul, ol {
+      padding-left: 22px;
+      margin: 8px 0 12px;
+    }
+
+    li { margin-bottom: 4px; }
+
+    /* ── Tables ───────────────────────────────────── */
+    .table-wrap {
+      overflow-x: auto;
+      margin: 10px 0 16px;
+      border-radius: 8px;
+      border: 1px solid #e2e6f0;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 14px;
+    }
+
+    thead th {
+      background: #f0f3fa;
+      color: #3b4070;
+      font-weight: 700;
+      text-align: left;
+      padding: 10px 14px;
+      border-bottom: 2px solid #d6dbe8;
+      white-space: nowrap;
+    }
+
+    tbody tr:nth-child(even) { background: #f8f9fc; }
+    tbody tr:hover { background: #eef2ff; }
+
+    tbody td {
+      padding: 9px 14px;
+      border-bottom: 1px solid #eaedf5;
+      vertical-align: top;
+    }
+
+    tbody tr:last-child td { border-bottom: none; }
+
+    /* ── Callouts ─────────────────────────────────── */
+    .callout {
+      display: flex;
+      gap: 10px;
+      padding: 12px 16px;
+      border-radius: 8px;
+      margin: 12px 0;
+      font-size: 14px;
+      line-height: 1.6;
+    }
+
+    .callout-icon { font-size: 16px; flex-shrink: 0; margin-top: 1px; }
+
+    .callout.tip   { background: #e8f5e9; border-left: 4px solid #43a047; color: #1b5e20; }
+    .callout.warn  { background: #fff3e0; border-left: 4px solid #fb8c00; color: #7c3d00; }
+    .callout.info  { background: #e3f2fd; border-left: 4px solid #1e88e5; color: #0d47a1; }
+    .callout.perm  { background: #fce4ec; border-left: 4px solid #e53935; color: #7f0000; }
+
+    /* ── Badges ───────────────────────────────────── */
+    .badge {
+      display: inline-block;
+      padding: 2px 8px;
+      border-radius: 12px;
+      font-size: 12px;
+      font-weight: 600;
+      line-height: 1.6;
+    }
+
+    .badge-pending  { border: 1.5px solid #9e9e9e; color: #616161; }
+    .badge-running  { background: #1976d2; color: #fff; }
+    .badge-success  { border: 1.5px solid #43a047; color: #2e7d32; }
+    .badge-fail     { background: #e53935; color: #fff; }
+    .badge-done-n   { border: 1.5px solid #43a047; color: #2e7d32; }
+    .badge-fail-n   { background: #e53935; color: #fff; }
+    .badge-total-n  { background: #eeeeee; color: #424242; }
+
+    /* ── Code ─────────────────────────────────────── */
+    code {
+      font-family: 'JetBrains Mono', 'Fira Code', 'Consolas', monospace;
+      font-size: 13px;
+      background: #eef0f7;
+      color: #3b5bdb;
+      padding: 2px 6px;
+      border-radius: 4px;
+    }
+
+    /* ── Step badges ──────────────────────────────── */
+    .step-list {
+      counter-reset: step;
+      list-style: none;
+      padding: 0;
+      margin: 10px 0 16px;
+    }
+
+    .step-list li {
+      counter-increment: step;
+      display: flex;
+      gap: 12px;
+      align-items: flex-start;
+      margin-bottom: 12px;
+    }
+
+    .step-list li::before {
+      content: "Step " counter(step);
+      display: inline-flex;
+      align-items: center;
+      background: #3b5bdb;
+      color: #fff;
+      font-size: 11px;
+      font-weight: 700;
+      padding: 3px 9px;
+      border-radius: 12px;
+      white-space: nowrap;
+      flex-shrink: 0;
+      margin-top: 2px;
+    }
+
+    /* ── Divider ──────────────────────────────────── */
+    hr { border: none; border-top: 1px solid #e2e6f0; margin: 32px 0; }
+
+    /* ── Figures / Wireframes ─────────────────────── */
+    figure {
+      margin: 16px 0 24px;
+      padding: 0;
+    }
+
+    figure svg {
+      display: block;
+      width: 100%;
+      height: auto;
+      border: 1px solid #d6dbe8;
+      border-radius: 10px;
+      background: #fff;
+    }
+
+    figcaption {
+      margin-top: 6px;
+      font-size: 12.5px;
+      color: #8b92a5;
+      text-align: center;
+      letter-spacing: 0.01em;
+    }
+
+    /* ── Scroll highlight ─────────────────────────── */
+    :target { scroll-margin-top: 24px; }
+
+    @media (max-width: 768px) {
+      nav { display: none; }
+      main { padding: 28px 20px 60px; }
+    }
+  </style>
+</head>
+<body>
+<div class="layout">
+
+  <!-- ── 사이드 네비게이션 ── -->
+  <nav>
+    <div class="nav-title">목차</div>
+    <ol>
+      <li><a href="#sec1">1. 화면 구성 개요</a></li>
+      <li><a href="#sec2">2. 스케줄 목록</a></li>
+      <li><a href="#sec3">3. 스케줄 등록</a></li>
+      <li><a href="#sec4">4. 스케줄 수정</a></li>
+      <li><a href="#sec5">5. 스케줄 삭제</a></li>
+      <li><a href="#sec6">6. 스케줄 상세 조회</a></li>
+      <li><a href="#sec7">7. 스케줄 결과 목록</a></li>
+      <li><a href="#sec8">8. 스케줄 결과 상세</a></li>
+      <li><a href="#sec9">9. 개별 STB 레코드 조회</a></li>
+      <li><a href="#sec10">10. 상태 및 진행 현황 안내</a></li>
+      <li><a href="#sec11">11. 권한 안내</a></li>
+    </ol>
+  </nav>
+
+  <!-- ── 본문 ── -->
+  <main>
+    <div class="page-header">
+      <h1>STB 제어 및 모니터링<br><small style="font-size:16px;font-weight:400;color:#5c6380;">사용자 매뉴얼</small></h1>
+      <p class="subtitle">CATV 셋톱박스(STB)에 제어 명령을 예약·실행하고 결과를 조회하는 기능입니다.</p>
+    </div>
+
+    <!-- 1 -->
+    <section id="sec1">
+      <h2><span class="section-num">1</span>화면 구성 개요</h2>
+      <p><strong>STB 제어 및 모니터링</strong> 기능은 스케줄 설정에 의한 즉시 제어, 예약 제어, 반복 제어 실행을 지원합니다. 각 실행 타입은 스케줄 등록 버튼을 누른 후 다이얼로그에서 선택할 수 있습니다 (<a href='#sec3'>스케줄 등록</a>의 그림 3-1 참고).</p>
+
+      <!-- SVG: 전체 화면 레이아웃 와이어프레임 -->
+      <figure>
+        <svg viewBox="0 0 760 258" xmlns="http://www.w3.org/2000/svg" font-family="-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif">
+          <!-- 전체 배경 -->
+          <rect x="0" y="0" width="760" height="258" rx="8" fill="#f5f7fa" stroke="#cdd1df" stroke-width="1.2"/>
+          <!-- 페이지 헤더: breadcrumb + 타이틀 -->
+          <rect x="0" y="0" width="760" height="52" rx="8" fill="#fff" stroke="none"/>
+          <rect x="0" y="44" width="760" height="8" fill="#fff"/>
+          <text x="16" y="17" font-size="9" fill="#9ca3af">제어</text>
+          <text x="36" y="17" font-size="9" fill="#9ca3af"> / STB 제어 및 모니터링</text>
+          <text x="16" y="39" font-size="14" fill="#111827" font-weight="700">STB 제어 및 모니터링</text>
+          <line x1="0" y1="52" x2="760" y2="52" stroke="#e5e7eb" stroke-width="1"/>
+          <!-- 탭 바 -->
+          <rect x="0" y="52" width="760" height="36" fill="#fff" stroke="none"/>
+          <!-- Tab 1: 스케줄 목록 (active - 파란 밑줄) -->
+          <text x="20" y="77" font-size="12" fill="#3b5bdb" font-weight="700">스케줄 목록</text>
+          <line x1="16" y1="88" x2="106" y2="88" stroke="#3b5bdb" stroke-width="2.5"/>
+          <!-- Tab 2: 스케줄 결과 (inactive) -->
+          <text x="124" y="77" font-size="12" fill="#6b7280">스케줄 결과</text>
+          <!-- Tab 3: 동적 탭 - closable (스케줄 결과 행 클릭 시 추가) -->
+          <text x="214" y="76" font-size="11" fill="#6b7280">상세 </text>
+          <text x="237" y="76" font-size="9.5" fill="#9ca3af">(daily-info · 4/13 09:00)</text>
+          <rect x="340" y="64" width="16" height="16" rx="3" fill="none" stroke="#e5e7eb" stroke-width="1"/>
+          <text x="348" y="76" text-anchor="middle" font-size="10" fill="#9ca3af">×</text>
+          <!-- 탭바 하단 구분선 -->
+          <line x1="0" y1="88" x2="760" y2="88" stroke="#e5e7eb" stroke-width="1"/>
+          <!-- 탭 콘텐츠 배경 -->
+          <rect x="0" y="88" width="760" height="170" fill="#f9fafb"/>
+          <!-- DataGrid 컨테이너 -->
+          <rect x="8" y="96" width="744" height="154" rx="6" fill="#fff" stroke="#e5e7eb" stroke-width="1"/>
+          <!-- Toolbar (rightFilters: [스케줄 등록]) -->
+          <rect x="8" y="96" width="744" height="30" rx="6" fill="#f9fafb" stroke="none"/>
+          <rect x="8" y="116" width="744" height="10" fill="#f9fafb"/>
+          <rect x="644" y="105" width="76" height="18" rx="4" fill="#3b5bdb"/>
+          <text x="682" y="118" text-anchor="middle" font-size="9.5" fill="#fff" font-weight="600">스케줄 등록</text>
+          <!-- 컬럼 헤더 -->
+          <rect x="8" y="126" width="744" height="20" fill="#f0f3fa" stroke="none"/>
+          <line x1="8" y1="146" x2="752" y2="146" stroke="#d6dbe8" stroke-width="1"/>
+          <text x="16" y="140" font-size="8.5" fill="#3b4070" font-weight="700">스케줄 이름</text>
+          <text x="170" y="140" font-size="8.5" fill="#3b4070" font-weight="700">실행 타입</text>
+          <text x="248" y="140" font-size="8.5" fill="#3b4070" font-weight="700">실행 스펙</text>
+          <text x="418" y="140" font-size="8.5" fill="#3b4070" font-weight="700">제어 명령</text>
+          <text x="518" y="140" font-size="8.5" fill="#3b4070" font-weight="700">대상 타입</text>
+          <text x="588" y="140" font-size="8.5" fill="#3b4070" font-weight="700">생성 시간</text>
+          <text x="700" y="140" font-size="8.5" fill="#3b4070" font-weight="700">액션</text>
+          <!-- Row 1 (hover) -->
+          <rect x="9" y="146" width="743" height="26" fill="#eff6ff"/>
+          <text x="16" y="163" font-size="9" fill="#1e40af" font-weight="600">daily-info-collection</text>
+          <rect x="166" y="150" width="52" height="14" rx="6" fill="#fff" stroke="#d1d5db" stroke-width="1"/>
+          <text x="192" y="160" text-anchor="middle" font-size="8" fill="#616161">반복 실행</text>
+          <text x="248" y="163" font-size="8.5" fill="#374151" font-family="Consolas,monospace">TZ=Asia/Seoul 0 0 9 * * *</text>
+          <text x="418" y="163" font-size="9" fill="#374151">stb_request_info</text>
+          <rect x="512" y="150" width="30" height="14" rx="6" fill="#f3f4f6"/>
+          <text x="527" y="160" text-anchor="middle" font-size="8" fill="374151">SO</text>
+          <text x="588" y="163" font-size="7.5" fill="#6b7280">2026. 04. 10. 오전 9:00:00</text>
+          <text x="700" y="163" font-size="8.5" fill="#374151">수정</text>
+          <text x="722" y="163" font-size="8.5" fill="#374151">삭제</text>
+          <!-- Row 2 (even) -->
+          <line x1="9" y1="172" x2="751" y2="172" stroke="#f0f0f0" stroke-width="1"/>
+          <rect x="9" y="172" width="743" height="26" fill="#f9fafb"/>
+          <text x="16" y="189" font-size="9" fill="#374151">smart-reboot-now</text>
+          <rect x="166" y="176" width="52" height="14" rx="6" fill="#fff" stroke="#d1d5db" stroke-width="1"/>
+          <text x="192" y="186" text-anchor="middle" font-size="8" fill="#616161">즉시 실행</text>
+          <text x="248" y="189" font-size="8.5" fill="#9ca3af">즉시</text>
+          <text x="418" y="189" font-size="9" fill="#374151">smartReboot</text>
+          <rect x="512" y="176" width="36" height="14" rx="6" fill="#f3f4f6"/>
+          <text x="530" y="186" text-anchor="middle" font-size="8" fill="#374151">Cell</text>
+          <text x="588" y="189" font-size="7.5" fill="#6b7280">2026. 04. 09. 오후 2:00:00</text>
+          <text x="700" y="189" font-size="8.5" fill="#9ca3af" opacity="0.45">수정</text>
+          <text x="722" y="189" font-size="8.5" fill="#374151">삭제</text>
+        </svg>
+        <figcaption>그림 1-1. 전체 화면 레이아웃 — 페이지 제목, 탭 바(활성/비활성/동적 탭) 중심 테이블 뷰</figcaption>
+      </figure>
+
+      <p><strong>STB 제어 및 모니터링</strong> 페이지는 다음 탭 구조로 구성됩니다.</p>
+
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>탭</th><th>설명</th></tr></thead>
+          <tbody>
+            <tr><td><strong>스케줄 목록</strong></td><td>등록된 제어 스케줄 전체 목록, 등록·수정·삭제 가능</td></tr>
+            <tr><td><strong>스케줄 결과</strong></td><td>스케줄 실행 결과 목록 (결과 행 클릭 시 상세 탭 추가)</td></tr>
+            <tr><td><strong>결과 상세 탭</strong></td><td>스케줄 결과 행 클릭 시 동적으로 추가되는 개별 탭</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="callout tip">
+        <span class="callout-icon">💡</span>
+        <span>결과 상세 탭은 여러 개를 동시에 열 수 있으며, 탭 제목 우측의 <code>×</code> 버튼으로 닫을 수 있습니다.</span>
+      </div>
+    </section>
+
+    <!-- 2 -->
+    <section id="sec2">
+      <h2><span class="section-num">2</span>스케줄 목록</h2>
+      <p><strong>스케줄 목록</strong> 탭에서는 등록된 모든 제어 스케줄을 확인할 수 있습니다.</p>
+
+      <!-- SVG: 스케줄 목록 그리드 상세 -->
+      <figure>
+        <svg viewBox="0 0 760 186" xmlns="http://www.w3.org/2000/svg" font-family="-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif">
+          <rect x="0" y="0" width="760" height="186" rx="8" fill="#fff" stroke="#d6dbe8" stroke-width="1.2"/>
+          <!-- Toolbar (rightFilters: [스케줄 등록]) -->
+          <rect x="0" y="0" width="760" height="34" rx="8" fill="#f9fafb" stroke="none"/>
+          <rect x="0" y="26" width="760" height="8" fill="#f9fafb"/>
+          <rect x="644" y="7" width="76" height="20" rx="4" fill="#3b5bdb"/>
+          <text x="682" y="21" text-anchor="middle" font-size="9.5" fill="#fff" font-weight="600">스케줄 등록</text>
+          <!-- 컬럼 헤더 -->
+          <rect x="0" y="34" width="760" height="22" fill="#f0f3fa" stroke="none"/>
+          <line x1="0" y1="56" x2="760" y2="56" stroke="#d6dbe8" stroke-width="1"/>
+          <text x="12" y="50" font-size="8.5" fill="#3b4070" font-weight="700">스케줄 이름</text>
+          <text x="176" y="50" font-size="8.5" fill="#3b4070" font-weight="700">실행 타입</text>
+          <text x="254" y="50" font-size="8.5" fill="#3b4070" font-weight="700">실행 스펙</text>
+          <text x="428" y="50" font-size="8.5" fill="#3b4070" font-weight="700">제어 명령</text>
+          <text x="524" y="50" font-size="8.5" fill="#3b4070" font-weight="700">대상 타입</text>
+          <text x="592" y="50" font-size="8.5" fill="#3b4070" font-weight="700">생성 시간</text>
+          <text x="702" y="50" font-size="8.5" fill="#3b4070" font-weight="700">액션</text>
+          <!-- Row 1: 반복 실행 / hover -->
+          <rect x="0" y="56" width="760" height="30" fill="#eff6ff"/>
+          <text x="12" y="75" font-size="9" fill="#1e40af" font-weight="600">daily-info-collection</text>
+          <!-- schedule_type: variant=&quot;outline&quot; (border only, white bg) -->
+          <rect x="172" y="61" width="52" height="15" rx="7" fill="#fff" stroke="#d1d5db" stroke-width="1"/>
+          <text x="198" y="72" text-anchor="middle" font-size="8" fill="#616161">반복 실행</text>
+          <!-- schedule_spec: &lt;code&gt; 요소 + Cron tooltip 인디케이터 -->
+          <rect x="250" y="62" width="168" height="14" rx="3" fill="#eef0f7"/>
+          <text x="254" y="73" font-size="8" fill="#3b5bdb" font-family="Consolas,monospace">TZ=Asia/Seoul 0 0 9 * * *</text>
+          <circle cx="424" cy="68" r="3" fill="#9ca3af"/>
+          <!-- work_type -->
+          <text x="428" y="75" font-size="9" fill="#374151">stb_request_info</text>
+          <!-- area_type: variant=&quot;secondary&quot; (gray bg) -->
+          <rect x="518" y="61" width="30" height="15" rx="7" fill="#f3f4f6"/>
+          <text x="533" y="72" text-anchor="middle" font-size="8" fill="#374151">SO</text>
+          <text x="592" y="75" font-size="7.5" fill="#6b7280">2026. 04. 10. 오전 9:00:00</text>
+          <!-- actions: plain text (px-2 py-1 text-xs rounded) -->
+          <text x="702" y="75" font-size="8.5" fill="#374151">수정</text>
+          <text x="726" y="75" font-size="8.5" fill="#374151">삭제</text>
+          <!-- Row 2: 즉시 실행 (수정 비활) -->
+          <line x1="0" y1="86" x2="760" y2="86" stroke="#eaedf5" stroke-width="1"/>
+          <text x="12" y="105" font-size="9" fill="#374151">smart-reboot-now</text>
+          <rect x="172" y="91" width="52" height="15" rx="7" fill="#fff" stroke="#d1d5db" stroke-width="1"/>
+          <text x="198" y="102" text-anchor="middle" font-size="8" fill="#616161">즉시 실행</text>
+          <!-- schedule_spec: 즉시 = muted text -->
+          <text x="254" y="105" font-size="8.5" fill="#9ca3af">즉시</text>
+          <text x="428" y="105" font-size="9" fill="#374151">smartReboot</text>
+          <rect x="518" y="91" width="36" height="15" rx="7" fill="#f3f4f6"/>
+          <text x="536" y="102" text-anchor="middle" font-size="8" fill="#374151">Cell</text>
+          <text x="592" y="105" font-size="7.5" fill="#6b7280">2026. 04. 09. 오후 2:00:00</text>
+          <!-- 수정: disabled (opacity-40, cursor-not-allowed) -->
+          <text x="702" y="105" font-size="8.5" fill="#374151" opacity="0.4">수정</text>
+          <text x="726" y="105" font-size="8.5" fill="#374151">삭제</text>
+          <!-- Row 3: 한번 실행 / even -->
+          <rect x="0" y="116" width="760" height="30" fill="#f9fafb"/>
+          <line x1="0" y1="116" x2="760" y2="116" stroke="#eaedf5" stroke-width="1"/>
+          <text x="12" y="135" font-size="9" fill="#374151">weekly-info-l3</text>
+          <rect x="172" y="121" width="52" height="15" rx="7" fill="#fff" stroke="#d1d5db" stroke-width="1"/>
+          <text x="198" y="132" text-anchor="middle" font-size="8" fill="#616161">한번 실행</text>
+          <!-- schedule_spec: font-mono text (once) -->
+          <text x="254" y="135" font-size="8" fill="#374151" font-family="Consolas,monospace">2026-04-15T09:00:00Z</text>
+          <text x="428" y="135" font-size="9" fill="#374151">stb_request_info</text>
+          <rect x="518" y="121" width="28" height="15" rx="7" fill="#f3f4f6"/>
+          <text x="532" y="132" text-anchor="middle" font-size="8" fill="#374151">L3</text>
+          <text x="592" y="135" font-size="7.5" fill="#6b7280">2026. 04. 08. 오전 10:15:00</text>
+          <text x="702" y="135" font-size="8.5" fill="#374151">수정</text>
+          <text x="726" y="135" font-size="8.5" fill="#374151">삭제</text>
+          <!-- 각주 -->
+          <text x="380" y="176" text-anchor="middle" font-size="8.5" fill="#9ca3af">실행 타입 배지 = outline(border만) | 대상 타입 배지 = secondary(gray bg) | 반독 코드 배경 = Cron 툴팁 (호버 시 설명 표시) | 실행 버튼 = 텍스트 plain(없음 테두리)</text>
+        </svg>
+        <figcaption>그림 2-1. 스케줄 목록 그리드 — 컬럼 구성 및 액션 버튼</figcaption>
+      </figure>
+
+      <h3>컬럼 설명</h3>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>컬럼</th><th>설명</th></tr></thead>
+          <tbody>
+            <tr><td><strong>스케줄 이름</strong></td><td>스케줄의 고유 식별자</td></tr>
+            <tr><td><strong>실행 타입</strong></td><td>즉시 실행 / 한번 실행 / 반복 실행</td></tr>
+            <tr><td><strong>실행 스펙</strong></td><td>한번 실행: 날짜·시간 / 반복 실행: Cron 표현식</td></tr>
+            <tr><td><strong>제어 명령</strong></td><td>실행할 명령 (예: <code>stb_request_info</code>, <code>smartReboot</code>)</td></tr>
+            <tr><td><strong>대상 타입</strong></td><td>제어할 STB 범위 (SO / L3 / Cell / STB / 테스트배드)</td></tr>
+            <tr><td><strong>생성 시간</strong></td><td>스케줄 생성 일시</td></tr>
+            <tr><td><strong>액션</strong></td><td>수정 / 삭제 버튼</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <ul>
+        <li>목록은 <strong>생성 시간 내림차순</strong> (최신순)으로 정렬됩니다.</li>
+        <li>목록 우측 상단에 <strong>전체 스케줄 수</strong>가 표시됩니다.</li>
+        <li>행을 클릭하면 <a href="#sec6">스케줄 상세 시트</a>가 열립니다.</li>
+      </ul>
+    </section>
+
+    <!-- 3 -->
+    <section id="sec3">
+      <h2><span class="section-num">3</span>스케줄 등록</h2>
+      <p>스케줄 목록 우측 상단의 <strong>[스케줄 등록]</strong> 버튼을 클릭하면 <strong>스케줄 등록</strong> 탭이 추가됩니다. 탭 제목 우측의 <code>×</code>를 클릭하거나 <strong>[취소]</strong> 버튼으로 탭을 닫을 수 있습니다.</p>
+      <div class="callout perm">
+        <span class="callout-icon">🔒</span>
+        <span><strong>권한 필요:</strong> <code>extension:catv:create</code> 권한이 있어야 버튼이 표시됩니다.</span>
+      </div>
+
+      <h3>스케줄 정보</h3>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>항목</th><th>필수</th><th>설명</th></tr></thead>
+          <tbody>
+            <tr><td><strong>스케줄 이름</strong></td><td>✅</td><td>영문·숫자·하이픈 조합 권장 (예: <code>daily-info-collection</code>)</td></tr>
+            <tr><td><strong>실행 타입</strong></td><td>✅</td><td>아래 표 참조</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h4>실행 타입 상세</h4>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>타입</th><th>설명</th><th>추가 입력</th></tr></thead>
+          <tbody>
+            <tr><td><strong>즉시 실행</strong></td><td>스케줄 등록 즉시 한 번 실행</td><td>없음</td></tr>
+            <tr><td><strong>한번 실행</strong></td><td>지정 날짜·시간에 한 번 실행</td><td>날짜 선택 + 시간 입력 (브라우저 현지 시간 기준)</td></tr>
+            <tr><td><strong>반복 실행</strong></td><td>Cron 표현식에 따라 반복 실행</td><td>타임존 + Cron 표현식</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <p><strong>Cron 표현식 형식:</strong> <code>초 분 시 일 월 요일</code></p>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>예시</th><th>설명</th></tr></thead>
+          <tbody>
+            <tr><td><code>0 0 9 * * *</code></td><td>매일 오전 9시</td></tr>
+            <tr><td><code>0 30 18 * * 1-5</code></td><td>평일 오후 6시 30분</td></tr>
+            <tr><td><code>0 0 0 1 * *</code></td><td>매월 1일 자정</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h3>대상 선택</h3>
+      <p>계층 구조(SO → L3 → Cell)를 선택합니다.</p>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>항목</th><th>필수</th><th>설명</th></tr></thead>
+          <tbody>
+            <tr><td><strong>SO</strong></td><td>✅</td><td>서비스 지역(SO) 선택</td></tr>
+            <tr><td><strong>L3</strong></td><td>—</td><td>미선택 시 전체 L3 대상 (기본: 전체 선택)</td></tr>
+            <tr><td><strong>Cell</strong></td><td>—</td><td>미선택 시 전체 Cell 대상 (기본: 전체 선택)</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <h4>제어 대상 결정 우선순위</h4>
+      <ol>
+        <li>Cell 일부 선택 → <strong>Cell 단위</strong> 제어</li>
+        <li>L3 일부 선택 (Cell 전체) → <strong>L3 단위</strong> 제어</li>
+        <li>L3 전체 + Cell 전체 → <strong>SO 단위</strong> 제어</li>
+      </ol>
+      <div class="callout warn">
+        <span class="callout-icon">⚠️</span>
+        <span>수정 모드에서 이미 삭제된 L3 또는 Cell 항목은 <code>(삭제됨)</code> 표시와 함께 경고 메시지가 나타납니다. 해당 항목을 제거한 후 저장하는 것을 권장합니다.</span>
+      </div>
+
+      <h3>제어 명령</h3>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>제어 명령</th><th>설명</th></tr></thead>
+          <tbody>
+            <tr><td><code>stb_request_info</code></td><td>STB 정보 수집 요청</td></tr>
+            <tr><td><code>smartReboot</code></td><td>STB 스마트 리부팅</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p>설정 내용은 폼 하단의 <strong>설정 요약</strong>에서 실시간으로 확인할 수 있습니다. <strong>[스케줄 등록]</strong> 버튼 클릭 시 저장되며, 성공·실패 토스트 메시지가 표시됩니다.</p>
+
+      <!-- SVG: 스케줄 등록 탭 에디터 레이아웃 -->
+      <figure>
+        <svg viewBox="0 0 760 370" xmlns="http://www.w3.org/2000/svg" font-family="-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif">
+          <rect x="0" y="0" width="760" height="370" rx="8" fill="#f5f7fa" stroke="#cdd1df" stroke-width="1.2"/>
+          <!-- 탭바 -->
+          <rect x="0" y="0" width="760" height="36" rx="8" fill="#fff"/>
+          <rect x="0" y="28" width="760" height="8" fill="#fff"/>
+          <text x="18" y="22" font-size="11.5" fill="#6b7280">스케줄 목록</text>
+          <text x="112" y="22" font-size="11.5" fill="#6b7280">스케줄 결과</text>
+          <!-- 활성 탭: 스케줄 등록 (파란 밑줄) -->
+          <text x="207" y="22" font-size="11.5" fill="#3b5bdb" font-weight="700">스케줄 등록</text>
+          <line x1="203" y1="36" x2="285" y2="36" stroke="#3b5bdb" stroke-width="2.5"/>
+          <!-- × 닫기 -->
+          <text x="290" y="22" font-size="12" fill="#9ca3af">×</text>
+          <line x1="0" y1="36" x2="760" y2="36" stroke="#e5e7eb" stroke-width="1"/>
+
+          <!-- 에디터 콘텐츠 영역 (px-5 pt-5, max-w-3xl) -->
+          <rect x="0" y="36" width="760" height="334" fill="#f9fafb"/>
+          <rect x="20" y="50" width="560" height="298" rx="6" fill="#fff" stroke="none"/>
+
+          <!-- 스케줄 이름 -->
+          <text x="30" y="72" font-size="8.5" fill="#111827" font-weight="600">스케줄 이름 <tspan fill="#ef4444">*</tspan></text>
+          <rect x="30" y="76" width="350" height="16" rx="3" fill="#fff" stroke="#d1d5db" stroke-width="1"/>
+          <text x="36" y="87" font-size="8.5" fill="#374151">daily-info-collection</text>
+
+          <!-- 실행 타입 -->
+          <text x="30" y="106" font-size="8.5" fill="#111827" font-weight="600">실행 타입 <tspan fill="#ef4444">*</tspan></text>
+          <rect x="30" y="110" width="160" height="16" rx="3" fill="#fff" stroke="#d1d5db" stroke-width="1"/>
+          <text x="36" y="121" font-size="8.5" fill="#374151">반복 실행 ▾</text>
+
+          <!-- 타임존 (반복 실행 선택 시) -->
+          <text x="30" y="140" font-size="8.5" fill="#111827" font-weight="600">타임존 <tspan fill="#ef4444">*</tspan></text>
+          <rect x="30" y="144" width="200" height="16" rx="3" fill="#fff" stroke="#d1d5db" stroke-width="1"/>
+          <text x="36" y="155" font-size="8" fill="#374151">Asia/Seoul (UTC+9) ▾</text>
+
+          <!-- Cron 표현식 -->
+          <text x="30" y="174" font-size="8.5" fill="#111827" font-weight="600">Cron 표현식 <tspan fill="#ef4444">*</tspan></text>
+          <rect x="30" y="178" width="280" height="16" rx="3" fill="#fff" stroke="#d1d5db" stroke-width="1"/>
+          <text x="36" y="189" font-size="8" fill="#374151" font-family="Consolas,monospace">0 0 9 * * *</text>
+          <text x="30" y="202" font-size="7.5" fill="#9ca3af">초 분 시 일 월 요일 형식 (예: 0 0 9 * * * = 매일 오전 9시)</text>
+
+          <!-- SO -->
+          <text x="30" y="222" font-size="8.5" fill="#111827" font-weight="600">SO <tspan fill="#ef4444">*</tspan></text>
+          <rect x="30" y="226" width="200" height="16" rx="3" fill="#fff" stroke="#d1d5db" stroke-width="1"/>
+          <text x="36" y="237" font-size="8.5" fill="#374151">SO-서울 ▾</text>
+
+          <!-- L3 -->
+          <text x="30" y="256" font-size="8.5" fill="#111827" font-weight="600">L3 (기본: All)</text>
+          <rect x="30" y="260" width="350" height="18" rx="3" fill="#fff" stroke="#3b5bdb" stroke-width="1"/>
+          <rect x="34" y="263" width="36" height="12" rx="8" fill="#e0e7ff"/>
+          <text x="52" y="271" text-anchor="middle" font-size="7.5" fill="#3b5bdb">L3-1 ×</text>
+          <rect x="74" y="263" width="36" height="12" rx="8" fill="#e0e7ff"/>
+          <text x="92" y="271" text-anchor="middle" font-size="7.5" fill="#3b5bdb">L3-2 ×</text>
+          <text x="116" y="271" font-size="7.5" fill="#9ca3af">+8개 ▾</text>
+
+          <!-- Cell -->
+          <text x="30" y="293" font-size="8.5" fill="#111827" font-weight="600">Cell (기본: All)</text>
+          <rect x="30" y="297" width="350" height="16" rx="3" fill="#fff" stroke="#d1d5db" stroke-width="1"/>
+          <text x="36" y="308" font-size="8" fill="#9ca3af">전체 선택됨</text>
+
+          <!-- 제어 명령 -->
+          <text x="30" y="328" font-size="8.5" fill="#111827" font-weight="600">제어 명령</text>
+          <rect x="30" y="332" width="200" height="16" rx="3" fill="#fff" stroke="#d1d5db" stroke-width="1"/>
+          <text x="36" y="343" font-size="8.5" fill="#374151">stb_request_info ▾</text>
+
+          <!-- 버튼 (justify-start) -->
+          <rect x="30" y="358" width="48" height="18" rx="4" fill="#fff" stroke="#d1d5db" stroke-width="1"/>
+          <text x="54" y="370" text-anchor="middle" font-size="8.5" fill="#374151">취소</text>
+          <rect x="84" y="358" width="72" height="18" rx="4" fill="#3b5bdb"/>
+          <text x="120" y="370" text-anchor="middle" font-size="8.5" fill="#fff" font-weight="600">스케줄 등록</text>
+
+          <!-- 설정 요약 카드 (우측) -->
+          <rect x="596" y="50" width="148" height="168" rx="6" fill="#f8faff" stroke="#c7d2fe" stroke-width="1"/>
+          <text x="606" y="66" font-size="8.5" fill="#6b7280" font-weight="700">설정 요약</text>
+          <line x1="596" y1="71" x2="744" y2="71" stroke="#c7d2fe" stroke-width="0.8"/>
+          <text x="606" y="84" font-size="8" fill="#9ca3af">이름</text>
+          <text x="640" y="84" font-size="8" fill="#374151">daily-info-coll…</text>
+          <text x="606" y="98" font-size="8" fill="#9ca3af">실행 타입</text>
+          <text x="640" y="98" font-size="8" fill="#374151">반복 실행</text>
+          <text x="606" y="112" font-size="8" fill="#9ca3af">Cron</text>
+          <text x="640" y="112" font-size="7.5" fill="#374151" font-family="Consolas,monospace">0 0 9 * * *</text>
+          <text x="606" y="126" font-size="8" fill="#9ca3af">타임존</text>
+          <text x="640" y="126" font-size="7.5" fill="#374151">Asia/Seoul</text>
+          <line x1="596" y1="132" x2="744" y2="132" stroke="#c7d2fe" stroke-width="0.8"/>
+          <text x="606" y="145" font-size="8" fill="#9ca3af">SO</text>
+          <text x="640" y="145" font-size="8" fill="#374151">SO-서울</text>
+          <text x="606" y="159" font-size="8" fill="#9ca3af">L3</text>
+          <text x="640" y="159" font-size="8" fill="#374151">2개 선택</text>
+          <text x="606" y="173" font-size="8" fill="#9ca3af">Cell</text>
+          <text x="640" y="173" font-size="8" fill="#374151">All</text>
+          <line x1="596" y1="179" x2="744" y2="179" stroke="#c7d2fe" stroke-width="0.8"/>
+          <text x="606" y="192" font-size="8" fill="#9ca3af">제어 명령</text>
+          <text x="640" y="192" font-size="7.5" fill="#374151">stb_request_info</text>
+        </svg>
+        <figcaption>그림 3-1. 스케줄 등록 탭 에디터 — 스케줄 정보·대상 선택·제어 명령·설정 요약 구성 (반복 실행 선택 예시)</figcaption>
+      </figure>
+    </section>
+
+    <!-- 4 -->
+    <section id="sec4">
+      <h2><span class="section-num">4</span>스케줄 수정</h2>
+      <p>스케줄 목록의 <strong>[수정]</strong> 버튼을 클릭하면 <strong>스케줄 수정</strong> 탭이 추가됩니다. 화면 구성은 <a href="#sec3">스케줄 등록</a>과 동일하며, 탭 닫기(×) 또는 <strong>[취소]</strong> 버튼으로 에디터를 닫을 수 있습니다.</p>
+      <ul>
+        <li><strong>즉시 실행</strong> 타입의 스케줄은 수정 버튼이 표시되지 않습니다.</li>
+        <li><strong>한번 실행</strong> 타입이고 실행 시간이 현재 이전인 경우 수정 버튼이 표시되지 않습니다.</li>
+        <li>스케줄 이름은 수정할 수 없습니다 (읽기 전용).</li>
+        <li>나머지 항목을 수정한 후 <strong>[스케줄 수정]</strong> 버튼으로 저장합니다.</li>
+        <li>수정 모드에서는 삭제된 L3·Cell 항목이 <strong>(삭제됨)</strong>으로 표시됩니다.</li>
+      </ul>
+      <div class="callout perm">
+        <span class="callout-icon">🔒</span>
+        <span><strong>권한 필요:</strong> <code>extension:catv:update</code> 권한이 있어야 수정 버튼이 출력됩니다.</span>
+      </div>
+    </section>
+
+    <!-- 5 -->
+    <section id="sec5">
+      <h2><span class="section-num">5</span>스케줄 삭제</h2>
+      <p>스케줄 목록의 <strong>[삭제]</strong> 버튼을 클릭하면 확인 팝업이 표시됩니다.</p>
+      <ul>
+        <li>팝업에서 확인을 선택하면 스케줄이 영구 삭제됩니다.</li>
+        <li>삭제 후 목록이 자동으로 갱신됩니다.</li>
+      </ul>
+      <div class="callout warn">
+        <span class="callout-icon">⚠️</span>
+        <span><strong>주의:</strong> 삭제된 스케줄은 복구할 수 없습니다.</span>
+      </div>
+    </section>
+
+    <!-- 6 -->
+    <section id="sec6">
+      <h2><span class="section-num">6</span>스케줄 상세 조회</h2>
+      <p>스케줄 목록에서 행을 클릭하면 우측에 <strong>상세 시트</strong>가 슬라이드됩니다.</p>
+
+      <h3>스케줄 정보 섹션</h3>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>항목</th><th>설명</th></tr></thead>
+          <tbody>
+            <tr><td>스케줄 이름</td><td>스케줄 고유 이름</td></tr>
+            <tr><td>실행 타입</td><td>즉시 / 한번 / 반복</td></tr>
+            <tr><td>실행 스펙</td><td>한번: 날짜·시간 / 반복: Cron 표현식</td></tr>
+            <tr><td>제어 명령</td><td><code>work_type</code> 값</td></tr>
+            <tr><td>대상 타입</td><td>제어 범위 (cm / stb 등)</td></tr>
+            <tr><td>대상 개수</td><td><code>area_ids</code> 항목 수</td></tr>
+            <tr><td>생성·수정 시간</td><td>ISO 형식 타임스탬프</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h3>스케줄 결과 목록 섹션</h3>
+      <p>해당 스케줄로 실행된 스케줄 결과 목록이 표시됩니다.</p>
+
+      <!-- SVG: 스케줄 상세 시트 -->
+      <figure>
+        <svg viewBox="0 0 760 240" xmlns="http://www.w3.org/2000/svg" font-family="-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif">
+          <rect x="0" y="0" width="760" height="240" rx="8" fill="#f0f3fa" stroke="#d6dbe8" stroke-width="1.2"/>
+          <!-- 배경: 스케줄 목록 (그림 2-1과 동일 구조, dim 적용) -->
+          <rect x="0" y="0" width="432" height="240" rx="8" fill="#f8f9fc"/>
+          <!-- Toolbar (dim) — rightFilters: 전체 N개 + 스케줄 등록 -->
+          <g opacity="0.4">
+            <rect x="0" y="0" width="432" height="34" rx="8" fill="#f9fafb"/>
+            <rect x="0" y="26" width="432" height="8" fill="#f9fafb"/>
+            <text x="298" y="21" font-size="8" fill="#6b7280">전체 <tspan font-weight="700" fill="#374151">3</tspan>개</text>
+            <rect x="330" y="8" width="64" height="20" rx="4" fill="#3b5bdb"/>
+            <text x="362" y="22" text-anchor="middle" font-size="8" fill="#fff" font-weight="600">스케줄 등록</text>
+          </g>
+          <!-- 컬럼 헤더 (dim) -->
+          <g opacity="0.45">
+            <rect x="0" y="34" width="432" height="22" fill="#f0f3fa"/>
+            <line x1="0" y1="56" x2="432" y2="56" stroke="#d6dbe8" stroke-width="0.8"/>
+            <text x="12" y="50" font-size="8" fill="#3b4070" font-weight="700">스케줄 이름</text>
+            <text x="172" y="50" font-size="8" fill="#3b4070" font-weight="700">실행 타입</text>
+            <text x="250" y="50" font-size="8" fill="#3b4070" font-weight="700">실행 스펙</text>
+            <text x="390" y="50" font-size="8" fill="#3b4070" font-weight="700">제어 명령</text>
+          </g>
+          <!-- Row 1: 활성 행 (클릭된 행 — 2-1 Row 1과 동일 스타일) -->
+          <rect x="0" y="56" width="432" height="30" fill="#eff6ff"/>
+          <text x="12" y="75" font-size="8.5" fill="#1e40af" font-weight="600">daily-info-collection</text>
+          <!-- schedule_type: outline badge -->
+          <rect x="168" y="61" width="50" height="15" rx="7" fill="#fff" stroke="#d1d5db" stroke-width="1"/>
+          <text x="193" y="72" text-anchor="middle" font-size="7.5" fill="#616161">반복 실행</text>
+          <!-- schedule_spec: code bg + cron -->
+          <rect x="246" y="62" width="136" height="14" rx="3" fill="#eef0f7"/>
+          <text x="250" y="73" font-size="7.5" fill="#3b5bdb" font-family="Consolas,monospace">TZ=Seoul 0 0 9 * * *</text>
+          <text x="390" y="75" font-size="8.5" fill="#374151">stb_request_info</text>
+          <!-- Row 2: dim (2-1 Row 2 — 즉시 실행, 수정 비활) -->
+          <g opacity="0.45">
+            <line x1="0" y1="86" x2="432" y2="86" stroke="#eaedf5" stroke-width="1"/>
+            <text x="12" y="105" font-size="8.5" fill="#374151">smart-reboot-now</text>
+            <rect x="168" y="91" width="50" height="15" rx="7" fill="#fff" stroke="#d1d5db" stroke-width="1"/>
+            <text x="193" y="102" text-anchor="middle" font-size="7.5" fill="#616161">즉시 실행</text>
+            <text x="250" y="105" font-size="8" fill="#9ca3af">즉시</text>
+            <text x="390" y="105" font-size="8.5" fill="#374151">smartReboot</text>
+          </g>
+          <!-- Row 3: dim, even (2-1 Row 3 — 한번 실행) -->
+          <g opacity="0.4">
+            <rect x="0" y="116" width="432" height="30" fill="#f9fafb"/>
+            <line x1="0" y1="116" x2="432" y2="116" stroke="#eaedf5" stroke-width="1"/>
+            <text x="12" y="135" font-size="8.5" fill="#374151">weekly-info-l3</text>
+            <rect x="168" y="121" width="50" height="15" rx="7" fill="#fff" stroke="#d1d5db" stroke-width="1"/>
+            <text x="193" y="132" text-anchor="middle" font-size="7.5" fill="#616161">한번 실행</text>
+            <text x="250" y="135" font-size="7.5" fill="#374151" font-family="Consolas,monospace">2026-04-15T09:00:00Z</text>
+            <text x="390" y="135" font-size="8.5" fill="#374151">stb_request_info</text>
+          </g>
+
+          <!-- 상세 시트 패널 (우측 슬라이드) -->
+          <rect x="430" y="0" width="330" height="240" fill="#fff" stroke="#d6dbe8" stroke-width="1"/>
+          <!-- 시트 헤더 -->
+          <rect x="430" y="0" width="330" height="42" fill="#f9fafb"/>
+          <line x1="430" y1="42" x2="760" y2="42" stroke="#e5e7eb" stroke-width="1"/>
+          <text x="444" y="17" font-size="10.5" fill="#111827" font-weight="700">daily-info-collection</text>
+          <!-- schedule_type badge (outline) -->
+          <rect x="444" y="22" width="52" height="13" rx="6" fill="#fff" stroke="#d1d5db" stroke-width="1"/>
+          <text x="470" y="31" text-anchor="middle" font-size="7.5" fill="#616161">반복 실행</text>
+          <!-- X 닫기 버튼 (7×7 IconButton) -->
+          <rect x="740" y="14" width="16" height="16" rx="3" fill="none" stroke="#e5e7eb" stroke-width="1"/>
+          <text x="748" y="25" text-anchor="middle" font-size="10" fill="#9ca3af">×</text>
+
+          <!-- 스케줄 정보 섹션 -->
+          <text x="444" y="56" font-size="9" fill="#374151" font-weight="700">스케줄 정보</text>
+          <line x1="444" y1="60" x2="752" y2="60" stroke="#e5e7eb" stroke-width="0.8"/>
+
+          <text x="444" y="73" font-size="8.5" fill="#9ca3af">스케줄 이름</text>
+          <text x="540" y="73" font-size="8.5" fill="#111827" font-weight="600">daily-info-collection</text>
+
+          <text x="444" y="87" font-size="8.5" fill="#9ca3af">실행 타입</text>
+          <!-- outline badge -->
+          <rect x="536" y="79" width="52" height="13" rx="6" fill="#fff" stroke="#d1d5db" stroke-width="1"/>
+          <text x="562" y="88" text-anchor="middle" font-size="7.5" fill="#616161">반복 실행</text>
+
+          <text x="444" y="101" font-size="8.5" fill="#9ca3af">실행 스펙</text>
+          <text x="540" y="101" font-size="8" fill="#374151" font-family="Consolas,monospace">TZ=Asia/Seoul 0 0 9 * * *</text>
+
+          <text x="444" y="115" font-size="8.5" fill="#9ca3af">제어 명령</text>
+          <text x="540" y="115" font-size="8.5" fill="#374151">stb_request_info</text>
+
+          <text x="444" y="129" font-size="8.5" fill="#9ca3af">대상 타입</text>
+          <!-- areaTypeLabels: cm→'CM', stb→'STB'. 'so'는 raw fallback('so') -->
+          <text x="540" y="129" font-size="8.5" fill="#374151">so</text>
+          <text x="560" y="129" font-size="7.5" fill="#c4c9d4">(매핑 없음 → raw 값)</text>
+
+          <text x="444" y="143" font-size="8.5" fill="#9ca3af">대상 개수</text>
+          <text x="540" y="143" font-size="8.5" fill="#374151">3</text>
+
+          <text x="444" y="157" font-size="8.5" fill="#9ca3af">생성 시간</text>
+          <text x="540" y="157" font-size="7.5" fill="#374151">2026. 04. 10. 오전 9:00:00</text>
+
+          <!-- 스케줄 결과 목록 섹션 (enablePagination=false) -->
+          <line x1="430" y1="168" x2="760" y2="168" stroke="#e5e7eb" stroke-width="1"/>
+          <text x="444" y="181" font-size="9" fill="#374151" font-weight="700">스케줄 결과 목록</text>
+          <text x="748" y="181" text-anchor="end" font-size="8" fill="#9ca3af">전체 2개</text>
+          <!-- 컬럼 헤더 (getScheduleResultColumns: 요청 시간 / 경과 시간 / 상태 / 진행 현황) -->
+          <rect x="430" y="186" width="330" height="16" fill="#f0f3fa"/>
+          <text x="438" y="197" font-size="7.5" fill="#3b4070" font-weight="700">요청 시간</text>
+          <text x="522" y="197" font-size="7.5" fill="#3b4070" font-weight="700">경과 시간</text>
+          <text x="588" y="197" font-size="7.5" fill="#3b4070" font-weight="700">상태</text>
+          <text x="634" y="197" font-size="7.5" fill="#3b4070" font-weight="700">진행 현황</text>
+          <!-- Row 1: 완료 -->
+          <line x1="430" y1="202" x2="760" y2="202" stroke="#e5e7eb" stroke-width="0.8"/>
+          <text x="438" y="214" font-size="7.5" fill="#374151">2026. 04. 13. 오전 9:00:00</text>
+          <text x="522" y="214" font-size="8" fill="#374151">1일 20시간</text>
+          <!-- 완료 badge (outline green) -->
+          <rect x="582" y="206" width="36" height="12" rx="5" fill="#fff" stroke="#43a047" stroke-width="1"/>
+          <text x="600" y="215" text-anchor="middle" font-size="7.5" fill="#2e7d32">완료</text>
+          <!-- progress badges -->
+          <rect x="622" y="206" width="42" height="12" rx="5" fill="#fff" stroke="#43a047" stroke-width="1"/>
+          <text x="643" y="215" text-anchor="middle" font-size="7" fill="#2e7d32">완료 120</text>
+          <rect x="667" y="206" width="42" height="12" rx="5" fill="#f3f4f6"/>
+          <text x="688" y="215" text-anchor="middle" font-size="7" fill="#374151">전체 120</text>
+          <!-- Row 2: 진행 중 -->
+          <line x1="430" y1="220" x2="760" y2="220" stroke="#eaedf5" stroke-width="0.8"/>
+          <text x="438" y="232" font-size="7.5" fill="#374151">2026. 04. 12. 오전 9:00:00</text>
+          <text x="522" y="232" font-size="8" fill="#9ca3af">-</text>
+          <rect x="582" y="223" width="44" height="12" rx="5" fill="#1976d2"/>
+          <text x="604" y="232" text-anchor="middle" font-size="7.5" fill="#fff">진행 중</text>
+          <rect x="630" y="223" width="42" height="12" rx="5" fill="#fff" stroke="#43a047" stroke-width="1"/>
+          <text x="651" y="232" text-anchor="middle" font-size="7" fill="#2e7d32">완료 80</text>
+          <rect x="676" y="223" width="42" height="12" rx="5" fill="#f3f4f6"/>
+          <text x="697" y="232" text-anchor="middle" font-size="7" fill="#374151">전체 120</text>
+        </svg>
+        <figcaption>그림 6-1. 스케줄 상세 시트 — 스케줄 정보 및 스케줄 결과 목록(페이지네이션 없음)</figcaption>
+      </figure>
+    </section>
+
+    <!-- 7 -->
+    <section id="sec7">
+      <h2><span class="section-num">7</span>스케줄 결과 목록</h2>
+      <p><strong>스케줄 결과</strong> 탭에서는 스케줄 실행 결과를 조회할 수 있습니다.</p>
+
+      <h3>필터</h3>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>필터</th><th>설명</th></tr></thead>
+          <tbody>
+            <tr><td><strong>제어 명령</strong></td><td>특정 <code>work_type</code>으로 필터링</td></tr>
+            <tr><td><strong>스케줄 이름</strong></td><td>스케줄 이름으로 검색 (300ms 디바운스)</td></tr>
+            <tr><td><strong>날짜 범위</strong></td><td>요청 시간 기준 필터링 (from ~ to). 같은 날 종료 시간이 시작 시간보다 앞서면 <strong>[적용]</strong> 버튼이 비활성화됩니다.</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h3>컬럼 설명</h3>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>컬럼</th><th>설명</th></tr></thead>
+          <tbody>
+            <tr><td><strong>요청 시간</strong></td><td>스케줄 실행 요청 일시 (호버 시 결과 ID 표시)</td></tr>
+            <tr><td><strong>경과 시간</strong></td><td>요청 시간 ~ 마지막 업데이트 시간 경과</td></tr>
+            <tr><td><strong>스케줄 이름</strong></td><td>실행된 스케줄 이름</td></tr>
+            <tr><td><strong>스케줄 타입</strong></td><td>즉시 / 한번 / 반복</td></tr>
+            <tr><td><strong>제어 명령</strong></td><td>실행된 명령</td></tr>
+            <tr><td><strong>상태</strong></td><td>대기 / 진행 중 / 완료 / 실패</td></tr>
+            <tr><td><strong>진행 현황</strong></td><td>완료·실패·전체 건수 배지 표시</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <ul>
+        <li>진행 중인 작업이 있을 경우 <strong>5초마다 자동 갱신</strong>되며, 우측 상단에 "실시간 갱신 중" 인디케이터가 표시됩니다.</li>
+        <li><strong>행 클릭</strong> 시 해당 결과의 개별 STB 레코드를 보여주는 상세 탭이 추가됩니다.</li>
+      </ul>
+
+      <!-- SVG: 스케줄 결과 목록 -->
+      <figure>
+        <svg viewBox="0 0 760 224" xmlns="http://www.w3.org/2000/svg" font-family="-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif">
+          <rect x="0" y="0" width="760" height="224" rx="8" fill="#fff" stroke="#d6dbe8" stroke-width="1.2"/>
+          <!-- ── 툴바 ── -->
+          <rect x="0" y="0" width="760" height="36" rx="8" fill="#f9fafb"/>
+          <rect x="0" y="28" width="760" height="8" fill="#f9fafb"/>
+          <!-- leftFilters: VariableSelect(제어 명령) + SearchInput + 기간 Popover -->
+          <text x="10" y="16" font-size="8" fill="#6b7280">제어 명령</text>
+          <rect x="10" y="19" width="104" height="12" rx="3" fill="#fff" stroke="#d1d5db" stroke-width="1"/>
+          <text x="16" y="28" font-size="8" fill="#374151">stb_request_info ▾</text>
+          <rect x="118" y="8" width="130" height="22" rx="4" fill="#fff" stroke="#d1d5db" stroke-width="1"/>
+          <text x="126" y="22" font-size="8.5" fill="#9ca3af">🔍 스케줄 이름 검색...</text>
+          <!-- 기간 버튼 (Popover trigger: CalendarIcon + 기간 + 날짜 선택) -->
+          <rect x="252" y="8" width="94" height="22" rx="4" fill="#fff" stroke="#d1d5db" stroke-width="1"/>
+          <text x="261" y="22" font-size="9" fill="#374151">◫</text>
+          <text x="273" y="22" font-size="8.5" fill="#374151" font-weight="600">기간</text>
+          <text x="295" y="22" font-size="8.5" fill="#9ca3af">날짜 선택</text>
+          <!-- rightFilters: 실시간 갱신 인디케이터 (DataGrid 페이지네이션에 전체 건수 표시) -->
+          <circle cx="648" cy="19" r="4.5" fill="#22c55e" opacity="0.8"/>
+          <circle cx="648" cy="19" r="7" fill="#22c55e" opacity="0.2"/>
+          <text x="658" y="23" font-size="8.5" fill="#6b7280">실시간 갱신 중</text>
+          <!-- ── 컬럼 헤더 ── -->
+          <rect x="0" y="36" width="760" height="22" fill="#f0f3fa"/>
+          <line x1="0" y1="58" x2="760" y2="58" stroke="#d6dbe8" stroke-width="1"/>
+          <text x="12" y="51" font-size="8.5" fill="#3b4070" font-weight="700">요청 시간</text>
+          <text x="148" y="51" font-size="8.5" fill="#3b4070" font-weight="700">경과 시간</text>
+          <text x="222" y="51" font-size="8.5" fill="#3b4070" font-weight="700">스케줄 이름</text>
+          <text x="358" y="51" font-size="8.5" fill="#3b4070" font-weight="700">스케줄 타입</text>
+          <text x="452" y="51" font-size="8.5" fill="#3b4070" font-weight="700">제어 명령</text>
+          <text x="552" y="51" font-size="8.5" fill="#3b4070" font-weight="700">상태</text>
+          <text x="618" y="51" font-size="8.5" fill="#3b4070" font-weight="700">진행 현황</text>
+          <!-- ── Row 1: 진행 중 (hover) ── -->
+          <rect x="0" y="58" width="760" height="28" fill="#eff6ff"/>
+          <text x="12" y="75" font-size="8" fill="#1e40af" font-weight="600">2026. 04. 13. 오전 9:00:00</text>
+          <text x="148" y="75" font-size="9" fill="#9ca3af">-</text>
+          <text x="222" y="75" font-size="9" fill="#374151">daily-info-coll…</text>
+          <rect x="352" y="63" width="56" height="14" rx="6" fill="#fff" stroke="#d1d5db" stroke-width="1"/>
+          <text x="380" y="73" text-anchor="middle" font-size="8" fill="#616161">반복 실행</text>
+          <text x="452" y="75" font-size="9" fill="#374151">stb_request_info</text>
+          <rect x="546" y="63" width="44" height="14" rx="6" fill="#1976d2"/>
+          <text x="568" y="73" text-anchor="middle" font-size="8" fill="#fff">진행 중</text>
+          <!-- progress badges -->
+          <rect x="612" y="63" width="42" height="14" rx="6" fill="#fff" stroke="#43a047" stroke-width="1"/>
+          <text x="633" y="73" text-anchor="middle" font-size="7.5" fill="#2e7d32">완료 80</text>
+          <rect x="658" y="63" width="36" height="14" rx="6" fill="#dc2626"/>
+          <text x="676" y="73" text-anchor="middle" font-size="7.5" fill="#fff">실패 2</text>
+          <rect x="698" y="63" width="46" height="14" rx="6" fill="#f3f4f6"/>
+          <text x="721" y="73" text-anchor="middle" font-size="7.5" fill="#374151">전체 120</text>
+          <!-- ── Row 2: 완료 ── -->
+          <line x1="0" y1="86" x2="760" y2="86" stroke="#eaedf5" stroke-width="1"/>
+          <text x="12" y="103" font-size="8" fill="#374151">2026. 04. 12. 오전 9:00:00</text>
+          <text x="148" y="103" font-size="9" fill="#374151">1일 3시간</text>
+          <text x="222" y="103" font-size="9" fill="#374151">daily-info-coll…</text>
+          <rect x="352" y="91" width="56" height="14" rx="6" fill="#fff" stroke="#d1d5db" stroke-width="1"/>
+          <text x="380" y="101" text-anchor="middle" font-size="8" fill="#616161">반복 실행</text>
+          <text x="452" y="103" font-size="9" fill="#374151">stb_request_info</text>
+          <rect x="546" y="91" width="44" height="14" rx="6" fill="#fff" stroke="#43a047" stroke-width="1"/>
+          <text x="568" y="101" text-anchor="middle" font-size="8" fill="#2e7d32">완료</text>
+          <rect x="612" y="91" width="48" height="14" rx="6" fill="#fff" stroke="#43a047" stroke-width="1"/>
+          <text x="636" y="101" text-anchor="middle" font-size="7.5" fill="#2e7d32">완료 120</text>
+          <rect x="664" y="91" width="46" height="14" rx="6" fill="#f3f4f6"/>
+          <text x="687" y="101" text-anchor="middle" font-size="7.5" fill="#374151">전체 120</text>
+          <!-- ── Row 3: 실패 ── -->
+          <rect x="0" y="114" width="760" height="28" fill="#f9fafb"/>
+          <line x1="0" y1="114" x2="760" y2="114" stroke="#eaedf5" stroke-width="1"/>
+          <text x="12" y="131" font-size="8" fill="#374151">2026. 04. 11. 오후 2:30:00</text>
+          <text x="148" y="131" font-size="9" fill="#374151">2시간 15분</text>
+          <text x="222" y="131" font-size="9" fill="#374151">smart-reboot-now</text>
+          <rect x="352" y="119" width="56" height="14" rx="6" fill="#fff" stroke="#d1d5db" stroke-width="1"/>
+          <text x="380" y="129" text-anchor="middle" font-size="8" fill="#616161">즉시 실행</text>
+          <text x="452" y="131" font-size="9" fill="#374151">smartReboot</text>
+          <rect x="546" y="119" width="44" height="14" rx="6" fill="#dc2626"/>
+          <text x="568" y="129" text-anchor="middle" font-size="8" fill="#fff">실패</text>
+          <rect x="612" y="119" width="36" height="14" rx="6" fill="#dc2626"/>
+          <text x="630" y="129" text-anchor="middle" font-size="7.5" fill="#fff">실패 5</text>
+          <rect x="652" y="119" width="46" height="14" rx="6" fill="#f3f4f6"/>
+          <text x="675" y="129" text-anchor="middle" font-size="7.5" fill="#374151">전체 5</text>
+          <!-- ── 페이지네이션 바 (pageSizes=[10,50,100,500]) ── -->
+          <line x1="0" y1="156" x2="760" y2="156" stroke="#e5e7eb" stroke-width="1"/>
+          <rect x="0" y="156" width="760" height="30" fill="#fafafa" rx="0"/>
+          <text x="14" y="176" font-size="8.5" fill="#6b7280">행 수:</text>
+          <rect x="40" y="163" width="36" height="15" rx="3" fill="#fff" stroke="#d1d5db" stroke-width="1"/>
+          <text x="58" y="174" text-anchor="middle" font-size="8.5" fill="#374151">10 ▾</text>
+          <text x="84" y="176" font-size="8.5" fill="#9ca3af">| 1-3 / 5</text>
+          <text x="620" y="176" font-size="8.5" fill="#9ca3af">1 페이지 / 1</text>
+          <!-- 이전/다음 버튼 -->
+          <rect x="692" y="163" width="28" height="15" rx="3" fill="#fff" stroke="#d1d5db" stroke-width="1"/>
+          <text x="706" y="174" text-anchor="middle" font-size="9" fill="#9ca3af">‹</text>
+          <rect x="724" y="163" width="28" height="15" rx="3" fill="#fff" stroke="#d1d5db" stroke-width="1"/>
+          <text x="738" y="174" text-anchor="middle" font-size="9" fill="#374151">›</text>
+          <!-- 각주 -->
+          <text x="380" y="214" text-anchor="middle" font-size="8.5" fill="#9ca3af">rightFilters: 실시간 갱신 중 (진행 중 작업 있을 때만) | 전체 건수: 페이지네이션 표시 | pageSizes=[10, 50, 100, 500]</text>
+        </svg>
+        <figcaption>그림 7-1. 스케줄 결과 목록</figcaption>
+      </figure>
+    </section>
+
+    <!-- 8 -->
+    <section id="sec8">
+      <h2><span class="section-num">8</span>스케줄 결과 상세</h2>
+      <p>스케줄 결과 목록에서 행을 클릭하면 탭이 추가되어 개별 STB 레코드를 조회할 수 있습니다.</p>
+      <p>탭 이름은 <strong><code>스케줄이름 · 월/일 시:분</code></strong> 형식으로 표시됩니다.</p>
+
+      <h3>검색</h3>
+      <p>우측 상단 검색창에서 다음 값으로 필터링할 수 있습니다.</p>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>입력 예시</th><th>동작</th></tr></thead>
+          <tbody>
+            <tr><td><code>대기</code> / <code>진행 중</code> / <code>성공</code> / <code>실패</code></td><td>한글 상태명으로 필터링</td></tr>
+            <tr><td><code>pending</code> / <code>running</code> / <code>succeeded</code> / <code>failed</code></td><td>영문 상태값으로 필터링</td></tr>
+            <tr><td>MAC 주소, K8s Job 이름, 결과 값</td><td>텍스트 검색</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h3>컬럼 표시 설정</h3>
+      <p>우측 상단 <strong>[컬럼]</strong> 버튼으로 표시할 컬럼을 선택·해제할 수 있습니다.</p>
+      <ul>
+        <li><strong>기본 컬럼:</strong> 시작 시간, 모델명, CM MAC, STB MAC, 진행 상태, 종료 시간, 경과 시간, 결과 코드, 결과 메시지, 스케줄 이름, 스케줄 타입, K8s Job (12개 — 모두 토글 가능)</li>
+        <li>work_type별로 초기 숨김 항목이 다릅니다. 일반 명령은 시간·결과 코드가 기본 표시되고, <code>stb_request_info</code>는 결과 코드·메시지·스케줄 정보가 기본 숨김입니다.</li>
+      </ul>
+
+      <h3>stb_request_info 전용 보기</h3>
+      <p>제어 명령이 <code>stb_request_info</code>인 경우, 결과 메시지(JSON)를 파싱하여 <strong>STB 정보 키별 동적 컬럼</strong>으로 표시합니다.</p>
+      <ul>
+        <li><strong>기본 표시 컬럼:</strong> 시작 시간, 모델명, CM MAC, STB MAC, 진행 상태</li>
+        <li><strong>기본 숨김 컬럼:</strong> 종료 시간, 경과 시간, 결과 코드, 결과 메시지, 스케줄 이름, 스케줄 타입, K8s Job</li>
+        <li><strong>동적 컬럼:</strong> JSON 키 목록 (예: <code>sw_version</code>, <code>hw_version</code> 등)</li>
+      </ul>
+
+      <!-- SVG: 스케줄 결과 상세 (ScheduleResultDetail) -->
+      <figure>
+        <svg viewBox="0 0 760 220" xmlns="http://www.w3.org/2000/svg" font-family="-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif">
+          <rect x="0" y="0" width="760" height="220" rx="8" fill="#fff" stroke="#d6dbe8" stroke-width="1.2"/>
+          <!-- ── 툴바 ── -->
+          <rect x="0" y="0" width="760" height="36" rx="8" fill="#f9fafb"/>
+          <rect x="0" y="28" width="760" height="8" fill="#f9fafb"/>
+          <!-- leftFilters: SearchInput -->
+          <rect x="10" y="8" width="168" height="22" rx="4" fill="#fff" stroke="#d1d5db" stroke-width="1"/>
+          <text x="18" y="22" font-size="8.5" fill="#9ca3af">🔍 MAC, K8s Job, 결과 값...</text>
+          <!-- rightFilters: 실시간 갱신 인디케이터 + [컬럼] 버튼 -->
+          <circle cx="578" cy="19" r="4.5" fill="#22c55e" opacity="0.8"/>
+          <circle cx="578" cy="19" r="7" fill="#22c55e" opacity="0.2"/>
+          <text x="588" y="23" font-size="8.5" fill="#6b7280">실시간 갱신 중</text>
+          <rect x="670" y="8" width="54" height="22" rx="4" fill="#fff" stroke="#d1d5db" stroke-width="1"/>
+          <text x="679" y="20" font-size="8" fill="#374151">⊞</text>
+          <text x="691" y="22" font-size="8.5" fill="#374151">컬럼</text>
+          <!-- ── 컬럼 헤더 (기본 표시: 시작 시간, 모델명, CM MAC, STB MAC, 진행 상태, 결과 코드, 결과 메시지) ── -->
+          <rect x="0" y="36" width="760" height="22" fill="#f0f3fa"/>
+          <line x1="0" y1="58" x2="760" y2="58" stroke="#d6dbe8" stroke-width="1"/>
+          <text x="12" y="51" font-size="8.5" fill="#3b4070" font-weight="700">시작 시간</text>
+          <text x="150" y="51" font-size="8.5" fill="#3b4070" font-weight="700">모델명</text>
+          <text x="218" y="51" font-size="8.5" fill="#3b4070" font-weight="700">CM MAC</text>
+          <text x="312" y="51" font-size="8.5" fill="#3b4070" font-weight="700">STB MAC</text>
+          <text x="406" y="51" font-size="8.5" fill="#3b4070" font-weight="700">진행 상태</text>
+          <text x="486" y="51" font-size="8.5" fill="#3b4070" font-weight="700">결과 코드</text>
+          <text x="558" y="51" font-size="8.5" fill="#3b4070" font-weight="700">결과 메시지</text>
+          <!-- ── Row 1: succeeded (hover) ── -->
+          <rect x="0" y="58" width="760" height="28" fill="#eff6ff"/>
+          <text x="12" y="75" font-size="7.5" fill="#1e40af" font-weight="600">2026. 04. 13. 오전 9:00:12</text>
+          <text x="150" y="75" font-size="8.5" fill="#374151">ABC-1234</text>
+          <text x="218" y="75" font-size="8" fill="#374151" font-family="Consolas,monospace">A1:B2:C3:D4:E5:F6</text>
+          <text x="312" y="75" font-size="8" fill="#374151" font-family="Consolas,monospace">11:22:33:44:55:66</text>
+          <!-- 성공 badge (outline green) -->
+          <rect x="400" y="63" width="44" height="14" rx="6" fill="#fff" stroke="#43a047" stroke-width="1"/>
+          <text x="422" y="73" text-anchor="middle" font-size="7.5" fill="#2e7d32">성공</text>
+          <text x="486" y="75" font-size="8.5" fill="#374151" font-family="Consolas,monospace">1</text>
+          <text x="558" y="75" font-size="8.5" fill="#374151">{"sw_version":"3.2.1",…}</text>
+          <!-- ── Row 2: failed ── -->
+          <line x1="0" y1="86" x2="760" y2="86" stroke="#eaedf5" stroke-width="1"/>
+          <text x="12" y="103" font-size="7.5" fill="#374151">2026. 04. 13. 오전 9:00:08</text>
+          <text x="150" y="103" font-size="8.5" fill="#374151">XYZ-5678</text>
+          <text x="218" y="103" font-size="8" fill="#374151" font-family="Consolas,monospace">B2:C3:D4:E5:F6:A1</text>
+          <text x="312" y="103" font-size="8" fill="#374151" font-family="Consolas,monospace">22:33:44:55:66:11</text>
+          <!-- 실패 badge -->
+          <rect x="400" y="91" width="44" height="14" rx="6" fill="#dc2626"/>
+          <text x="422" y="101" text-anchor="middle" font-size="7.5" fill="#fff">실패</text>
+          <text x="486" y="103" font-size="8.5" fill="#374151" font-family="Consolas,monospace">-1</text>
+          <text x="558" y="103" font-size="8.5" fill="#374151">connection timeout</text>
+          <!-- ── Row 3: pending (even) ── -->
+          <rect x="0" y="114" width="760" height="28" fill="#f9fafb"/>
+          <line x1="0" y1="114" x2="760" y2="114" stroke="#eaedf5" stroke-width="1"/>
+          <text x="12" y="131" font-size="8.5" fill="#9ca3af">-</text>
+          <text x="150" y="131" font-size="8.5" fill="#374151">ABC-1234</text>
+          <text x="218" y="131" font-size="8" fill="#374151" font-family="Consolas,monospace">C3:D4:E5:F6:A1:B2</text>
+          <text x="312" y="131" font-size="8" fill="#374151" font-family="Consolas,monospace">33:44:55:66:11:22</text>
+          <!-- 대기 badge -->
+          <rect x="400" y="119" width="44" height="14" rx="6" fill="#fff" stroke="#d1d5db" stroke-width="1"/>
+          <text x="422" y="129" text-anchor="middle" font-size="7.5" fill="#9ca3af">대기</text>
+          <text x="486" y="131" font-size="8.5" fill="#9ca3af">-</text>
+          <text x="558" y="131" font-size="8.5" fill="#9ca3af">-</text>
+          <!-- ── 페이지네이션 바 (pageSizes=[10,50,100,500,1000]) ── -->
+          <line x1="0" y1="156" x2="760" y2="156" stroke="#e5e7eb" stroke-width="1"/>
+          <rect x="0" y="156" width="760" height="30" fill="#fafafa" rx="0"/>
+          <text x="14" y="176" font-size="8.5" fill="#6b7280">행 수:</text>
+          <rect x="40" y="163" width="42" height="15" rx="3" fill="#fff" stroke="#d1d5db" stroke-width="1"/>
+          <text x="61" y="174" text-anchor="middle" font-size="8.5" fill="#374151">100 ▾</text>
+          <text x="90" y="176" font-size="8.5" fill="#9ca3af">| 1-3 / 3</text>
+          <text x="620" y="176" font-size="8.5" fill="#9ca3af">1 페이지 / 1</text>
+          <!-- 이전/다음 버튼 -->
+          <rect x="692" y="163" width="28" height="15" rx="3" fill="#fff" stroke="#d1d5db" stroke-width="1"/>
+          <text x="706" y="174" text-anchor="middle" font-size="9" fill="#9ca3af">‹</text>
+          <rect x="724" y="163" width="28" height="15" rx="3" fill="#fff" stroke="#d1d5db" stroke-width="1"/>
+          <text x="738" y="174" text-anchor="middle" font-size="9" fill="#9ca3af">›</text>
+          <!-- 각주 -->
+          <text x="380" y="210" text-anchor="middle" font-size="8.5" fill="#9ca3af">기본 숨김: 종료 시간, 경과 시간, 스케줄 이름, 스케줄 타입, K8s Job | pageSizes=[10, 50, 100, 500, 1000]</text>
+        </svg>
+        <figcaption>그림 8-1. 스케줄 결과 상세</figcaption>
+      </figure>
+    </section>
+
+    <!-- 9 -->
+    <section id="sec9">
+      <h2><span class="section-num">9</span>개별 STB 레코드 조회</h2>
+      <p>결과 상세 탭에서 행을 클릭하면 개별 STB 레코드의 <strong>상세 시트</strong>가 열립니다.</p>
+
+      <h3>기본 정보</h3>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>항목</th><th>설명</th></tr></thead>
+          <tbody>
+            <tr><td>K8s Job</td><td>실행된 Kubernetes Job 이름</td></tr>
+            <tr><td>스케줄 ID</td><td>스케줄 고유 ID</td></tr>
+            <tr><td>스케줄 이름</td><td>스케줄 이름</td></tr>
+            <tr><td>Work Type</td><td>실행 명령</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h3>상태 정보</h3>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>항목</th><th>설명</th></tr></thead>
+          <tbody>
+            <tr><td>진행 상태</td><td><code>pending</code> / <code>running</code> / <code>succeeded</code> / <code>failed</code> 배지</td></tr>
+            <tr><td>결과 코드</td><td>스케줄 결과 코드</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h3>대상 정보</h3>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>항목</th><th>설명</th></tr></thead>
+          <tbody>
+            <tr><td>모델명</td><td>STB 모델명</td></tr>
+            <tr><td>CM MAC</td><td>Cable Modem MAC 주소</td></tr>
+            <tr><td>STB MAC</td><td>셋톱박스 MAC 주소</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h3>시간 정보</h3>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>항목</th><th>설명</th></tr></thead>
+          <tbody>
+            <tr><td>요청 시간</td><td>스케줄이 제어 요청을 수신한 시간</td></tr>
+            <tr><td>제어 시작</td><td>실제 STB에 명령이 전달된 시간</td></tr>
+            <tr><td>제어 종료</td><td>제어가 완료된 시간</td></tr>
+            <tr><td>경과 시간</td><td>제어 시작~종료 사이의 소요 시간</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h3>결과 메시지</h3>
+      <ul>
+        <li>결과 코드가 <code>1</code>이고 결과 메시지가 유효한 JSON인 경우 <strong>그리드 형식</strong>으로 파싱하여 표시합니다.</li>
+        <li>그 외의 경우 원본 텍스트로 표시합니다.</li>
+      </ul>
+    </section>
+
+    <!-- 10 -->
+    <section id="sec10">
+      <h2><span class="section-num">10</span>상태 및 진행 현황 안내</h2>
+
+      <h3>작업 상태</h3>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>상태</th><th>배지 예시</th><th>설명</th></tr></thead>
+          <tbody>
+            <tr>
+              <td><strong>대기</strong></td>
+              <td><span class="badge badge-pending">대기</span></td>
+              <td>아직 처리되지 않은 상태</td>
+            </tr>
+            <tr>
+              <td><strong>진행 중</strong></td>
+              <td><span class="badge badge-running">진행 중</span></td>
+              <td>현재 STB에 명령 전송 중</td>
+            </tr>
+            <tr>
+              <td><strong>성공</strong></td>
+              <td><span class="badge badge-success">성공</span></td>
+              <td>정상적으로 완료됨</td>
+            </tr>
+            <tr>
+              <td><strong>실패</strong></td>
+              <td><span class="badge badge-fail">실패</span></td>
+              <td>처리 중 오류 발생</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h3>진행 현황 배지</h3>
+      <ul>
+        <li><span class="badge badge-done-n">완료 N</span> &nbsp; 성공한 STB 수</li>
+        <li><span class="badge badge-fail-n">실패 N</span> &nbsp; 실패한 STB 수 (1건 이상일 때만 표시)</li>
+        <li><span class="badge badge-total-n">전체 N</span> &nbsp; 총 대상 STB 수</li>
+      </ul>
+      <div class="callout info">
+        <span class="callout-icon">ℹ️</span>
+        <span>성공과 실패가 함께 존재하는 경우 결과 상태는 <strong>완료</strong>로 표시됩니다. 실패 건수는 진행 현황 배지에서 확인하세요.</span>
+      </div>
+
+      <h3>실시간 갱신</h3>
+      <p>진행 중(<code>running</code>) 또는 대기 중(<code>pending</code>) 상태의 작업이 있을 경우:</p>
+      <ul>
+        <li><strong>스케줄 결과 목록:</strong> 5초마다 자동 갱신</li>
+        <li><strong>결과 상세 탭:</strong> 5초마다 자동 갱신 (녹색 점 애니메이션 표시)</li>
+      </ul>
+      <p>모든 작업이 완료되면 자동 갱신이 중단됩니다.</p>
+    </section>
+
+    <!-- 11 -->
+    <section id="sec11">
+      <h2><span class="section-num">11</span>권한 안내</h2>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>권한 키</th><th>관련 기능</th></tr></thead>
+          <tbody>
+            <tr><td><code>extension:catv:read</code></td><td>페이지 접근, 스케줄 목록·결과 조회</td></tr>
+            <tr><td><code>extension:catv:create</code></td><td>스케줄 등록 버튼 출력 및 스케줄 등록 탭 진입</td></tr>
+            <tr><td><code>extension:catv:update</code></td><td>스케줄 수정 버튼 출력 및 스케줄 수정 탭 진입</td></tr>
+            <tr><td><code>extension:catv:delete</code></td><td>스케줄 삭제 버튼 출력 및 삭제 실행</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h3>버튼 표시 조건</h3>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Create</th><th>Update</th><th>Delete</th><th>등록 버튼</th><th>수정 버튼¹</th><th>삭제 버튼</th></tr></thead>
+          <tbody>
+            <tr><td>❌</td><td>❌</td><td>❌</td><td>미출력</td><td>미출력</td><td>미출력</td></tr>
+            <tr><td>❌</td><td>❌</td><td>✅</td><td>미출력</td><td>미출력</td><td>출력</td></tr>
+            <tr><td>❌</td><td>✅</td><td>❌</td><td>미출력</td><td>출력</td><td>미출력</td></tr>
+            <tr><td>❌</td><td>✅</td><td>✅</td><td>미출력</td><td>출력</td><td>출력</td></tr>
+            <tr><td>✅</td><td>❌</td><td>❌</td><td>출력</td><td>미출력</td><td>미출력</td></tr>
+            <tr><td>✅</td><td>❌</td><td>✅</td><td>출력</td><td>미출력</td><td>출력</td></tr>
+            <tr><td>✅</td><td>✅</td><td>❌</td><td>출력</td><td>출력</td><td>미출력</td></tr>
+            <tr><td>✅</td><td>✅</td><td>✅</td><td>출력</td><td>출력</td><td>출력</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p style="font-size:0.85em;color:#6b7280;">¹ <code>immediately</code> 타입이거나 <code>once</code> 타입인데 실행 시간이 현재 이전이면 수정 버튼 미출력</p>
+
+      <div class="callout perm">
+        <span class="callout-icon">🔒</span>
+        <span><code>extension:catv:read</code> 권한이 없는 경우 페이지 접근 시 "이 페이지에 접근할 권한이 없습니다" 메시지가 표시됩니다.</span>
+      </div>
+      <div class="callout tip">
+        <span class="callout-icon">💡</span>
+        <span><code>role:super_admin</code> 계정은 모든 권한을 보유하므로 항상 모든 버튼이 출력됩니다.</span>
+      </div>
+    </section>
+
+  </main>
+</div>
+
+<script>
+  // 현재 뷰포트에 보이는 섹션 강조
+  const links = document.querySelectorAll('nav a');
+  const sections = document.querySelectorAll('section[id]');
+
+  const observer = new IntersectionObserver((entries) => {
+    entries.forEach(entry => {
+      if (entry.isIntersecting) {
+        links.forEach(l => l.classList.remove('active'));
+        const active = document.querySelector(`nav a[href="#${entry.target.id}"]`);
+        if (active) active.classList.add('active');
+      }
+    });
+  }, { rootMargin: '-20% 0px -70% 0px' });
+
+  sections.forEach(s => observer.observe(s));
+</script>
+</body>
+</html>

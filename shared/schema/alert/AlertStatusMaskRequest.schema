@@ -1,0 +1,13 @@
+{
+  "title": "Alert Status Mask Request",
+  "description": "Request schema for masking/unmasking alert status notifications",
+  "type": "object",
+  "properties": {
+    "mask": {
+      "type": "boolean",
+      "description": "Whether to mask (true) or unmask (false) the alert status"
+    }
+  },
+  "required": ["mask"],
+  "additionalProperties": false
+}

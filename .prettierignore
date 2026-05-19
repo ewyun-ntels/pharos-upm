@@ -1,0 +1,12 @@
+ui/node_modules
+ui/build
+ui/.next
+ui/src/components/ui
+ui/src/components/ui-extension
+ui/src/components/template
+
+# Ignore all HTML files:
+**/*.html
+
+# Ignore all css files:
+**/*.css

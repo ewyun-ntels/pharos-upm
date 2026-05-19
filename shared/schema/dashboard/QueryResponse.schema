@@ -1,0 +1,49 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "QueryResponse",
+  "description": "Dashboard query execution response",
+  "type": "object",
+  "properties": {
+    "data": {
+      "type": "array",
+      "description": "Query result rows",
+      "items": {
+        "type": "object",
+        "additionalProperties": true
+      }
+    },
+    "meta": {
+      "type": "array",
+      "description": "Column metadata",
+      "items": {
+        "type": "object",
+        "additionalProperties": {
+          "type": "string"
+        }
+      }
+    },
+    "rows": {
+      "type": "integer",
+      "description": "Row count"
+    },
+    "statistics": {
+      "$ref": "#/definitions/Statistics"
+    }
+  },
+  "required": ["data", "meta", "rows", "statistics"],
+  "additionalProperties": false,
+  "definitions": {
+    "Statistics": {
+      "type": "object",
+      "description": "Query execution statistics",
+      "properties": {
+        "elapsed": {
+          "type": "number",
+          "description": "Execution time in seconds"
+        }
+      },
+      "required": ["elapsed"],
+      "additionalProperties": false
+    }
+  }
+}

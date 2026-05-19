@@ -1,0 +1,86 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "QueryInspectResponse",
+  "description": "Extended query response with debug information (when ?inspect=true)",
+  "type": "object",
+  "properties": {
+    "data": {
+      "type": "array",
+      "description": "Query result rows",
+      "items": {
+        "type": "object",
+        "additionalProperties": true
+      }
+    },
+    "meta": {
+      "type": "array",
+      "description": "Column metadata",
+      "items": {
+        "type": "object",
+        "additionalProperties": {
+          "type": "string"
+        }
+      }
+    },
+    "rows": {
+      "type": "integer",
+      "description": "Row count"
+    },
+    "statistics": {
+      "$ref": "#/definitions/Statistics"
+    },
+    "inspect": {
+      "$ref": "#/definitions/InspectInfo"
+    }
+  },
+  "required": ["data", "meta", "rows", "statistics", "inspect"],
+  "additionalProperties": false,
+  "definitions": {
+    "Statistics": {
+      "type": "object",
+      "description": "Query execution statistics",
+      "properties": {
+        "elapsed": {
+          "type": "number",
+          "description": "Execution time in seconds"
+        }
+      },
+      "required": ["elapsed"],
+      "additionalProperties": false
+    },
+    "InspectInfo": {
+      "type": "object",
+      "description": "Additional debug information for query inspection",
+      "properties": {
+        "rawQuery": {
+          "type": "string",
+          "description": "Template query (with {{variables}})"
+        },
+        "executedQuery": {
+          "type": "string",
+          "description": "Actual executed query (variables substituted)"
+        },
+        "variables": {
+          "type": "object",
+          "description": "Variable values used in substitution",
+          "additionalProperties": true
+        },
+        "datasourceName": {
+          "type": "string",
+          "description": "Datasource name"
+        },
+        "timestamp": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Query execution timestamp (ISO 8601)"
+        },
+        "error": {
+          "type": "string",
+          "description": "Error message if query failed"
+        }
+      },
+      "required": ["rawQuery", "executedQuery", "variables", "datasourceName", "timestamp"],
+      "additionalProperties": false
+    }
+  }
+}
