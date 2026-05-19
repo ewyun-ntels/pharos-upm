@@ -55,7 +55,7 @@ export function QueryAlertRuleEditor({
       datasource: initialData?.datasource || '',
       datasource_query: initialData?.datasource_query || {
         query: '',
-        time_label: 'time',
+        time_label: 'timestamp',
         variable_label: 'value',
       },
       evaluation_interval: initialData?.evaluation_interval || '@every 30s',
@@ -159,7 +159,7 @@ export function QueryAlertRuleEditor({
               <Input
                 id="time_label"
                 {...register('datasource_query.time_label')}
-                placeholder="time"
+                placeholder="timestamp"
               />
               {errors.datasource_query?.time_label && (
                 <p className="text-sm text-red-500 mt-1">

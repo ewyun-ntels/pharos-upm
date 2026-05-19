@@ -20,14 +20,17 @@ func ParseRow(row map[string]any, timeLabel, variableLabel string) (time.Time, f
 	}
 
 	var ts time.Time
-	if timeStr, ok := timeRaw.(string); ok {
-		parsedTime, err := time.Parse(time.DateTime, timeStr)
+	switch v := timeRaw.(type) {
+	case time.Time:
+		ts = v
+	case string:
+		parsedTime, err := time.Parse(time.DateTime, v)
 		if err != nil {
 			return time.Time{}, 0, nil, fmt.Errorf("invalid time format: %w", err)
 		}
 		ts = parsedTime
-	} else {
-		return time.Time{}, 0, nil, errors.New("time label is not a string")
+	default:
+		return time.Time{}, 0, nil, fmt.Errorf("time label has unsupported type: %T", v)
 	}
 
 	// Parse value
@@ -36,13 +39,23 @@ func ParseRow(row map[string]any, timeLabel, variableLabel string) (time.Time, f
 		return time.Time{}, 0, nil, errors.New("missing variable label")
 	}
 
-	varStr, ok := varRaw.(string)
-	if !ok {
-		return time.Time{}, 0, nil, errors.New("variable label is not a string")
-	}
-	decVal, err := strconv.ParseFloat(varStr, 64)
-	if err != nil {
-		return time.Time{}, 0, nil, fmt.Errorf("failed to parse float: %w", err)
+	var decVal float64
+	switch v := varRaw.(type) {
+	case float64:
+		decVal = v
+	case string:
+		parsed, err := strconv.ParseFloat(v, 64)
+		if err != nil {
+			return time.Time{}, 0, nil, fmt.Errorf("failed to parse float: %w", err)
+		}
+		decVal = parsed
+	default:
+		// model.SampleValue and other numeric types
+		parsed, err := strconv.ParseFloat(fmt.Sprint(v), 64)
+		if err != nil {
+			return time.Time{}, 0, nil, fmt.Errorf("variable label has unsupported type %T: %w", v, err)
+		}
+		decVal = parsed
 	}
 
 	// Base labels from row (pre-size capacity to reduce reallocations)

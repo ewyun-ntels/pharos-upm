@@ -3,6 +3,8 @@ import {TableTabsTemplate, Tab, Tabs} from '@pharos/shared/components/template/t
 import {PageBreadcrumb} from '@components/breadcrumb';
 import {DataGrid} from '@pharos/shared/components/ui-extension/data-grid/DataGrid';
 import {useAlertRuleList, useAlertHistoryList} from '../../hooks';
+import {useDelete} from '@/lib/data-provider';
+import {ALERT_RESOURCES, ALERT_PROVIDER_NAME} from '@providers/alert-provider/types';
 import {ColumnDef} from '@tanstack/react-table';
 import type {AlertRule, AlertValue} from '@pharos/shared/types/alert';
 import {Badge, Button} from '@pharos/shared/components/ui';
@@ -14,7 +16,7 @@ import {formatDateTime, formatDateTimeShort} from '@lib/format-date';
 /**
  * Alert Rule Table Columns
  */
-const getAlertRuleColumns = (navigate: NavigateFunction): ColumnDef<AlertRule>[] => [
+const getAlertRuleColumns = (navigate: NavigateFunction, onDelete: (id: string) => void): ColumnDef<AlertRule>[] => [
   {
     accessorKey: 'rule.name',
     accessorFn: (row) => {
@@ -108,7 +110,9 @@ const getAlertRuleColumns = (navigate: NavigateFunction): ColumnDef<AlertRule>[]
             variant="ghost"
             size="icon-xs"
             onClick={() => {
-              // TODO: Delete confirmation dialog
+              if (window.confirm(`Delete rule "${rule?.name}"?`)) {
+                onDelete(ruleId);
+              }
             }}
             icon={<Trash2 />}
             disabled={!ruleId}
@@ -200,14 +204,23 @@ function AlertRulesTab() {
     pagination: {currentPage: 1, pageSize: 50},
   });
 
+  const {mutate: deleteRule} = useDelete();
+
   const handleCreateNew = () => {
     navigate('/alert/edit');
+  };
+
+  const handleDelete = (ruleId: string) => {
+    deleteRule(
+      {resource: ALERT_RESOURCES.RULE, id: ruleId, meta: {dataProviderName: ALERT_PROVIDER_NAME}},
+      {onSuccess: () => refetchRules()},
+    );
   };
 
   return (
     <DataGrid
       data={rulesData?.data || []}
-      columns={getAlertRuleColumns(navigate)}
+      columns={getAlertRuleColumns(navigate, handleDelete)}
       tableKey="alert-rules-table"
       searchableColumns={['rule.name', 'rule.datasource']}
       useTableSorting={true}

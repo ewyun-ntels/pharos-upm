@@ -26,6 +26,9 @@ func (r *Rule) BuildFromDb(m *model.Rule, v []common.Value) error {
 		return err
 	}
 
+	// Always override with DB primary key so frontend can reliably use rule.id
+	rule["id"] = m.ID
+
 	r.AlertType = common.Type(m.AlertType)
 	r.Rule = rule
 	r.Status = v

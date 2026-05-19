@@ -26,6 +26,7 @@ const HomePage = React.lazy(() => import('@/routes/home/page'));
 const LoginPage = React.lazy(() => import('@/routes/login/page'));
 const DashboardsPage = React.lazy(() => import('@/routes/dashboards/page'));
 const AlertPage = React.lazy(() => import('@/routes/alert/page'));
+const AlertRuleEditPage = React.lazy(() => import('@/routes/alert/edit/page'));
 const NotificationPage = React.lazy(() => import('@/routes/notification/page'));
 const UsersPage = React.lazy(() => import('@/routes/users/page'));
 const UserEditPage = React.lazy(() => import('@/routes/users/edit/page'));
@@ -48,6 +49,7 @@ function App() {
               <Route path="/" element={<Navigate to="/home" replace />} />
               <Route path="/home" element={<HomePage />} />
               <Route path="/dashboards/*" element={<DashboardsPage />} />
+              <Route path="/alert/edit" element={<AlertRuleEditPage />} />
               <Route path="/alert/*" element={<AlertPage />} />
               <Route path="/notification/*" element={<NotificationPage />} />
               <Route path="/users/edit" element={<UserEditPage />} />
