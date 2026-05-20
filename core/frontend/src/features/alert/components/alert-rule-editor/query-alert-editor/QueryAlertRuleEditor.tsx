@@ -53,14 +53,24 @@ export function QueryAlertRuleEditor({
       alert_type: 'query',
       name: initialData?.name || '',
       datasource: initialData?.datasource || '',
-      datasource_query: initialData?.datasource_query || {
-        query: '',
-        time_label: 'time',
-        variable_label: 'value',
+      datasource_query: {
+        query: initialData?.datasource_query?.query ?? '',
+        time_label: initialData?.datasource_query?.time_label ?? 'timestamp',
+        variable_label: initialData?.datasource_query?.variable_label ?? 'value',
+        ...(initialData?.datasource_query?.variables != null
+          ? { variables: initialData.datasource_query.variables }
+          : {}),
       },
       evaluation_interval: initialData?.evaluation_interval || '@every 30s',
       check_type: initialData?.check_type || 'last',
-      threshold: initialData?.threshold || [],
+      threshold: ((initialData?.threshold ?? []) as any[]).map((t) => ({
+        id: t.id,
+        condition: t.condition,
+        start_value: t.start_value ?? 0,
+        severity: t.severity,
+        ...(t.end_value != null ? { end_value: t.end_value } : {}),
+        ...(t.labels != null ? { labels: t.labels } : {}),
+      })),
       notifications: initialData?.notifications || [],
       description: initialData?.description || '',
     },
@@ -159,7 +169,7 @@ export function QueryAlertRuleEditor({
               <Input
                 id="time_label"
                 {...register('datasource_query.time_label')}
-                placeholder="time"
+                placeholder="timestamp"
               />
               {errors.datasource_query?.time_label && (
                 <p className="text-sm text-red-500 mt-1">

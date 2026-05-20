@@ -23,7 +23,7 @@
         {"extension": "core", "name": "dashboard", "display_name": "Dashboard"},
         {"extension": "core", "name": "users", "display_name": "Users"},
         {"extension": "core", "name": "alert", "display_name": "Alert"},
-        {"extension": "core", "name": "notification", "display_name": "Notification"},
+        {"extension": "core", "name": "notification", "display_name": "Notification", "hidden": true},
         {
           "extension": "core",
           "name": "settings",

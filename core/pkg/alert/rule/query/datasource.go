@@ -7,7 +7,7 @@ import (
 )
 
 type Datasource struct {
-	Variables     map[string]any `json:"variables" mapstructure:"variables"`
+	Variables     map[string]any `json:"variables,omitempty" mapstructure:"variables"`
 	Query         string         `json:"query" mapstructure:"query"`
 	TimeLabel     string         `json:"time_label" mapstructure:"time_label"`
 	VariableLabel string         `json:"variable_label" mapstructure:"variable_label"`

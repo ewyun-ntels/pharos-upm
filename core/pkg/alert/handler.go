@@ -747,6 +747,7 @@ type HistoryRow struct {
 	Description      string       `db:"description"`
 	Value            float64      `db:"value"`
 	Severity         string       `db:"severity"`
+	Status           string       `db:"status"`
 	PreviousSeverity string       `db:"previous_severity"`
 	PreviousValue    *float64     `db:"previous_value"`
 	Labels           string       `db:"labels"`
@@ -810,7 +811,7 @@ func queryHistoryFromDB(statsDB *orm.DatabaseConfig, params *HistoryQueryParams)
 
 	err := orm.StatisticsHandler("", statsDB, func(db *sqlx.DB) error {
 		query := `SELECT timestamp, id, alert_id, name, alert_type, description, value, 
-		          severity, previous_severity, previous_value, labels FROM history_alert`
+		          severity, status, previous_severity, previous_value, labels FROM history_alert`
 
 		// ClickHouse만 FINAL 절 추가
 		if statsDB.Driver == orm.DriverClickHouse {
@@ -865,6 +866,7 @@ func queryHistoryFromDB(statsDB *orm.DatabaseConfig, params *HistoryQueryParams)
 				Value:            row.Value,
 				Description:      row.Description,
 				Severity:         row.Severity,
+				Status:           row.Status,
 				PreviousSeverity: row.PreviousSeverity,
 				PreviousValue:    row.PreviousValue,
 				StringLabels:     row.Labels,

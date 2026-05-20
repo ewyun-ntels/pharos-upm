@@ -35,11 +35,9 @@ export function useAlertRule({id, enabled = true}: UseAlertRuleOptions): UseAler
   const {query: {data: rawData, isLoading, isError, error}} = useOne({
     resource: ALERT_RESOURCES.RULE,
     id: id || '',
+    dataProviderName: ALERT_PROVIDER_NAME,
     queryOptions: {
       enabled: enabled && !!id,
-    },
-    meta: {
-      dataProviderName: ALERT_PROVIDER_NAME,
     },
   });
 

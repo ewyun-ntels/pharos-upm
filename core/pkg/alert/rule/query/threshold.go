@@ -26,7 +26,7 @@ type Threshold struct {
 	StartValue float64           `mapstructure:"start_value" json:"start_value"`
 	EndValue   float64           `mapstructure:"end_value" json:"end_value"`
 	Severity   string            `mapstructure:"severity" json:"severity"`
-	Labels     map[string]string `mapstructure:"labels" json:"labels"`
+	Labels     map[string]string `mapstructure:"labels" json:"labels,omitempty"`
 }
 
 func (t *Threshold) Validate() error {

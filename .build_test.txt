@@ -863,3 +863,140 @@ __end_time
 2. `shared/frontend/src/lib/timestamp.ts`에서 명시적 timezone offset 감지 로직 추가.
 3. TCP Bridge 대시보드에서 최근 1시간 범위로 Grafana와 PHAROS 시간축 비교.
 4. 범례 클릭 전/후 데이터 표시와 timestamp tooltip 시간이 모두 맞는지 확인.
+
+---
+
+## 20. Alert 기능 버그 수정 (2026-05-19)
+
+### 20-1. Alert 룰 편집(Edit) 페이지 라우트 누락 수정
+
+파일: core/frontend/src/App.tsx
+
+문제: Create Alert Rule / Edit 버튼 클릭 시 /alert/edit 라우트가 없어서
+      /alert/* 가 가로채어 목록 페이지가 그대로 표시됨
+
+수정: AlertRuleEditPage 컴포넌트 import 및 라우트 추가
+      <Route path="/alert/edit" element={<AlertRuleEditPage />} />  ← 신규 (기존 /alert/* 앞에 위치)
+
+테스트: Create Alert Rule 버튼 → 폼 진입, Edit 버튼 → 편집 폼 진입 확인
+
+---
+
+### 20-2. Alert 룰 Edit API 미호출 버그 수정
+
+파일: core/frontend/src/features/alert/hooks/useAlertRule.ts
+
+문제: useOne 호출 시 dataProviderName을 meta 안에 전달
+      → useOne은 top-level prop으로만 읽으므로 default provider 사용
+      → 잘못된 API 호출 → 실패 → React Query 에러 캐시
+      → 이후 동일 ID에 대해 API 요청 자체를 보내지 않음
+      → 로그에 GET /alert/rule/:id 흔적 없음, "Alert rule not found" 표시
+
+수정:
+  변경 전: meta: { dataProviderName: ALERT_PROVIDER_NAME }
+  변경 후: dataProviderName: ALERT_PROVIDER_NAME  (useOne top-level prop)
+
+테스트: Edit 클릭 시 백엔드 로그에 GET /alert/rule/:id status=200 확인
+
+---
+
+### 20-3. Alert 룰 목록 응답의 rule.id 보장
+
+파일: core/pkg/alert/resources/resources.go (BuildFromDb 함수)
+
+문제: rule JSON 파싱 결과를 그대로 반환
+      → rule JSON 내부의 id와 DB alert_rule.id가 불일치 가능
+      → 프론트엔드에서 잘못된 id로 GET /alert/rule/:id 호출 → 404
+
+수정: BuildFromDb에서 rule["id"] = m.ID 로 DB primary key를 항상 명시적으로 설정
+
+테스트: 목록 API 응답 rule.id === DB alert_rule.id 일치 확인
+
+---
+
+### 20-4. Alert 룰 삭제 버튼 구현
+
+파일: core/frontend/src/features/alert/components/alert-table-tabs/AlertTableTabs.tsx
+
+문제: 삭제 버튼 onClick이 // TODO 미구현 상태
+
+수정:
+  - useDelete 훅 + ALERT_RESOURCES/ALERT_PROVIDER_NAME import 추가
+  - handleDelete(ruleId) 구현: window.confirm → DELETE /alert/rule/:id → 목록 갱신
+  - getAlertRuleColumns 시그니처에 onDelete 콜백 추가
+
+테스트: 삭제 버튼 클릭 → confirm → DELETE /alert/rule/:id status=200 → 목록에서 제거 확인
+
+---
+
+### 20-5. Prometheus 쿼리 결과 타입 파싱 버그 수정
+
+파일: core/pkg/alert/rule/query/parser.go (ParseRow 함수)
+
+문제: timestamp와 value 컬럼을 string 타입만 처리
+      Prometheus 응답 실제 타입:
+        - timestamp 컬럼: time.Time (Go 네이티브 타입)
+        - value 컬럼: model.SampleValue (float64 alias)
+      → "time label is not a string" 에러 반복 발생
+
+수정:
+  - timestamp: type switch로 time.Time 직접 처리 추가, string은 기존 파싱 유지
+  - value: float64 직접 처리 추가, string은 ParseFloat 유지, 기타 타입은 fmt.Sprint fallback
+
+테스트:
+  - Prometheus datasource Query Alert 룰 cron 실행 시 에러 없음
+  - "time label is not a string" 로그 미발생 확인
+
+---
+
+### 20-6. Query Alert Time Label 기본값 수정
+
+파일: core/frontend/src/features/alert/components/alert-rule-editor/
+      query-alert-editor/QueryAlertRuleEditor.tsx
+
+문제: Time Label 기본값이 'time' → Prometheus 실제 컬럼명은 'timestamp'
+      → 신규 룰 생성마다 수동 수정 필요
+
+수정:
+  - defaultValues.datasource_query.time_label: 'time' → 'timestamp'
+  - Input placeholder: 'time' → 'timestamp'
+
+테스트: 신규 Query Alert 룰 폼에서 Time Label 기본값이 'timestamp'인지 확인
+
+---
+
+### 빌드 대상 (20번 변경사항)
+
+백엔드 (재빌드 + 재시작 필요):
+  core/pkg/alert/resources/resources.go   (20-3)
+  core/pkg/alert/rule/query/parser.go     (20-5)
+
+프론트엔드 (재빌드 필요):
+  core/frontend/src/App.tsx                                              (20-1)
+  core/frontend/src/features/alert/hooks/useAlertRule.ts                 (20-2)
+  core/frontend/src/features/alert/components/alert-table-tabs/          (20-4)
+  core/frontend/src/features/alert/components/alert-rule-editor/.../     (20-6)
+
+---
+
+## 21. Multi-instance 운영 검토 메모 추가 (2026-05-19)
+
+### 파일
+- `.multi-instance-test.txt`
+
+### 정리 내용
+- PHAROS를 여러 인스턴스로 띄울 때의 고려사항을 정리.
+- NGINX sticky session으로 완화 가능한 부분과 한계를 분리.
+- Alert rule이 DB에는 공유되지만 각 인스턴스 local cron에 등록되는 구조라 중복 실행 가능성이 있음을 명시.
+- Notification을 제외하더라도 history/websocket/query 부하/runtime rule 변경 전파 이슈가 남을 수 있음을 정리.
+- 현재 우선안으로 `sticky + polling fallback`을 정리.
+
+### 주요 결론
+- Sticky는 사용자 세션/refresh token/websocket 연결 안정화에는 도움이 됨.
+- Sticky만으로는 Alert cron 중복 실행이나 cross-instance websocket event 전달 문제를 해결하지 못함.
+- Websocket은 best-effort로 두고 Alert UI에서 `/alert/status`, `/alert/rule?detail=true`, `/alert/hist` 등을 주기적으로 polling하는 fallback이 필요.
+- 운영 안정화를 위해 이후 단계에서 periodic DB rule sync와 rule-level DB lease를 추가하는 방향을 권장.
+
+### 테스트/검증 메모
+- 이번 변경은 코드 동작 수정이 아니라 운영 검토 문서 추가.
+- 별도 빌드/테스트는 수행하지 않음.
