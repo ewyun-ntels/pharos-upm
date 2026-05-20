@@ -1,6 +1,7 @@
 import { useList, useInfiniteList, type HttpError } from '@/lib/data-provider';
 import { ALERT_RESOURCES, ALERT_PROVIDER_NAME } from '@providers/alert-provider';
 import type { AlertRule, AlertValue } from '@pharos/shared/types/alert';
+import type { UseQueryOptions } from '@tanstack/react-query';
 
 /**
  * Alert Rule 목록 조회 Hook
@@ -16,6 +17,7 @@ export function useAlertRuleList(config?: {
   pagination?: { currentPage: number; pageSize: number };
   sorters?: any[];
   meta?: Record<string, any>;
+  queryOptions?: Omit<UseQueryOptions<any, HttpError>, 'queryKey' | 'queryFn'>;
 }) {
   return useList<AlertRule, HttpError>({
     resource: ALERT_RESOURCES.RULE,
@@ -27,6 +29,7 @@ export function useAlertRuleList(config?: {
       ...config?.meta,
       detail: true, // Alert rules에는 detail이 있음
     },
+    queryOptions: config?.queryOptions,
   });
 }
 
@@ -45,6 +48,7 @@ export function useAlertStatusList(config?: {
   filters?: any[];
   pagination?: { currentPage: number; pageSize: number };
   sorters?: any[];
+  queryOptions?: Omit<UseQueryOptions<any, HttpError>, 'queryKey' | 'queryFn'>;
 }) {
   return useList<AlertValue, HttpError>({
     resource: ALERT_RESOURCES.STATUS,
@@ -52,6 +56,7 @@ export function useAlertStatusList(config?: {
     filters: config?.filters,
     pagination: config?.pagination || { currentPage: 1, pageSize: 20, mode: 'server' },
     sorters: config?.sorters,
+    queryOptions: config?.queryOptions,
   });
 }
 
@@ -76,6 +81,7 @@ export function useAlertHistoryList(params?: {
   startTime?: Date;
   endTime?: Date;
   count?: number;
+  queryOptions?: Omit<UseQueryOptions<any, HttpError>, 'queryKey' | 'queryFn'>;
 }) {
   // 현재는 일반 useList 사용 (페이징 미지원)
   return useList<AlertValue, HttpError>({
@@ -92,6 +98,7 @@ export function useAlertHistoryList(params?: {
       pageSize: params?.count || 100,
       mode: 'server',
     },
+    queryOptions: params?.queryOptions,
   });
 }
 

@@ -73,6 +73,25 @@ func (c *Cron) RemoveJob(id string) error {
 	return nil
 }
 
+func (c *Cron) HasJob(id string) bool {
+	c.mutex.Lock()
+	defer c.mutex.Unlock()
+
+	_, ok := c.Jobs[id]
+	return ok
+}
+
+func (c *Cron) JobIDs() []string {
+	c.mutex.Lock()
+	defer c.mutex.Unlock()
+
+	ids := make([]string, 0, len(c.Jobs))
+	for id := range c.Jobs {
+		ids = append(ids, id)
+	}
+	return ids
+}
+
 func (c *Cron) RescheduleJob(id string, spec string) error {
 	c.mutex.Lock()
 	defer c.mutex.Unlock()

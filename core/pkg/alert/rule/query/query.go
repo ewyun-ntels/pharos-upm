@@ -5,10 +5,12 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"strings"
 	"time"
 
 	"github.com/go-viper/mapstructure/v2"
 	"github.com/google/uuid"
+	"github.com/robfig/cron/v3"
 	"ntels.com/pharos/core/external/orm"
 	alert_common "ntels.com/pharos/core/pkg/alert/common"
 	"ntels.com/pharos/core/pkg/alert/model"
@@ -50,6 +52,37 @@ func (r *Rule) Normalize() error {
 // SetConfig allows external packages (e.g., tests) to set the rule's configuration safely.
 func (r *Rule) SetConfig(cfg common.Config) {
 	r.config = cfg
+}
+
+func evaluationIntervalSeconds(spec string) int64 {
+	spec = strings.TrimSpace(spec)
+	if spec == "" {
+		return 0
+	}
+
+	durationSpec := spec
+	if strings.HasPrefix(spec, "@every ") {
+		durationSpec = strings.TrimSpace(strings.TrimPrefix(spec, "@every "))
+	}
+	if d, err := time.ParseDuration(durationSpec); err == nil && d > 0 {
+		return int64(d.Seconds())
+	}
+
+	parser := cron.NewParser(cron.SecondOptional | cron.Minute | cron.Hour | cron.Dom | cron.Month | cron.Dow | cron.Descriptor)
+	schedule, err := parser.Parse(spec)
+	if err != nil {
+		slog.Warn("failed to parse evaluation interval for history dedup", "spec", spec, "error", err)
+		return 0
+	}
+
+	now := time.Now()
+	next := schedule.Next(now)
+	afterNext := schedule.Next(next)
+	interval := afterNext.Sub(next)
+	if interval <= 0 {
+		return 0
+	}
+	return int64(interval.Seconds())
 }
 
 func (r *Rule) Load(config common.Config, data map[string]any) error {
@@ -335,7 +368,10 @@ func (r *Rule) AlertCheck(data *orm.DatabaseResponse) error {
 	h := rule_common.History{
 		Config: r.config,
 	}
-	if err = h.Send(notifyAlerts, alert_common.StatusChangeReasonAuto, nil); err != nil {
+	dedup := &rule_common.HistoryDedup{
+		EvaluationIntervalSeconds: evaluationIntervalSeconds(r.EvaluationInterval),
+	}
+	if err = h.Send(notifyAlerts, alert_common.StatusChangeReasonAuto, nil, dedup); err != nil {
 		slog.Error("history.Send failed", append([]any{slog.Any("error", err)}, AttrsToArgs(LogAttrs(r.Name, nil, nil))...)...)
 	}
 
@@ -411,7 +447,7 @@ func (r *Rule) Run(_ context.Context) error {
 func (r *Rule) Destroy() error {
 	err := rule_common.CronInstance.RemoveJob(r.Id)
 	if err != nil {
-		return err
+		slog.Warn("cron remove job failed", "id", r.Id, "error", err)
 	}
 
 	return nil

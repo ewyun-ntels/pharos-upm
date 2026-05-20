@@ -74,7 +74,8 @@ func prepareAlertHistoryTables(t *testing.T, cfg *pkgcommon.Config) {
 			start_timestamp DATETIME,
 			status_change_reason TEXT,
 			status_changed_by TEXT,
-			mask BOOLEAN
+			mask BOOLEAN,
+			evaluation_epoch BIGINT
 		)`)
 		return err
 	}))
@@ -237,6 +238,48 @@ func TestHistory_Send_SQLite_UpsertByIDVersion(t *testing.T) {
 		assert.Equal(t, "second", got.Description)
 		assert.Equal(t, SeverityMajor, got.Severity)
 		assert.Equal(t, 2.0, got.Value)
+		return nil
+	}))
+}
+
+func TestHistory_Send_SQLite_DeduplicatesAutoRowsByEvaluationEpoch(t *testing.T) {
+	cfg, _ := createStatsSQLiteConfig(t)
+	prepareAlertHistoryTables(t, &cfg)
+	h := History{Config: cfg}
+
+	require.NoError(t, orm.StatisticsHandler(orm.DriverDefault, &cfg.Statistics.Database, func(db *sqlx.DB) error {
+		_, err := db.Exec(`CREATE UNIQUE INDEX IF NOT EXISTS ux_history_alert_row_auto_epoch
+			ON history_alert_row (id, status, severity, evaluation_epoch)
+			WHERE evaluation_epoch IS NOT NULL AND status_change_reason = 'auto'`)
+		return err
+	}))
+
+	checkTime := time.Unix(120, 0).UTC()
+	v := alertcommon.Value{
+		Id:           "same-alert",
+		Name:         "rule",
+		Description:  "dedup",
+		AlertId:      "aid-dedup",
+		AlertType:    string(alertcommon.TypeQuery),
+		Value:        1,
+		Severity:     SeverityMinor,
+		Status:       alertcommon.StatusAlerting,
+		Timestamp:    checkTime.Add(3 * time.Second),
+		CheckTime:    &checkTime,
+		UpdatedAt:    checkTime,
+		StringLabels: `{"k":"v"}`,
+	}
+	dedup := &HistoryDedup{EvaluationIntervalSeconds: 60}
+
+	require.NoError(t, h.Send([]alertcommon.Value{v}, alertcommon.StatusChangeReasonAuto, nil, dedup))
+	require.NoError(t, h.Send([]alertcommon.Value{v}, alertcommon.StatusChangeReasonAuto, nil, dedup))
+
+	require.NoError(t, orm.StatisticsHandler(orm.DriverDefault, &cfg.Statistics.Database, func(db *sqlx.DB) error {
+		var cntRow int
+		if err := db.Get(&cntRow, "SELECT COUNT(*) FROM history_alert_row"); err != nil {
+			return err
+		}
+		assert.Equal(t, 1, cntRow)
 		return nil
 	}))
 }

@@ -112,6 +112,7 @@ func (a *Api) loadRules() error {
 			slog.Error("alert rule run failed", "error", err)
 			return err
 		}
+		ruleSchedulerVersions.Store(r.ID, r.UpdatedAt.Time)
 	}
 
 	return nil
