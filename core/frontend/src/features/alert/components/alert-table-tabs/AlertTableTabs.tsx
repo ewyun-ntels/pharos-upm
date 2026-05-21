@@ -2,16 +2,89 @@ import React from 'react';
 import {TableTabsTemplate, Tab, Tabs} from '@pharos/shared/components/template/table-tabs';
 import {PageBreadcrumb} from '@components/breadcrumb';
 import {DataGrid} from '@pharos/shared/components/ui-extension/data-grid/DataGrid';
-import {useAlertRuleList, useAlertHistoryList} from '../../hooks';
+import {useAlertRuleList, useAlertHistoryList, useAlertStatusList} from '../../hooks';
 import {useDelete} from '@/lib/data-provider';
 import {ALERT_RESOURCES, ALERT_PROVIDER_NAME} from '@providers/alert-provider/types';
 import {ColumnDef} from '@tanstack/react-table';
 import type {AlertRule, AlertValue} from '@pharos/shared/types/alert';
-import {Badge, Button} from '@pharos/shared/components/ui';
-import {AlertCircle, Clock, CheckCircle2, Plus, Edit, Trash2} from 'lucide-react';
+import {
+  Badge,
+  Button,
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@pharos/shared/components/ui';
+import {AlertCircle, Clock, CheckCircle2, Plus, Edit, Trash2, RefreshCcw} from 'lucide-react';
 import {useNavigate, NavigateFunction} from 'react-router-dom';
 import {IconButton} from '@shared/frontend/components/ui-extension/icon-button';
 import {formatDateTime, formatDateTimeShort} from '@lib/format-date';
+
+type AlertRefreshValue = 'off' | '5s' | '30s' | '1m' | '5m';
+type AlertRefetchInterval = number | false;
+
+const ALERT_REFRESH_DEFAULT: AlertRefreshValue = '30s';
+const ALERT_REFRESH_STORAGE_KEY = 'pharos.alert.refreshInterval';
+const ALERT_REFRESH_OPTIONS: Array<{
+  label: string;
+  value: AlertRefreshValue;
+  interval: AlertRefetchInterval;
+}> = [
+  {label: 'Off', value: 'off', interval: false},
+  {label: '5s', value: '5s', interval: 5_000},
+  {label: '30s', value: '30s', interval: 30_000},
+  {label: '1m', value: '1m', interval: 60_000},
+  {label: '5m', value: '5m', interval: 300_000},
+];
+
+const getAlertRefreshInterval = (value: AlertRefreshValue): AlertRefetchInterval =>
+  ALERT_REFRESH_OPTIONS.find((option) => option.value === value)?.interval ?? false;
+
+const isAlertRefreshValue = (value: string | null): value is AlertRefreshValue =>
+  ALERT_REFRESH_OPTIONS.some((option) => option.value === value);
+
+const getStoredAlertRefreshValue = (): AlertRefreshValue => {
+  if (typeof window === 'undefined') return ALERT_REFRESH_DEFAULT;
+
+  const storedValue = window.localStorage.getItem(ALERT_REFRESH_STORAGE_KEY);
+  return isAlertRefreshValue(storedValue) ? storedValue : ALERT_REFRESH_DEFAULT;
+};
+
+interface AlertRefreshControlsProps {
+  value: AlertRefreshValue;
+  onValueChange: (value: AlertRefreshValue) => void;
+  onRefresh: () => void;
+  isRefreshing?: boolean;
+}
+
+function AlertRefreshControls({
+  value,
+  onValueChange,
+  onRefresh,
+  isRefreshing,
+}: AlertRefreshControlsProps) {
+  return (
+    <div className="flex items-center gap-2">
+      <Select value={value} onValueChange={(nextValue) => onValueChange(nextValue as AlertRefreshValue)}>
+        <SelectTrigger className="h-9 w-[132px]">
+          <SelectValue />
+        </SelectTrigger>
+        <SelectContent>
+          {ALERT_REFRESH_OPTIONS.map((option) => (
+            <SelectItem key={option.value} value={option.value}>
+              {option.label}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+      <Button variant="outline" onClick={onRefresh} disabled={isRefreshing}>
+        <RefreshCcw className="h-4 w-4" />
+        Refresh
+      </Button>
+    </div>
+  );
+}
 
 /**
  * Alert Rule Table Columns
@@ -196,12 +269,27 @@ const alertHistoryColumns: ColumnDef<AlertValue>[] = [
 /**
  * Alert Rules Tab Component
  */
-function AlertRulesTab() {
+interface AlertTabProps {
+  refreshValue: AlertRefreshValue;
+  refreshInterval: AlertRefetchInterval;
+  onRefreshValueChange: (value: AlertRefreshValue) => void;
+  onRefreshStatus: () => void;
+}
+
+function AlertRulesTab({
+  refreshValue,
+  refreshInterval,
+  onRefreshValueChange,
+  onRefreshStatus,
+}: AlertTabProps) {
   const navigate = useNavigate();
   const {
     query: {data: rulesData, isLoading: rulesLoading, refetch: refetchRules},
   } = useAlertRuleList({
     pagination: {currentPage: 1, pageSize: 50},
+    queryOptions: {
+      refetchInterval: refreshInterval,
+    },
   });
 
   const {mutate: deleteRule} = useDelete();
@@ -213,8 +301,18 @@ function AlertRulesTab() {
   const handleDelete = (ruleId: string) => {
     deleteRule(
       {resource: ALERT_RESOURCES.RULE, id: ruleId, meta: {dataProviderName: ALERT_PROVIDER_NAME}},
-      {onSuccess: () => refetchRules()},
+      {
+        onSuccess: () => {
+          refetchRules();
+          onRefreshStatus();
+        },
+      },
     );
+  };
+
+  const handleRefresh = () => {
+    refetchRules();
+    onRefreshStatus();
   };
 
   return (
@@ -228,6 +326,13 @@ function AlertRulesTab() {
       onRefresh={refetchRules}
       isRefreshing={rulesLoading}
       rightFilters={() => [
+        <AlertRefreshControls
+          key="refresh"
+          value={refreshValue}
+          onValueChange={onRefreshValueChange}
+          onRefresh={handleRefresh}
+          isRefreshing={rulesLoading}
+        />,
         <Button onClick={handleCreateNew} key="create">
           <Plus className="h-4 w-4" />
           Create Alert Rule
@@ -241,12 +346,25 @@ function AlertRulesTab() {
 /**
  * Alert History Tab Component
  */
-function AlertHistoryTab() {
+function AlertHistoryTab({
+  refreshValue,
+  refreshInterval,
+  onRefreshValueChange,
+  onRefreshStatus,
+}: AlertTabProps) {
   const {
     query: {data: historyData, isLoading: historyLoading, refetch: refetchHistory},
   } = useAlertHistoryList({
     count: 100,
+    queryOptions: {
+      refetchInterval: refreshInterval,
+    },
   });
+
+  const handleRefresh = () => {
+    refetchHistory();
+    onRefreshStatus();
+  };
 
   return (
     <DataGrid
@@ -258,6 +376,15 @@ function AlertHistoryTab() {
       rowCursor={false}
       onRefresh={refetchHistory}
       isRefreshing={historyLoading}
+      rightFilters={() => [
+        <AlertRefreshControls
+          key="refresh"
+          value={refreshValue}
+          onValueChange={onRefreshValueChange}
+          onRefresh={handleRefresh}
+          isRefreshing={historyLoading}
+        />,
+      ]}
       emptyCustomMessage={
         historyLoading
           ? 'Loading alert history...'
@@ -273,6 +400,21 @@ function AlertHistoryTab() {
  * ⚠️ History 탭은 백엔드 페이징 지원 대기 중입니다.
  */
 export function AlertTableTabs() {
+  const [refreshValue, setRefreshValue] = React.useState<AlertRefreshValue>(getStoredAlertRefreshValue);
+  const refreshInterval = getAlertRefreshInterval(refreshValue);
+  const {
+    query: {refetch: refetchStatus},
+  } = useAlertStatusList({
+    pagination: {currentPage: 1, pageSize: 100},
+    queryOptions: {
+      refetchInterval: refreshInterval,
+    },
+  });
+
+  React.useEffect(() => {
+    window.localStorage.setItem(ALERT_REFRESH_STORAGE_KEY, refreshValue);
+  }, [refreshValue]);
+
   return (
     <TableTabsTemplate
       name="Alert Management"
@@ -282,13 +424,23 @@ export function AlertTableTabs() {
       <Tabs>
         <Tab name="Rules">
           <div className={'p-4'}>
-            <AlertRulesTab />
+            <AlertRulesTab
+              refreshValue={refreshValue}
+              refreshInterval={refreshInterval}
+              onRefreshValueChange={setRefreshValue}
+              onRefreshStatus={refetchStatus}
+            />
           </div>
         </Tab>
 
         <Tab name="History">
           <div className={'p-4'}>
-            <AlertHistoryTab />
+            <AlertHistoryTab
+              refreshValue={refreshValue}
+              refreshInterval={refreshInterval}
+              onRefreshValueChange={setRefreshValue}
+              onRefreshStatus={refetchStatus}
+            />
           </div>
         </Tab>
       </Tabs>

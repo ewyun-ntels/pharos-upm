@@ -102,7 +102,8 @@ func newTestDBConfig(t *testing.T) common.Config {
 				start_timestamp DATETIME,
 				status_change_reason TEXT,
 				status_changed_by TEXT,
-				mask BOOLEAN
+				mask BOOLEAN,
+				evaluation_epoch BIGINT
 			);`,
 		}
 		for _, s := range stmts {
@@ -358,6 +359,14 @@ func seedHistoryData(t *testing.T, cfg *common.Config) {
 				(timestamp, id, alert_id, name, alert_type, description, value, severity, previous_severity, previous_value, labels, status, previous_timestamp, version)
 				VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 			`, r.timestamp, r.id, r.alertId, r.name, r.alertType, r.description, r.value, r.severity, r.prevSeverity, r.prevValue, r.labels, "alerting", nil, r.timestamp)
+			if err != nil {
+				return err
+			}
+			_, err = db.Exec(`
+				INSERT INTO history_alert_row
+				(timestamp, id, alert_id, name, alert_type, description, value, severity, previous_severity, previous_value, labels, status, previous_timestamp, version, start_timestamp, status_change_reason, status_changed_by, mask, evaluation_epoch)
+				VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+			`, r.timestamp, r.id, r.alertId, r.name, r.alertType, r.description, r.value, r.severity, r.prevSeverity, r.prevValue, r.labels, "alerting", nil, r.timestamp, r.timestamp, "auto", nil, false, nil)
 			if err != nil {
 				return err
 			}

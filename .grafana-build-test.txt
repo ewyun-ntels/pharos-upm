@@ -1,0 +1,510 @@
+# Dashboard Query Build - Grafana vs Pharos 비교 및 멀티 스타일 설계
+
+작성일: 2026-05-21
+
+---
+
+## 1. 워크플로우 비교
+
+### 공통점
+- 대시보드에 쿼리(템플릿)를 등록
+- 변수(Variables)를 통해 동적으로 쿼리 값을 치환
+- 데이터소스 타입별로 쿼리 실행 방식이 다름
+
+### 핵심 차이: 치환 위치
+
+```
+[Grafana]
+  Frontend
+    └─ template_srv.ts → $variable, ${var:format}, [[var]] 치환
+         ↓ (치환 완료된 쿼리를 백엔드로 전송)
+  Backend
+    └─ 1단계: 글로벌 매크로 치환 ($__interval_ms, $__unixEpochFrom() 등)
+    └─ 2단계: 데이터소스별 매크로 치환 ($__timeFilter(col), $__table 등)
+    └─ 최종 쿼리 실행
+
+[Pharos]
+  Frontend
+    └─ 변수값(variables)만 백엔드로 전달 (쿼리 문자열은 템플릿 그대로)
+         ↓
+  Backend
+    └─ convertInternalContext() → __start_time, __end_time 등 시간 변수 변환
+    └─ pongo2.FromString() → {{ variable }} 치환
+    └─ 데이터소스 타입별 실행 (Prometheus / Elasticsearch / SQL)
+```
+
+---
+
+## 2. Grafana 변수 문법 (template_srv.ts)
+
+정규식: `/\$(\w+)|\[\[(\w+?)(?::(\w+))?\]\]|\${(\w+)(?:\.([^:^\}]+))?(?::([^\}]+))?}/g`
+
+| 문법 | 예시 | 설명 |
+|------|------|------|
+| `$varName` | `$host` | 단순 변수 |
+| `[[varName]]` | `[[host]]` | 레거시 문법 |
+| `${varName}` | `${host}` | 확장 문법 |
+| `${varName:format}` | `${hosts:csv}` | 포맷 지정 |
+
+포맷 종류: `csv`, `regex`, `json`, `text`, `glob` 등
+
+Grafana 특수 매크로 (백엔드 처리):
+- `$__interval` / `$__interval_ms` — 쿼리 인터벌
+- `$__timeFilter(column)` — WHERE 시간 조건 자동 생성
+- `$__unixEpochFrom()` / `$__unixEpochTo()` — Unix timestamp
+- `$__table` — 테이블명
+- `$__from` / `$__to` — 시간 범위
+
+---
+
+## 3. Pharos 현재 구조
+
+### 핵심 파일
+- `core/internal/query_builder/template.go` — pongo2 치환 로직
+- `core/internal/query_builder/query_spec.go` — QuerySpec 구조체
+- `core/pkg/dashboard/handler/query.go` — 쿼리 핸들러
+- `core/pkg/plugins/ds_query_response.go` — 데이터소스별 쿼리 실행
+
+### 치환 흐름 (template.go)
+```go
+func GetQuery(query string, queryContext map[string]any) ([]byte, error) {
+    convertContext, _ := convertInternalContext(queryContext)
+    // 특수 시간 변수 변환:
+    //   __start_time    → Unix timestamp (초)
+    //   __end_time      → Unix timestamp (초)
+    //   __start_time_ms → Unix timestamp (밀리초)
+    //   __end_time_ms   → Unix timestamp (밀리초)
+
+    tpl, _ := pongo2.FromString(query)
+    out, _ := tpl.Execute(convertContext)
+    return []byte(out), nil
+}
+```
+
+### 데이터소스 타입별 분기 (config.go)
+| 타입 | 처리 함수 |
+|------|----------|
+| Prometheus | `makeDatabaseResponseForPrometheus()` |
+| Elasticsearch | `makeDatabaseResponseForElasticsearch()` |
+| ClickHouse / PostgreSQL / Altibase / Vertica | `makeDatabaseResponseForSqlx()` |
+
+---
+
+## 4. 멀티 스타일 쿼리 빌더 설계
+
+### 목표
+쿼리 등록 시 템플릿 스타일을 지정해 빌드 방식을 분기한다.
+- `"pongo2"` 스타일: 현재 방식 유지 (`{{ variable }}`)
+- `"grafana"` 스타일: Grafana 문법 지원 (`$variable`, `${var:format}`)
+
+### 파일 구조 변경
+```
+core/internal/query_builder/
+  template.go      ← 기존 pongo2 로직 (유지)
+  grafana.go       ← 신규: Grafana 스타일 치환
+  builder.go       ← 신규: 스타일 디스패처
+  query_spec.go    ← Style 타입 추가
+```
+
+### builder.go (디스패처)
+```go
+type Style string
+
+const (
+    StylePongo2  Style = "pongo2"
+    StyleGrafana Style = "grafana"
+)
+
+func Build(style Style, query string, ctx map[string]any) ([]byte, error) {
+    switch style {
+    case StyleGrafana:
+        return buildGrafana(query, ctx)
+    default: // StylePongo2 또는 미지정
+        return GetQuery(query, ctx)
+    }
+}
+```
+
+### grafana.go (Grafana 스타일 치환)
+처리 대상:
+```
+$varName          → context["varName"] 값으로 치환
+${varName}        → 동일
+${varName:csv}    → 값이 배열일 경우 콤마 구분 문자열
+${varName:regex}  → regex-safe 이스케이프
+${varName:json}   → JSON 인코딩
+$__start_time     → __start_time 처리 (기존 로직 재사용)
+$__end_time       → __end_time 처리 (기존 로직 재사용)
+```
+
+### 변경 필요 파일
+1. `shared/types/dashboard/types.go`
+   - `ChartQuery` 구조체에 `TemplateStyle string` 필드 추가
+
+2. `core/pkg/dashboard/handler/query.go`
+   - `Run` 구조체에 `TemplateStyle string` 추가
+   - `getPostResponse()` 에서 `query_builder.GetQuery()` 대신 `query_builder.Build()` 호출
+
+3. `core/internal/query_builder/builder.go` (신규)
+   - Style 타입 및 Build() 함수
+
+4. `core/internal/query_builder/grafana.go` (신규)
+   - Grafana 문법 regex 치환 구현
+
+### 호출 예시 (변경 후 query.go)
+```go
+func (query *Query) getPostResponse(ctx context.Context) (int, orm.DatabaseResponse, error) {
+    style := query_builder.Style(query.Run.TemplateStyle)
+    sql, err := query_builder.Build(style, query.Run.Query, query.Variables)
+    // ...
+}
+```
+
+---
+
+## 5. 미결 사항 (구현 전 확인 필요)
+
+1. **스타일 저장 위치**
+   - ChartQuery(대시보드 설정에 영구 저장) — 권장
+   - 요청 바디에서 매번 전달 — 간단하지만 비일관적
+
+2. **Grafana 포맷 지원 범위**
+   - 단순 치환만 (`$var` → 값)
+   - 포맷팅 포함 (`${var:csv}`, `${var:regex}`, `${var:json}`)
+
+3. **default 스타일**
+   - 미지정 시 `pongo2`를 default로 유지 (하위 호환)
+
+---
+
+## 6. 리뷰 피드백 검토 및 추가 의견 (2차 보완 포함)
+
+### [검증 완료] High: TemplateStyle 전파 지점 부족
+
+코드를 직접 확인한 결과 지적이 정확합니다.
+
+**누락 지점 1 — panelToRun() (query.go:297-302)**
+```go
+// 현재: DatasourceName, Query만 복사
+query.Run.DatasourceName = chartQuery.DatasourceName
+query.Run.Query = chartQuery.Query
+// → TemplateStyle 복사 없음. 수정 필요.
+```
+
+**누락 지점 2 — getInspectResponse() (query.go:109)**
+```go
+// 현재
+executedSQL, err := query_builder.GetQuery(query.Run.Query, query.Variables)
+// → GetQuery() 직접 호출. Build()로 교체 필요.
+```
+
+`getPostResponse()`와 `getInspectResponse()` 모두 `Build()`로 교체하지 않으면
+inspect 결과와 실제 실행 결과가 다른 엔진으로 치환되어 디버깅 불일치가 발생합니다.
+
+---
+
+### [검증 완료] Medium: 타입 추가는 Go만으로 끝나지 않음 — 위험도 상향 권장
+
+설계서에서 `types.go`만 언급했지만 실제 수정 지점은 네 곳입니다.
+
+| 파일 | 역할 | 누락 시 증상 |
+|------|------|------------|
+| `shared/schema/dashboard/ChartQuery.schema` | JSON Schema (원본) | RJSF 폼에서 검증 오류 / quicktype 재생성 시 필드 누락 |
+| `shared/types/dashboard/types.go` | Go 구조체 (generated) | 백엔드 역직렬화 실패 |
+| `shared/frontend/src/types/dashboard/index.ts` | Zod Schema (generated) | Zod `z.object()` 파싱 시 unknown 키 silently strip |
+| `core/frontend/src/types/charts.ts` | 로컬 프론트 타입 | ChartQuery 확장 타입에서 필드 누락 |
+
+`types.go`와 `index.ts`는 generated 파일입니다. 직접 수정하면 다음 quicktype 재생성 시 덮어써집니다.
+반드시 `ChartQuery.schema` 수정 → quicktype 스크립트 실행 → 자동 재생성 순서로 진행해야 합니다.
+
+동작 차이:
+- `ChartQuery.schema`의 `additionalProperties: false` → RJSF 기반 폼에서 **검증 오류** 유발
+- Zod `z.object()` 기본 동작 → unknown 키를 **silently strip** (에러 없이 제거)
+
+두 경로 모두 `templateStyle`을 schema에 먼저 추가해야 막을 수 있습니다.
+
+**권장 조치:** `ChartQuery.schema` 수정 → quicktype 재생성을 가장 먼저 실행.
+
+---
+
+### [동의] High: Grafana 포맷 안전성
+
+`${var:sqlstring}` 미구현 시 아래와 같은 문제가 생깁니다.
+
+```sql
+-- 사용자 입력 예: $hostname = "server'; DROP TABLE metrics; --"
+-- 단순 치환 결과
+SELECT * FROM metrics WHERE host = 'server'; DROP TABLE metrics; --'
+```
+
+**구현 우선순위 (보안 중요도 기준):**
+
+| 포맷 | 출력 예시 (값: `["a","b"]`) | 용도 |
+|------|--------------------------|------|
+| (미지정, glob 기본값) | `{a,b}` | Grafana 기본값. multi-value는 `{a,b}` 형태로 출력해야 호환됨 |
+| `raw` | `a,b` | 변환 없음 |
+| `csv` | `a,b` | 콤마 구분, quoting 없음 |
+| `singlequote` | `'a','b'` | SQL IN 절 리터럴 |
+| `sqlstring` | `'a','b'` | SQL single quote escape (`a'b` → `'a''b'`) — **injection 방지 필수** |
+| `regex` | `(a|b)` | PromQL/regex 다중값. 값 내 메타문자 escape. 예: `(test\.|test2)` |
+| `json` | `["a","b"]` | Elasticsearch body |
+
+미구현 포맷을 요청하면 치환 없이 `${var:unknownformat}` 문자열이 그대로 남아
+쿼리 오류가 발생하도록 처리하는 것이 안전합니다 (조용히 무시하면 안 됨).
+
+---
+
+### [동의 + 범위 제안] Medium: 시간 변수 alias 정책
+
+Grafana의 `${__from}` / `${__to}` 는 밀리초 epoch이고,
+Pharos의 `__start_time` / `__end_time` 은 초 epoch입니다.
+단위가 다르므로 단순 alias는 오동작을 유발합니다.
+
+**권장 mapping:**
+
+| Grafana 변수 | Pharos 대응 | 단위 |
+|-------------|------------|------|
+| `$__from` / `${__from}` | `__start_time_ms` | 밀리초 |
+| `$__to` / `${__to}` | `__end_time_ms` | 밀리초 |
+| `${__from:date:seconds}` | `__start_time` | 초 |
+| `${__to:date:seconds}` | `__end_time` | 초 |
+| `$__interval_ms` | 미지원 (범위 외) | — |
+
+`convertInternalContext()`는 이미 `_ms` suffix 처리 로직이 있으므로
+Grafana 스타일 빌더에서 `__from` / `__to` 를 각각 `__start_time_ms` / `__end_time_ms`로
+rename 후 동일 함수에 넘기는 방식으로 재사용할 수 있습니다.
+
+---
+
+### [범위 제안] Medium: 데이터소스별 매크로 분리
+
+`$__timeFilter(column)` 같은 함수형 매크로는 첫 버전에서 제외를 권장합니다.
+
+**이유:**
+- 매크로가 생성하는 SQL은 데이터소스 방언에 따라 다릅니다.
+  - PostgreSQL: `"column" BETWEEN '...' AND '...'`
+  - ClickHouse: `column >= toDateTime(...) AND column <= toDateTime(...)`
+- 지원하려면 빌더가 타겟 데이터소스 타입을 알아야 하므로
+  현재 `Build(style, query, ctx)` 시그니처를 `Build(style, dsType, query, ctx)`로 확장해야 합니다.
+- 이 확장을 나중에 추가하더라도 기존 코드에 영향이 없도록
+  지금부터 `datasourceType` 파라미터를 optional로 받는 구조로 설계하는 것을 권장합니다.
+
+**현실적인 1차 범위:**
+```
+포함: $var, ${var}, [[var]], 포맷 7종 (glob기본값/raw/csv/singlequote/sqlstring/regex/json), 시간 변수 alias
+제외: $__timeFilter(), $__timeGroup(), $__table, $__interval
+```
+
+---
+
+---
+
+### [신규 High] 프론트엔드 Run 모드 전파 누락 — 코드 직접 확인
+
+백엔드 경로만 잡으면 반쪽입니다. editor/owner 실행 경로에서 `templateStyle`이 빠질 지점이 세 군데 있습니다.
+
+**누락 지점 1 — `useDashboardQuery.ts:73` `toChartQueryRequests()`**
+```typescript
+// 현재: templateStyle 누락
+return queries.map((q, idx) => ({
+  dashboardId,
+  queryName: `query-${idx}`,
+  label: q.label || '',
+  query: q.query || '',
+  datasourceName: q.datasourceName || '',
+  forceRefresh: q.forceRefresh,
+  // → templateStyle: q.templateStyle 없음
+}));
+```
+`ChartQuery`에 `templateStyle`을 추가해도 이 함수가 전파하지 않으면
+Run 모드 요청에 스타일이 실리지 않습니다.
+
+**누락 지점 2 — `dashboard-provider/index.ts` Run 모드 body (2곳)**
+
+timeseries 경로 (`index.ts:73`):
+```typescript
+// 현재
+const body = id && kind && !query
+  ? { panel: { kind, id }, variables }
+  : { run: { datasourceName: datasourceName || '', query: query || '' }, variables };
+// → templateStyle 없음
+```
+
+raw 경로 (`index.ts:207`):
+```typescript
+// 현재
+body = { run: { datasourceName: datasourceName || '', query: query || '' }, variables };
+// → templateStyle 없음
+```
+
+두 경로 모두 `run.templateStyle`을 추가해야 합니다.
+저장된 패널 실행(Panel 모드, `kind + id`)은 백엔드 `panelToRun()`이 처리하므로
+Run 모드(직접 실행) 경로만 수정 대상입니다.
+
+**누락 지점 3 — `use-query-inspector.ts:80` Inspector 요청**
+```typescript
+// 현재
+...(datasourceName && query ? { datasourceName, query } : {})
+// → templateStyle 없음
+```
+Inspector가 다른 스타일로 치환하면 `rawQuery` ↔ `executedQuery` 비교 자체가 무의미해집니다.
+
+---
+
+### [신규 High] 패널 에디터가 templateStyle을 날릴 위험 — 코드 직접 확인
+
+**누락 지점 1 — `chart-editor-layout.tsx:60-66` hash 비교**
+```typescript
+// 현재: 3개 필드만 포함
+return JSON.stringify(
+  chartQueries.map((q) => ({
+    datasourceName: q.datasourceName,
+    query: q.query,
+    label: q.label,
+    // → templateStyle 없음
+  }))
+);
+```
+`templateStyle`만 바뀌어도 hash가 동일하게 계산되어
+`useEffect`가 실행되지 않고 로컬 state가 갱신되지 않습니다.
+
+**누락 지점 2 — `chart-editor-layout.tsx:100-106` 패널 로드 시 state 초기화**
+```typescript
+// 현재
+setQueries(
+  chartQueries.map((q) => ({
+    datasourceName: q.datasourceName || '',
+    query: q.query || '',
+    label: q.label || '',
+    // → templateStyle 없음
+  }))
+);
+```
+패널 에디터를 열면 store에 저장된 `templateStyle`이 로컬 `queries` state에서 사라집니다.
+이 상태로 Save하면 `templateStyle`이 빈 값으로 덮어써집니다.
+
+수정 방향: 두 곳 모두 `...q` 스프레드로 교체하거나 `templateStyle` 명시 포함.
+
+---
+
+### [정정] Medium: JSON Schema 동작 설명 수정
+
+이전 섹션에서 "additionalProperties: false로 인해 필드가 저장 시 자동으로 제거됨"이라고 적었는데
+표현이 부정확합니다.
+
+**정확한 동작:**
+- `ChartQuery.schema`의 `additionalProperties: false`는 JSON Schema **검증 실패**를 유발합니다.
+- 조용히 필드가 사라지는 것은 `shared/frontend/src/types/dashboard/index.ts:79`의
+  Zod `z.object()` 파싱 기본 동작입니다. Zod는 unknown 키를 기본으로 **strip(제거)** 합니다.
+  (`z.object().passthrough()`를 써야 보존됩니다.)
+
+따라서 실제 위험 경로는:
+- JSON Schema → RJSF 기반 폼에서 사용 시 검증 오류
+- Zod → 프론트 저장/로드 파싱 시 silently strip
+
+두 경로 모두 `templateStyle`을 추가해야 막을 수 있다는 결론은 동일합니다.
+
+---
+
+### [정정] Medium: Grafana 포맷 기본값, csv, regex 동작
+
+이전 섹션에 세 가지 오류가 있었습니다.
+
+**오류 1: 기본 포맷**
+- 이전 표현: `raw` (포맷 미지정 fallback)
+- 정정: Grafana의 포맷 미지정 기본값은 **`glob`** 입니다. (`formatVariableValue.ts:29`)
+- Pharos 구현 시 미지정 multi-value는 `{a,b}` 형태로 출력해야 Grafana 호환됩니다.
+
+**오류 2: csv 포맷 출력**
+- 이전 표현: `'a','b','c'`
+- 정정: `csv` 포맷 출력은 **`a,b,c`** 입니다. (quoting 없음)
+- quoting이 필요한 것은 `singlequote`(`'a','b','c'`) 또는 `sqlstring` 역할입니다.
+
+**오류 3: regex 포맷 예시**
+- 이전 표현: `a\|b\|c` (값 안에 pipe가 있는 것처럼 읽힘)
+- 정정: Grafana multi-value regex는 값들을 `|`로 묶어 **`(a|b)`** 형태로 출력합니다.
+  값 자체가 `.` 같은 regex 메타문자를 포함하면 escape합니다. 예: `(test\.|test2)`
+- 앞 표의 `regex` 행도 `(a|b)` 기준으로 통일합니다.
+
+---
+
+### [정정] Medium: 구현 순서 — generated 타입 재생성 방식
+
+이전 순서에서 Go `types.go`를 직접 수정하는 것처럼 썼는데,
+`types.go` 첫 줄에 generated 파일 주석이 있습니다.
+
+올바른 순서:
+```
+ChartQuery.schema 수정
+    → quicktype 생성 스크립트 실행
+    → shared/types/dashboard/types.go (Go) 자동 갱신
+    → shared/frontend/src/types/dashboard/index.ts (Zod) 자동 갱신
+```
+
+스크립트 위치를 확인하고 `templateStyle` 필드 추가 후 재생성하는 것이 안전합니다.
+수동으로 고치면 다음 재생성 시 덮어써집니다.
+
+---
+
+### 최종 수정된 구현 순서
+
+| 순서 | 작업 | 근거 |
+|------|------|------|
+| 1 | `ChartQuery.schema`에 `templateStyle` 추가 | additionalProperties 열어야 후속 작업 가능 |
+| 2 | quicktype 스크립트 실행 | `types.go` + `index.ts` 자동 재생성 (직접 수정 금지) |
+| 3 | `core/frontend/src/types/charts.ts` `ChartQueryRequest`에 `templateStyle` 추가 | Run 모드 request 타입 확보 |
+| 4 | `DatasourceEditor.tsx` — `templateStyle` selector UI 추가 (또는 JSON import 전제 명시) | 사용자 입력 경로. 미추가 시 JSON 직접 편집만 가능하다는 점을 문서화해야 함 |
+| 5 | `chart-editor-layout.tsx` — hash + 로드 모두 `templateStyle` 포함 | 에디터 저장 시 필드 보존 |
+| 6 | `toChartQueryRequests()` (`useDashboardQuery.ts:73`) — `templateStyle` 전파 | panel → request 변환 경로 |
+| 7 | `dashboard-provider/index.ts:73` + `:207` Run 모드 body에 `templateStyle` 추가 | timeseries + raw 두 경로 모두 |
+| 8 | `use-query-inspector.ts:80` Run 모드에 `templateStyle` 추가 | Inspector 일관성 |
+| 9 | 백엔드 `Run` 구조체에 `TemplateStyle` 추가 | 수신 구조체 |
+| 10 | `panelToRun()` — `chartQuery.TemplateStyle` 복사 | Panel 모드 전파 |
+| 11 | `builder.go` — Style 타입 + `Build()` 디스패처 | 인터페이스 확정 |
+| 12 | `grafana.go` — 포맷 7종 + 시간 alias 구현 | 핵심 로직 |
+| 13 | `getPostResponse()` + `getInspectResponse()` → `Build()` 교체 | 실행 경로 통합 |
+| 14 | 테스트 작성 (하단 테스트 범위 참고) | — |
+
+**[전제 명시] DatasourceEditor UI selector 추가 여부**
+- 추가하는 경우: `DatasourceEditor.tsx`에 `templateStyle` prop + segmented control(pongo2/grafana) 추가.
+  `left-bottom.tsx`에서 `queries` state와 함께 관리.
+- 추가하지 않는 경우: templateStyle은 JSON import/export로만 설정 가능.
+  이 전제를 대시보드 편집 UI 어딘가에 명시해야 합니다.
+
+---
+
+### 테스트 범위
+
+`grafana_test.go`만으로는 부족합니다. 전파 경로 전체를 커버해야 합니다.
+
+**백엔드 (Go)**
+
+| 파일 | 테스트 케이스 |
+|------|------------|
+| `grafana_test.go` | 포맷별 출력 검증, missing variable 보존, sqlstring injection 방어, `__from`/`__to` alias, 기존 pongo2 하위 호환 |
+| 기존 `query_test.go`에 케이스 추가 (`TestQueryPanelToRun`) | `panelToRun()`이 `TemplateStyle`을 `Run`에 복사하는지 검증 |
+
+**프론트엔드 (TypeScript)**
+
+| 파일 | 테스트 케이스 |
+|------|------------|
+| `useDashboardQuery.test.ts` | `toChartQueryRequests()`가 `templateStyle`을 request에 포함하는지 |
+| `chart-editor-layout.test.tsx` | 저장된 `templateStyle`이 에디터 open → save 사이클에서 보존되는지 |
+| `dashboard-provider.test.ts` | Run 모드 body(timeseries `:73`, raw `:207` 두 경로)에 `templateStyle`이 포함되는지 |
+| `use-query-inspector.test.ts` | Inspector 요청 body에 `templateStyle`이 포함되는지 |
+
+---
+
+## 7. 관련 파일 경로 요약
+
+| 파일 | 역할 |
+|------|------|
+| `core/internal/query_builder/template.go` | pongo2 변수 치환 (현재) |
+| `core/internal/query_builder/query_spec.go` | QuerySpec 구조체 |
+| `core/pkg/dashboard/handler/query.go` | 대시보드 쿼리 핸들러 |
+| `core/pkg/plugins/ds_query_response.go` | 데이터소스 쿼리 실행 |
+| `core/external/orm/config.go` | 타입별 쿼리 처리 (Prometheus/ES/SQL) |
+| `shared/types/dashboard/types.go` | Dashboard/Query 구조체 정의 |
+| `C:\Users\bigwo\nTels\07.UPM\github\grafana\public\app\features\templating\template_srv.ts` | Grafana 변수 치환 엔진 |
+| `C:\Users\bigwo\nTels\07.UPM\github\grafana\pkg\tsdb\grafana-postgresql-datasource\macros.go` | Grafana PostgreSQL 매크로 |
+| `C:\Users\bigwo\nTels\07.UPM\github\grafana\pkg\tsdb\loki\parse_query.go` | Grafana Loki 변수 치환 |

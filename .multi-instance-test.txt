@@ -34,23 +34,30 @@ PHAROS 다중 인스턴스 구현 정리
 - 리프레시 토큰은 여전히 프로세스 로컬 (스티키 세션으로 보완)
 
 
-3. Alert 규칙 주기적 DB 동기화
-------------------------------
-목적: 런타임 규칙 변경(생성/수정/삭제)이 모든 인스턴스에 반영되도록 함
+3. Alert 규칙 refresh 시점 DB 동기화
+------------------------------------
+목적: 런타임 규칙 변경(생성/수정/삭제)이 각 인스턴스의 로컬 scheduler에도 반영되도록 함
 
 현재 문제:
 - 인스턴스 A에서 규칙을 변경하면 A의 로컬 크론만 업데이트됨
 - B/C는 재시작 전까지 변경을 인지하지 못함
+- UI polling으로 규칙 목록은 보이지만, 해당 인스턴스의 `CronInstance.Jobs`에는 아직 없을 수 있음
+- 이 상태에서 B/C가 수정 요청을 처리하면 로컬 cron 기준 `job not found`가 발생할 수 있음
 
 구현:
-- 모든 인스턴스에 주기적 DB 동기화 루프 추가
-- 각 인스턴스가 주기적으로 `alert_rule` 테이블을 읽음
-- `rule_id` + `updated_at`(또는 규칙 JSON 해시)로 로컬 크론과 비교
-- 누락 규칙 추가 / 변경 규칙 재스케줄 / 삭제 규칙 제거
+- `/alert/rule` 조회 또는 Rule 탭 polling/수동 refresh 시점에 DB 동기화 수행
+- 각 인스턴스가 `alert_rule` 테이블을 읽고 자신의 로컬 `CronInstance.Jobs`와 비교
+- `rule_id` + `updated_at` 기준으로 로컬 scheduler version을 관리
+- DB에는 있는데 로컬 cron에 없는 규칙: 추가
+- DB `updated_at`이 바뀐 규칙: 기존 job 제거 후 재등록
+- DB에는 없는데 로컬 cron에 남은 규칙: stale job 제거
+- 로컬 cron에 job이 없는 상태는 멀티 인스턴스에서 정상적으로 생길 수 있으므로,
+  `job not found`는 fatal error가 아니라 warning으로 처리
 
 참고:
 - 규칙은 모든 인스턴스에서 실행됨 (DB 리스 없음)
 - 최대 3인스턴스 × 100규칙 = 300 쿼리/사이클로 허용 가능한 수준
+- 별도 백그라운드 reconcile loop가 아니라, 현재 구현은 Rule API refresh/polling에 piggyback함
 
 
 4. history_alert_row 중복 방지
@@ -62,11 +69,11 @@ PHAROS 다중 인스턴스 구현 정리
 - `history_alert`는 upsert로 수렴되므로 문제 없음
 
 구현:
-- `history_alert_row`에 unique constraint 추가
-  예: UNIQUE (alert_id, transitioned_at) 또는
-      UNIQUE (alert_id, from_state, to_state, transitioned_at)
-- INSERT 시 ON CONFLICT DO NOTHING 처리
-- 코드 변경 없이 DB 레벨에서 중복 차단
+- `history_alert_row`에 evaluation_epoch 기반 중복 차단 컬럼/인덱스 추가
+- query 자동 전환에 한해 동일 평가 사이클의 동일 alert 전환을 중복으로 판단
+- PostgreSQL/SQLite는 partial unique index + INSERT ON CONFLICT DO NOTHING 적용
+- ClickHouse는 unique constraint가 없으므로 별도 제한 사항을 두고 ReplacingMergeTree 기반 dedup 검토
+- 상세 구현은 아래 "1차 개발 방안" 기준으로 진행
 
 
 5. 프론트엔드 폴링 폴백
@@ -76,9 +83,20 @@ PHAROS 다중 인스턴스 구현 정리
 구현:
 - 웹소켓은 베스트 에포트로 유지, 폴링을 신뢰 원천으로 사용
 - 폴링 대상 및 주기:
-  - 활성 Alert 상태 (`/alert/status`): 10~30초마다
-  - 규칙 상세/상태 뷰 (`/alert/rule?detail=true`): 탭 진입 시 + 필요 시
-  - 히스토리 (`/alert/hist`): 탭 진입 시 + 30~60초마다
+  - 활성 Alert 상태 (`/alert/status`): 공통 refresh interval 기준
+  - 규칙 상세/상태 뷰 (`/alert/rule?detail=true`): 공통 refresh interval 기준
+  - 히스토리 (`/alert/hist`): 공통 refresh interval 기준
+- Alert 화면 전체 공통 refresh interval 제공
+  - Off / 5s / 30s / 1m / 5m
+  - 기본값 30s
+  - 선택값은 브라우저 localStorage에 저장해 생성/수정 화면 이동 후에도 유지
+- 명시적 수동 Refresh 버튼 제공
+- `/alert/rule` polling/refresh는 화면 데이터 갱신뿐 아니라 해당 인스턴스의 local scheduler 동기화 트리거로도 사용
+
+참고:
+- 폴링은 API를 다시 호출해 공유 DB를 조회하므로, 다른 인스턴스가 저장한
+  rule/status/history 정보도 다음 polling 시점에 반영됨
+- Rule 탭의 polling은 "보여주기"와 "local cron 보충 등록"을 함께 수행함
 
 
 이번 범위 제외 항목
@@ -102,6 +120,171 @@ Notification (SNMP 포함)
 웹소켓 백플레인 (NATS/Redis/Centrifuge)
 - 폴링 폴백으로 커버 가능
 - 실시간 전달 보장이 요구사항으로 확정되면 도입
+
+
+1차 개발 방안
+=============
+
+history_alert_row 중복 방지 - evaluation_epoch 기반 구현
+---------------------------------------------------------
+
+배경:
+- 초기 검토안의 UNIQUE (alert_id, transitioned_at) 방식은 인스턴스 간 timestamp가
+  다르기 때문에 실제로 중복을 막지 못함
+- 인스턴스 A가 T=120s, 인스턴스 B가 T=123s에 같은 전환을 감지하면
+  timestamp가 달라 UNIQUE 충돌이 발생하지 않아 두 행이 모두 삽입됨
+
+핵심 아이디어:
+- alert rule에는 evaluation_interval이 이미 존재함
+- 같은 인터벌 안에 발생한 동일 alert 전환은 같은 평가 사이클의 결과로 봄
+- evaluation_epoch = FLOOR(check_time_unix / evaluation_interval_seconds) 를
+  삽입 시점에 계산해 컬럼으로 저장
+- 인스턴스 A(T=120s, epoch=2)와 B(T=123s, epoch=2)가 같은 epoch → 충돌 → DO NOTHING
+
+엣지 케이스 (수용):
+- 인스턴스 시작 시점이 엇갈려 epoch 경계에 걸리면 같은 전환이 2회 기록될 수 있음
+- 최대 1 interval 오차이며 현재 규모(3인스턴스)에서 허용 가능한 수준으로 판단
+
+
+History 탭 조회 원천 정리:
+
+- `history_alert`
+  - id 기준 upsert로 수렴하는 alert instance별 최신 스냅샷 테이블
+  - 현재 상태/최신 상태 조회에는 적합하지만, 시간순 전환 이력 전체를 표현하지 못함
+- `history_alert_row`
+  - append-only 전환 이력 테이블
+  - alerting/normal/severity 변경 등 "언제 어떻게 바뀌었는가"를 보여주는 History 탭의 원천 데이터로 사용
+
+결정:
+- `/alert/hist` 조회 대상을 `history_alert`에서 `history_alert_row`로 전환
+- History 탭은 `history_alert_row`의 최근 row를 시간 역순으로 표시
+- 기본 조회는 최근 100건 기준으로 유지하고, 기간 필터/limit은 계속 사용
+- evaluation_epoch dedup 작업은 History 탭에 중복 전환 이력이 노출되는 문제를 직접 방지함
+- History 탭 polling은 `/alert/hist`를 재조회하므로 다른 인스턴스가 저장한 이력 row도 자동 반영됨
+
+
+수정 반영 사항 (코드 검토 결과):
+
+[수정 1] UNIQUE 키에 severity 추가
+- 초안: UNIQUE (id, status, evaluation_epoch)
+- 수정: UNIQUE (id, status, severity, evaluation_epoch)
+- 이유: 같은 epoch 안에서 minor→critical처럼 severity만 바뀌는 전환은
+  status가 동일(alerting)해서 초안 키로는 정상 전환이 누락됨
+
+[수정 2] partial unique index로 query 자동 전환에만 적용
+- History.Send()는 수동 clear(handler.go:100), mask(handler.go:182),
+  event alert(eventStatus.go:201)에서도 호출됨
+- 전체 테이블에 UNIQUE를 걸면 수동 작업이 잘못 차단될 수 있음
+- 해결: partial unique index 사용
+    WHERE evaluation_epoch IS NOT NULL AND status_change_reason = 'auto'
+- query 자동 전환: epoch 값 있음 → dedup 적용
+- 수동/mask/event 경로: epoch NULL 유지 → dedup 미적용
+
+[수정 3] epoch 계산 기준을 CheckTime 우선으로
+- alert.Timestamp는 datasource에서 가져온 데이터 row의 시간
+  (query.go:152 기준)
+- alert clear 시에는 checkTime이 사용됨 (query.go:296 기준)
+- dedup 목적은 "평가 실행 시점" 기준이므로 CheckTime 우선 사용,
+  없을 때만 Timestamp로 fallback
+
+[수정 4] evaluation_interval_seconds 파싱 복잡도 수용
+- EvaluationInterval은 cron spec 문자열 (query.go:32 기준)
+- "@every 30s" → time.ParseDuration으로 파싱 가능
+- "*/5 * * * *" 같은 cron 표현식 → robfig cron parser 기준으로
+  다음 2회 실행 시각 차이를 계산하는 helper 필요
+- 파싱 실패 시: evaluation_epoch = NULL로 fallback → 해당 rule은 dedup 비활성화
+
+
+DB별 구현 방식:
+
+PostgreSQL / SQLite:
+- evaluation_epoch BIGINT 컬럼 추가 (NULL 허용)
+- partial UNIQUE INDEX 추가:
+    CREATE UNIQUE INDEX IF NOT EXISTS ux_history_alert_row_auto_epoch
+    ON history_alert_row (id, status, severity, evaluation_epoch)
+    WHERE evaluation_epoch IS NOT NULL AND status_change_reason = 'auto';
+- History 탭 최근 이력 조회 최적화 인덱스는 별도 마이그레이션으로 추가:
+  - `20260520000008_add_alert_history_row_query_indexes.sql`
+    CREATE INDEX IF NOT EXISTS ix_history_alert_row_timestamp
+    ON history_alert_row (timestamp DESC);
+- 이름 필터 + 최근순 조회 최적화 인덱스 추가:
+    CREATE INDEX IF NOT EXISTS ix_history_alert_row_name_timestamp
+    ON history_alert_row (name, timestamp DESC);
+- INSERT ON CONFLICT DO NOTHING
+- 두 DB 모두 동일 문법 사용 가능
+
+ClickHouse:
+- ClickHouse는 alert rule의 메타정보 저장소로는 미지원
+  - `alert_rule` 같은 규칙 설정/메타 테이블 저장은 PostgreSQL/SQLite 등 master DB 기준
+  - ClickHouse는 statistics/history 저장소로만 고려
+- UNIQUE constraint 없음 → ReplacingMergeTree 활용
+- evaluation_epoch 컬럼 추가
+- partial unique index가 없으므로 PostgreSQL/SQLite와 동일한 조건부 dedup은 불가
+- `dedup_key` 같은 non-null 문자열 컬럼을 추가해 ReplacingMergeTree key로 사용
+  - query 자동 전환: `id/status/severity/evaluation_epoch` 기반의 동일 dedup_key 생성
+  - 수동 clear/mask/event: 매번 유니크한 dedup_key 생성 → append-only 성격 유지
+- engine = ReplacingMergeTree(version) ORDER BY dedup_key
+- 단, MergeTree → ReplacingMergeTree 변경은 ALTER 불가
+  → 신규 테이블 생성 → 데이터 복사 → RENAME 순서로 마이그레이션 필요
+- 조회 시 FINAL 키워드로 dedup된 결과 반환
+- dedup은 비동기 merge 기반이므로 FINAL 없으면 짧은 시간 동안 중복이 보일 수 있음
+
+
+코드 변경 범위:
+
+1. 스키마 (마이그레이션 파일 신규 추가)
+   - postgresql: evaluation_epoch BIGINT 컬럼 추가 + partial UNIQUE INDEX
+   - sqlite: 동일
+   - clickhouse: evaluation_epoch + dedup_key 추가, ReplacingMergeTree로 테이블 재생성
+     (CREATE→INSERT→RENAME)
+
+2. core/pkg/alert/rule/common/history.go
+   - Send() 시그니처에 raw int64 대신 옵션 구조체로 전달
+       HistoryDedup{ EvaluationIntervalSeconds: n }
+   - query 자동 경로: epoch 계산 후 evaluation_epoch 세팅
+   - 수동/mask/event 경로: HistoryDedup = nil → evaluation_epoch = NULL
+   - epoch 계산: CheckTime 우선, 없으면 alert.Timestamp 사용
+   - insertRow 쿼리에 evaluation_epoch 컬럼 추가
+   - ClickHouse 사용 시 dedup_key도 함께 세팅
+   - INSERT ON CONFLICT DO NOTHING (PostgreSQL/SQLite)
+   - ClickHouse: plain INSERT 유지 (ReplacingMergeTree가 처리)
+
+3. /alert/hist 조회 API
+   - 조회 원천을 `history_alert`에서 `history_alert_row`로 변경
+   - timestamp/start_timestamp 기준 최신순 정렬
+   - 기존 name/start-time/end-time/count 필터 유지
+   - ClickHouse는 dedup 결과가 필요하므로 FINAL 조회 적용
+
+4. Send() 호출부
+   - query.go (AlertCheck): HistoryDedup 구조체에 interval 초 값 세팅해 전달
+   - handler.go (clear/mask), eventStatus.go, eventHistory.go: nil 전달 → epoch 없음
+
+5. Alert rule local scheduler 동기화
+   - `/alert/rule` 조회 시 DB의 `alert_rule` 목록과 현재 인스턴스의 `CronInstance.Jobs` 비교
+   - `rule_id` + `updated_at` 기준으로 scheduler version cache 관리
+   - 로컬에 없는 DB rule은 cron job 추가
+   - DB에서 수정된 rule은 기존 job 제거 후 새 rule로 재등록
+   - DB에서 삭제된 rule이 로컬에 남아 있으면 stale job 제거
+   - create/update/delete를 처리한 인스턴스는 즉시 version cache 갱신
+   - query rule Destroy()의 `job not found`는 멀티 인스턴스 정상 상황으로 보고 warning 처리
+
+6. 프론트엔드 Alert 화면
+   - Alert 화면 전체 공통 refresh interval selector 추가
+     - Off / 5s / 30s / 1m / 5m
+     - 기본값 30s
+     - localStorage에 선택값 저장
+   - 명시적 수동 Refresh 버튼 추가
+   - 공통 Alert 상태/뱃지/요약: `/alert/status` polling 추가
+   - Rule 탭: `/alert/rule?detail=true` polling 추가
+     - 이 API 호출은 화면 갱신과 함께 local scheduler 동기화도 트리거
+   - History 탭: `/alert/hist` polling 추가
+   - polling 결과는 공유 DB 기반 API 재조회이므로 다른 인스턴스 저장분도 반영
+
+
+참고:
+- Notification(SNMP) 중복은 이 작업으로 해결되지 않음
+  history 저장보다 notification 전송이 먼저 실행되므로 (query.go:330 기준)
+  SNMP 환경에서는 별도 리스/중복 방지 필요 → 향후 과제로 유지
 
 
 향후 과제 (이번 이후)

@@ -249,7 +249,8 @@ func setupSQLite(t *testing.T) (common.Config, *clickhouseMock) {
             start_timestamp DATETIME,
             status_change_reason TEXT,
             status_changed_by TEXT,
-            mask BOOLEAN
+            mask BOOLEAN,
+            evaluation_epoch BIGINT
         )`); err != nil {
 		t.Fatalf("failed to create history_alert_row table: %v", err)
 	}

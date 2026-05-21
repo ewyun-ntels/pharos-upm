@@ -34,6 +34,67 @@ import (
 // Alert rule을 여러번 쿼리하기 때문에 lock 처리 (많은 데이터를 다루지 않기 때문에 큰 문제는 없을것으로 보임
 // create, modify 하는 구간만 처리
 var handlerMutex = sync.Mutex{}
+var ruleSchedulerSyncMutex = sync.Mutex{}
+var ruleSchedulerVersions sync.Map
+
+func isScheduledAlertType(alertType common.Type) bool {
+	return alertType == common.TypeQuery || alertType == common.TypeEventHistory
+}
+
+func syncLocalRuleSchedulers(config pkg_common.Config, ruleDbs []model.Rule) {
+	ruleSchedulerSyncMutex.Lock()
+	defer ruleSchedulerSyncMutex.Unlock()
+
+	dbScheduledRuleIDs := make(map[string]struct{})
+
+	for _, ruleDb := range ruleDbs {
+		alertType := common.Type(ruleDb.AlertType)
+		if !isScheduledAlertType(alertType) {
+			continue
+		}
+
+		dbScheduledRuleIDs[ruleDb.ID] = struct{}{}
+		currentVersion := ruleDb.UpdatedAt.Time
+		hasJob := rule_common.CronInstance.HasJob(ruleDb.ID)
+		if storedVersion, ok := ruleSchedulerVersions.Load(ruleDb.ID); hasJob && ok {
+			if version, ok := storedVersion.(time.Time); ok && version.Equal(currentVersion) {
+				continue
+			}
+		} else if hasJob {
+			ruleSchedulerVersions.Store(ruleDb.ID, currentVersion)
+			continue
+		}
+
+		if hasJob {
+			if err := rule_common.CronInstance.RemoveJob(ruleDb.ID); err != nil {
+				slog.Warn("alert rule scheduler remove failed during sync", "id", ruleDb.ID, "error", err)
+			}
+		}
+
+		template, err := rule.GetRuleFromStr(alertType, config, []byte(ruleDb.Rule))
+		if err != nil {
+			slog.Warn("alert rule scheduler load failed during sync", "id", ruleDb.ID, "error", err)
+			continue
+		}
+		template.SetId(ruleDb.ID)
+
+		if err = template.Run(context.Background()); err != nil {
+			slog.Warn("alert rule scheduler run failed during sync", "id", ruleDb.ID, "error", err)
+			continue
+		}
+		ruleSchedulerVersions.Store(ruleDb.ID, currentVersion)
+	}
+
+	for _, jobID := range rule_common.CronInstance.JobIDs() {
+		if _, ok := dbScheduledRuleIDs[jobID]; ok {
+			continue
+		}
+		if err := rule_common.CronInstance.RemoveJob(jobID); err != nil {
+			slog.Warn("alert rule scheduler stale job remove failed during sync", "id", jobID, "error", err)
+		}
+		ruleSchedulerVersions.Delete(jobID)
+	}
+}
 
 // getJWTClaims returns JWT claims from the Gin context if present, otherwise an empty claims struct.
 func getJWTClaims(c *gin.Context) *jwt.JWTClaims {
@@ -368,6 +429,7 @@ func GetPostRuleHandler(config pkg_common.Config) gin.HandlerFunc {
 			c.JSON(http.StatusInternalServerError, external.ErrorResponse{Message: err.Error()})
 			return
 		}
+		ruleSchedulerVersions.Store(insertRule.ID, insertRule.UpdatedAt.Time)
 
 		c.JSON(http.StatusOK, map[string]string{"id": newRule.GetId()})
 	}
@@ -398,6 +460,7 @@ func GetRuleListHandler(config pkg_common.Config) gin.HandlerFunc {
 			c.JSON(http.StatusInternalServerError, external.ErrorResponse{Message: err.Error()})
 			return
 		}
+		syncLocalRuleSchedulers(config, ruleDbs)
 
 		var statusMap = make(map[string][]common.Value)
 		if detail {
@@ -619,6 +682,7 @@ func GetPutRuleHandler(config pkg_common.Config) gin.HandlerFunc {
 			c.JSON(http.StatusInternalServerError, external.ErrorResponse{Message: err.Error()})
 			return
 		}
+		ruleSchedulerVersions.Store(updateRule.ID, updateRule.UpdatedAt.Time)
 
 		c.Status(http.StatusOK)
 	}
@@ -667,6 +731,7 @@ func GetDeleteRuleHandler(config pkg_common.Config) gin.HandlerFunc {
 			c.JSON(http.StatusInternalServerError, external.ErrorResponse{Message: err.Error()})
 			return
 		}
+		ruleSchedulerVersions.Delete(id)
 
 		c.Status(http.StatusOK)
 	}
@@ -750,6 +815,9 @@ type HistoryRow struct {
 	Status           string       `db:"status"`
 	PreviousSeverity string       `db:"previous_severity"`
 	PreviousValue    *float64     `db:"previous_value"`
+	PreviousTimestamp *orm.Datetime `db:"previous_timestamp"`
+	Version           orm.Datetime  `db:"version"`
+	Mask              bool          `db:"mask"`
 	Labels           string       `db:"labels"`
 }
 
@@ -811,7 +879,7 @@ func queryHistoryFromDB(statsDB *orm.DatabaseConfig, params *HistoryQueryParams)
 
 	err := orm.StatisticsHandler("", statsDB, func(db *sqlx.DB) error {
 		query := `SELECT timestamp, id, alert_id, name, alert_type, description, value, 
-		          severity, status, previous_severity, previous_value, labels FROM history_alert`
+		          severity, status, previous_severity, previous_value, previous_timestamp, version, mask, labels FROM history_alert_row`
 
 		// ClickHouse만 FINAL 절 추가
 		if statsDB.Driver == orm.DriverClickHouse {
@@ -859,6 +927,7 @@ func queryHistoryFromDB(statsDB *orm.DatabaseConfig, params *HistoryQueryParams)
 		for _, row := range rows {
 			value := common.Value{
 				Timestamp:        row.Timestamp.Time,
+				UpdatedAt:        row.Version.Time,
 				Id:               row.Id,
 				Name:             row.Name,
 				AlertType:        row.AlertType,
@@ -869,7 +938,11 @@ func queryHistoryFromDB(statsDB *orm.DatabaseConfig, params *HistoryQueryParams)
 				Status:           row.Status,
 				PreviousSeverity: row.PreviousSeverity,
 				PreviousValue:    row.PreviousValue,
+				Mask:             row.Mask,
 				StringLabels:     row.Labels,
+			}
+			if row.PreviousTimestamp != nil {
+				value.PreviousTimestamp = row.PreviousTimestamp.Time
 			}
 			_ = value.ConvertStringLabelsToLabels()
 			values = append(values, value)
