@@ -24,6 +24,8 @@ export interface FilterMeta {
   id: string;
   query: string;
   datasourceName: string;
+  datasourceType?: string;
+  options?: FilterConfig['options'];
 
   // === 런타임 상태 (변함) ===
   value?: FilterValue;
@@ -77,6 +79,12 @@ export function resetDependencyGraph(): void {
 }
 
 // ─── DashboardStore ──────────────────────────────────────────────────────────
+
+export type LoadDashboardOptions = {
+  forceReload?: boolean;
+  urlParams?: URLSearchParams;
+  datasourceTypeMap?: Record<string, string>;
+};
 
 export type DashboardStore = {
   // === 기본 상태 ===
@@ -146,7 +154,7 @@ export type DashboardStore = {
   removeAnnotation: (annotationId: string) => Promise<void>;
 
   // === 내부 로딩 ===
-  _loadDashboard: (dashboardId: string, options?: { forceReload?: boolean; urlParams?: URLSearchParams }) => Promise<void>;
+  _loadDashboard: (dashboardId: string, options?: LoadDashboardOptions) => Promise<void>;
 
   // === 유틸리티 ===
   reset: () => void;

@@ -10,6 +10,7 @@ import { useTheme } from '@providers/theme-provider';
 import 'ace-builds/src-noconflict/ext-language_tools';
 import { Label } from '@pharos/shared/components/ui';
 import { Input } from '@pharos/shared/components/ui';
+import { isPrometheusDatasource } from '@features/dashboard/utils/datasource';
 import {
   Select,
   SelectContent,
@@ -31,8 +32,12 @@ interface QueryValidationResult {
  * Query 유효성 검증
  * data-driven 타입 (select with isMulti option)의 query 검증
  */
-const validateQuery = (query: string): QueryValidationResult => {
+const validateQuery = (query: string, isPrometheus: boolean): QueryValidationResult => {
   if (!query.trim()) {
+    return {isValid: true, message: ''};
+  }
+
+  if (isPrometheus) {
     return {isValid: true, message: ''};
   }
 
@@ -78,10 +83,12 @@ export function QueryFields({ data, onChange }: QueryFieldsProps) {
   });
 
   const { dataSourceList } = useDatasourceList();
+  const selectedDatasource = dataSourceList.find(ds => ds.value === data.datasourceName);
+  const isPrometheus = isPrometheusDatasource(data.datasourceName ?? '', selectedDatasource?.type);
 
   const handleChange = (field: keyof FilterConfig, value: string | boolean) => {
     if (field === 'query' && typeof value === 'string') {
-      const validation = validateQuery(value);
+      const validation = validateQuery(value, isPrometheus);
       setQueryValidation(validation);
     }
 
@@ -93,10 +100,10 @@ export function QueryFields({ data, onChange }: QueryFieldsProps) {
 
   useEffect(() => {
     if (data.query) {
-      const validation = validateQuery(data.query);
+      const validation = validateQuery(data.query, isPrometheus);
       setQueryValidation(validation);
     }
-  }, [data.query]);
+  }, [data.query, isPrometheus]);
 
   return (
     <div className="space-y-4 mt-4">
@@ -148,27 +155,47 @@ export function QueryFields({ data, onChange }: QueryFieldsProps) {
         <Label htmlFor="query" className="text-sm font-normal">
           Query <span className="text-red-500">*</span>
         </Label>
-        <div className="text-xs text-muted-foreground mt-1 mb-2 space-y-2">
-          <p>Write a SELECT query that returns &quot;value&quot; and &quot;label&quot; columns:</p>
-          <div className="pl-2 space-y-1">
+        {isPrometheus ? (
+          <div className="text-xs text-muted-foreground mt-1 mb-2 space-y-2">
+            <p>Write a PromQL or Grafana classic variable query:</p>
+            <div className="pl-2 space-y-1">
+              <p>• PromQL: label_replace(...), vector(0), up{'{job=~"$job"}'}</p>
+              <p>• Grafana classic: label_values(metric, label_name)</p>
+              <p className="pl-3">label_values(metric{'{job=~"$job"}'}, label_name)</p>
+            </div>
             <p>
-              • <strong>value</strong>: The actual data value used for filtering (stored internally)
+              Example:{' '}
+              <code className="bg-input px-1 rounded">
+                label_values(up{'{job=~"$job"}'}, instance)
+              </code>
             </p>
-            <p>
-              • <strong>label</strong>: The human-readable text displayed to users in the dropdown
+            <p className="text-muted-foreground">
+              Variable references: use $varName or ${'{varName}'} syntax. Note: query_result() is not yet supported.
             </p>
           </div>
-          <p>
-            Example:{' '}
-            <code className="bg-input px-1 rounded">
-              SELECT system_id AS value, system_name AS label FROM table_name ORDER BY system_name
-            </code>
-          </p>
-          <p className="text-muted-foreground">
-            This will show &quot;system_name&quot; to users but filter by &quot;system_id&quot; when
-            selected.
-          </p>
-        </div>
+        ) : (
+          <div className="text-xs text-muted-foreground mt-1 mb-2 space-y-2">
+            <p>Write a SELECT query that returns &quot;value&quot; and &quot;label&quot; columns:</p>
+            <div className="pl-2 space-y-1">
+              <p>
+                • <strong>value</strong>: The actual data value used for filtering (stored internally)
+              </p>
+              <p>
+                • <strong>label</strong>: The human-readable text displayed to users in the dropdown
+              </p>
+            </div>
+            <p>
+              Example:{' '}
+              <code className="bg-input px-1 rounded">
+                SELECT system_id AS value, system_name AS label FROM table_name ORDER BY system_name
+              </code>
+            </p>
+            <p className="text-muted-foreground">
+              This will show &quot;system_name&quot; to users but filter by &quot;system_id&quot; when
+              selected.
+            </p>
+          </div>
+        )}
         <div
           className={`max-w-3xl mt-2 border rounded-md overflow-hidden ${!queryValidation.isValid ? 'border-red-500' : 'border-border'}`}
         >
@@ -186,7 +213,11 @@ export function QueryFields({ data, onChange }: QueryFieldsProps) {
             }}
             width="100%"
             height="120px"
-            placeholder="SELECT column_name AS value, column_name AS label FROM table_name"
+            placeholder={
+              isPrometheus
+                ? 'label_values(metric, label_name)'
+                : 'SELECT column_name AS value, column_name AS label FROM table_name'
+            }
             // showPrintMargin={false}
           />
         </div>

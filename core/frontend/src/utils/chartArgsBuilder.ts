@@ -5,6 +5,8 @@ import {
   QUERY_PARAM_START_TIME_MS,
   QUERY_PARAM_END_TIME_MS,
   QUERY_PARAM_STEP,
+  QUERY_PARAM_INTERVAL,
+  QUERY_PARAM_INTERVAL_MS,
 } from '@lib/query-params';
 import {getAbsoluteValueTimestamp, getAbsoluteValueTimestampMs} from '@pharos/shared/components/ui-extension';
 
@@ -71,6 +73,8 @@ export function buildChartQueryArgs(options: ChartArgsBuilderOptions): ChartQuer
   result.set(QUERY_PARAM_START_TIME_MS, startTime ? getAbsoluteValueTimestampMs(startTime) : 0);
   result.set(QUERY_PARAM_END_TIME_MS, endTime ? getAbsoluteValueTimestampMs(endTime) : 0);
   result.set(QUERY_PARAM_STEP, resolvedStep);
+  result.set(QUERY_PARAM_INTERVAL, `${resolvedStep}s`);
+  result.set(QUERY_PARAM_INTERVAL_MS, resolvedStep * 1000);
 
   // refreshCount가 있을 때만 추가 (패널 에디터용)
   if (refreshCount !== undefined) {

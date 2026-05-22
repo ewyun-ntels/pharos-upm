@@ -249,8 +249,8 @@ SELECT * FROM metrics WHERE host = 'server'; DROP TABLE metrics; --'
 | `regex` | `(a|b)` | PromQL/regex 다중값. 값 내 메타문자 escape. 예: `(test\.|test2)` |
 | `json` | `["a","b"]` | Elasticsearch body |
 
-미구현 포맷을 요청하면 치환 없이 `${var:unknownformat}` 문자열이 그대로 남아
-쿼리 오류가 발생하도록 처리하는 것이 안전합니다 (조용히 무시하면 안 됨).
+미구현 포맷을 요청하면 `${var:unknownformat}` 문자열이 그대로 원본 유지됩니다 (Pharos 정책).
+→ 9번 섹션 최종 정책 참고. (Grafana는 glob fallback, Pharos는 원본 유지로 다름)
 
 ---
 
@@ -268,7 +268,7 @@ Pharos의 `__start_time` / `__end_time` 은 초 epoch입니다.
 | `$__to` / `${__to}` | `__end_time_ms` | 밀리초 |
 | `${__from:date:seconds}` | `__start_time` | 초 |
 | `${__to:date:seconds}` | `__end_time` | 초 |
-| `$__interval_ms` | 미지원 (범위 외) | — |
+| `$__interval_ms` | 미지원 (범위 외) — 단, 11-A에서 1차 포함 여부 최종 결정 | — |
 
 `convertInternalContext()`는 이미 `_ms` suffix 처리 로직이 있으므로
 Grafana 스타일 빌더에서 `__from` / `__to` 를 각각 `__start_time_ms` / `__end_time_ms`로
@@ -292,7 +292,8 @@ rename 후 동일 함수에 넘기는 방식으로 재사용할 수 있습니다
 **현실적인 1차 범위:**
 ```
 포함: $var, ${var}, [[var]], 포맷 7종 (glob기본값/raw/csv/singlequote/sqlstring/regex/json), 시간 변수 alias
-제외: $__timeFilter(), $__timeGroup(), $__table, $__interval
+제외: $__timeFilter(), $__timeGroup(), $__table, $__interval, $__interval_ms
+      (단, $__interval/$__interval_ms/$__step는 11-A에서 1차 포함 여부 최종 결정 — 프론트 variables에 값 주입으로 해결 가능)
 ```
 
 ---
@@ -319,15 +320,23 @@ return queries.map((q, idx) => ({
 `ChartQuery`에 `templateStyle`을 추가해도 이 함수가 전파하지 않으면
 Run 모드 요청에 스타일이 실리지 않습니다.
 
-**누락 지점 2 — `dashboard-provider/index.ts` Run 모드 body (2곳)**
+**누락 지점 2 — `dashboard-provider/index.ts` Run 모드 전파**
 
-timeseries 경로 (`index.ts:73`):
+timeseries 경로는 `convertToChartData()` 내부에서 처리됩니다. body만이 아니라 destructure 지점부터 `templateStyle`이 빠져 있습니다.
+
+timeseries 경로 (`convertToChartData()`, `index.ts:55`, `index.ts:73`):
 ```typescript
 // 현재
 const body = id && kind && !query
   ? { panel: { kind, id }, variables }
   : { run: { datasourceName: datasourceName || '', query: query || '' }, variables };
 // → templateStyle 없음
+```
+
+```typescript
+// 현재: templateStyle을 꺼내지 않음
+const { dashboardId, datasourceName, query, args, id, kind } = promQuery;
+// → templateStyle destructure 필요
 ```
 
 raw 경로 (`index.ts:207`):
@@ -337,17 +346,33 @@ body = { run: { datasourceName: datasourceName || '', query: query || '' }, vari
 // → templateStyle 없음
 ```
 
-두 경로 모두 `run.templateStyle`을 추가해야 합니다.
+raw 경로도 `queryObject` destructure와 `run` body 양쪽에 `templateStyle`을 추가해야 합니다.
 저장된 패널 실행(Panel 모드, `kind + id`)은 백엔드 `panelToRun()`이 처리하므로
 Run 모드(직접 실행) 경로만 수정 대상입니다.
 
 **누락 지점 3 — `use-query-inspector.ts:80` Inspector 요청**
+```typescript
+// 현재: templateStyle 파라미터 자체가 없음
+interface UseQueryInspectorParams {
+  dashboardId: string;
+  panelId?: string;
+  kind?: Kind;
+  datasourceName?: string;
+  query?: string;
+  variables?: Record<string, any>;
+  enabled?: boolean;
+}
+// → templateStyle?: string 추가 필요
+```
+
 ```typescript
 // 현재
 ...(datasourceName && query ? { datasourceName, query } : {})
 // → templateStyle 없음
 ```
 Inspector가 다른 스타일로 치환하면 `rawQuery` ↔ `executedQuery` 비교 자체가 무의미해집니다.
+또한 hook 내부만 고치면 부족하고, `QueryInspectorSheet` props와 `LeftBottomPanel` 호출부에서도 `firstQuery?.templateStyle`을 전달해야 합니다.
+React Query cache key가 꼬이지 않도록 `use-query-inspector.ts`의 `queryKey`에도 `templateStyle`을 포함하는 것이 좋습니다.
 
 ---
 
@@ -453,11 +478,11 @@ ChartQuery.schema 수정
 | 1 | `ChartQuery.schema`에 `templateStyle` 추가 | additionalProperties 열어야 후속 작업 가능 |
 | 2 | quicktype 스크립트 실행 | `types.go` + `index.ts` 자동 재생성 (직접 수정 금지) |
 | 3 | `core/frontend/src/types/charts.ts` `ChartQueryRequest`에 `templateStyle` 추가 | Run 모드 request 타입 확보 |
-| 4 | `DatasourceEditor.tsx` — `templateStyle` selector UI 추가 (또는 JSON import 전제 명시) | 사용자 입력 경로. 미추가 시 JSON 직접 편집만 가능하다는 점을 문서화해야 함 |
+| 4 | 쿼리창 UI — `grafanaStyle` switch 추가, ON이면 `templateStyle: "grafana"`, OFF면 `templateStyle: "pongo2"` | 사용자 입력 경로. JSON 직접 편집 없이 Grafana 스타일을 켜고 끌 수 있어야 함 |
 | 5 | `chart-editor-layout.tsx` — hash + 로드 모두 `templateStyle` 포함 | 에디터 저장 시 필드 보존 |
 | 6 | `toChartQueryRequests()` (`useDashboardQuery.ts:73`) — `templateStyle` 전파 | panel → request 변환 경로 |
-| 7 | `dashboard-provider/index.ts:73` + `:207` Run 모드 body에 `templateStyle` 추가 | timeseries + raw 두 경로 모두 |
-| 8 | `use-query-inspector.ts:80` Run 모드에 `templateStyle` 추가 | Inspector 일관성 |
+| 7 | `dashboard-provider/index.ts` — `convertToChartData()` destructure + timeseries Run body + raw destructure/body에 `templateStyle` 추가 | timeseries + raw Run mode 전파 |
+| 8 | Query Inspector 전파 — `UseQueryInspectorParams`, `queryKey`, Run body, `QueryInspectorSheet` props, `LeftBottomPanel` 호출부에 `templateStyle` 추가 | Inspector 일관성 |
 | 9 | 백엔드 `Run` 구조체에 `TemplateStyle` 추가 | 수신 구조체 |
 | 10 | `panelToRun()` — `chartQuery.TemplateStyle` 복사 | Panel 모드 전파 |
 | 11 | `builder.go` — Style 타입 + `Build()` 디스패처 | 인터페이스 확정 |
@@ -465,11 +490,13 @@ ChartQuery.schema 수정
 | 13 | `getPostResponse()` + `getInspectResponse()` → `Build()` 교체 | 실행 경로 통합 |
 | 14 | 테스트 작성 (하단 테스트 범위 참고) | — |
 
-**[전제 명시] DatasourceEditor UI selector 추가 여부**
-- 추가하는 경우: `DatasourceEditor.tsx`에 `templateStyle` prop + segmented control(pongo2/grafana) 추가.
-  `left-bottom.tsx`에서 `queries` state와 함께 관리.
-- 추가하지 않는 경우: templateStyle은 JSON import/export로만 설정 가능.
-  이 전제를 대시보드 편집 UI 어딘가에 명시해야 합니다.
+**[확정 요구사항] 쿼리창 grafanaStyle switch**
+- `DatasourceEditor.tsx` 쿼리창 상단에 `grafanaStyle` switch를 추가합니다.
+- switch ON: 해당 query의 `templateStyle`을 `"grafana"`로 저장/전파합니다.
+- switch OFF: 해당 query의 `templateStyle`을 `"pongo2"`로 명시 저장/전파합니다.
+- 기존 저장 데이터처럼 `templateStyle`이 없는 경우만 하위 호환을 위해 백엔드 default `"pongo2"`로 처리합니다.
+- `left-bottom.tsx`에서 `queries` state와 함께 `templateStyle`을 관리합니다.
+- 사용자는 JSON import/export를 직접 편집하지 않고도 Grafana 스타일을 켜고 끌 수 있어야 합니다.
 
 ---
 
@@ -508,3 +535,1988 @@ ChartQuery.schema 수정
 | `C:\Users\bigwo\nTels\07.UPM\github\grafana\public\app\features\templating\template_srv.ts` | Grafana 변수 치환 엔진 |
 | `C:\Users\bigwo\nTels\07.UPM\github\grafana\pkg\tsdb\grafana-postgresql-datasource\macros.go` | Grafana PostgreSQL 매크로 |
 | `C:\Users\bigwo\nTels\07.UPM\github\grafana\pkg\tsdb\loki\parse_query.go` | Grafana Loki 변수 치환 |
+
+---
+
+## 8. 추가 검토 의견 (2026-05-21)
+
+### 결론
+현재 설계 방향은 진행해도 됩니다. 특히 `ChartQuery.schema`를 먼저 수정하고 quicktype으로 generated 타입을 재생성한 뒤, 프론트 전파 경로와 백엔드 `Build()` 경로를 맞추는 순서는 적절합니다.
+
+다만 구현 전에 아래 두 가지 정책은 먼저 확정하는 것이 좋습니다.
+
+1. Grafana 스타일을 차트 패널 쿼리에만 적용할지, 필터/변수 쿼리에도 적용할지
+2. unsupported format을 Grafana처럼 `glob` fallback 할지, Pharos 정책으로 원본 유지할지
+   → **확정: 원본 유지** (9번 섹션 최종 정책)
+
+---
+
+### [사용자 요구사항] 쿼리창 grafanaStyle switch
+
+쿼리 편집 UI에는 selector/dropdown이 아니라 `grafanaStyle` switch를 둡니다. 사용자가 이 switch를 켜면 해당 쿼리는 Grafana 스타일로 동작해야 합니다.
+
+권장 모델:
+
+| UI | 저장/전송 값 | 동작 |
+|----|-------------|------|
+| `grafanaStyle = false` | `templateStyle: "pongo2"` | 기존 pongo2 `{{ variable }}` 방식 |
+| `grafanaStyle = true` | `templateStyle: "grafana"` | Grafana `$var`, `${var:format}`, `[[var]]` 방식 |
+
+구현 기준:
+- UI control 이름/라벨은 `grafanaStyle` switch로 둡니다.
+- 스키마와 백엔드/요청 전파 필드는 기존 설계대로 `templateStyle`을 사용합니다.
+- 즉, `grafanaStyle`은 UI boolean이고, 저장/전송 시 `templateStyle`로 매핑합니다.
+- switch는 query별 설정입니다. 여러 query가 있는 패널에서는 각 query마다 독립적으로 켜고 끌 수 있어야 합니다.
+- 새 query의 기본값은 `grafanaStyle = false`, `templateStyle = "pongo2"`로 둡니다.
+- 기존 저장 데이터처럼 `templateStyle`이 없는 경우만 백엔드에서 `"pongo2"`로 fallback합니다.
+- 저장된 `templateStyle: "grafana"` query를 에디터에서 다시 열면 switch가 ON 상태로 복원되어야 합니다.
+
+수정 대상:
+- `DatasourceEditor.tsx`: switch UI 표시 및 prop 추가
+- `left-bottom.tsx`: query별 `templateStyle` 갱신 핸들러 추가
+- `chart-editor-layout.tsx`: open/save cycle에서 `templateStyle` 보존
+- `core/frontend/src/types/charts.ts`: `ChartQueryRequest.templateStyle` 유지
+- `dashboard-provider/index.ts`, `use-query-inspector.ts`: switch 결과가 요청 body까지 전파되도록 유지
+
+---
+
+### [사용자 요구사항] 디버깅용 상세 로그 추가
+
+나중에 Grafana 스타일 치환 문제를 추적할 수 있도록 백엔드 쿼리 빌더와 dashboard query handler에 상세 로그를 추가합니다.
+
+로그 원칙:
+- 기본 동작 흐름은 `debug` 레벨로 남깁니다.
+- 실제 실행 오류, 치환 실패, panic 방어 등은 `warn` 또는 `error` 레벨로 남깁니다.
+- 디버깅 편의를 위해 `debug` 레벨에서는 raw query, executed query, 변수 map 전문을 노출할 수 있습니다.
+- 단, `info` 이상 일반 운영 로그에서는 쿼리 전문과 변수 원본값을 기본 노출하지 않고 query length, variable count, key 목록 중심으로 남깁니다.
+- `sqlstring`, `singlequote` 등 민감할 수 있는 값도 debug 레벨에서는 전문 확인이 가능하게 하되, 운영 환경에서는 debug 로그를 켜지 않는 전제로 관리합니다.
+- inspect 응답에는 기존처럼 `rawQuery`, `executedQuery`를 제공합니다.
+
+권장 로그 지점:
+
+| 위치 | 레벨 | 내용 |
+|------|------|------|
+| `query_builder.Build()` | debug | 선택된 style, query length, variables key count |
+| `buildGrafana()` 시작 | debug | grafana style 시작, ctx key 목록 또는 key count |
+| time alias pre-process | debug | 치환된 alias 이름 (`__from`, `__to`, `date:seconds`) |
+| 일반 변수 치환 | debug | var name, format, value type, multi-value 여부, 치환 여부 |
+| debug 전문 로그 | debug | raw query, executed query, variables map 전문 |
+| context에 없는 변수 | debug | var name과 원본 유지 사유 (`missing context`) |
+| unsupported format | debug 또는 warn | var name, format, 원본 유지 사유 (`unsupported format`) |
+| field path 감지 | debug | var name, field path, 원본 유지 사유 (`field path unsupported`) |
+| `getPostResponse()` | debug | datasourceName, templateStyle, timeout, inspect 여부 |
+| `getInspectResponse()` | debug | raw/executed query length, templateStyle |
+
+예시:
+```go
+slog.Debug("Building dashboard query",
+    "templateStyle", style,
+    "datasource", query.Run.DatasourceName,
+    "queryLen", len(query.Run.Query),
+    "variableCount", len(query.Variables),
+    "rawQuery", query.Run.Query,
+    "variables", query.Variables,
+)
+
+slog.Debug("Grafana variable interpolation",
+    "var", varName,
+    "format", format,
+    "valueType", fmt.Sprintf("%T", val),
+    "matched", exists,
+)
+
+slog.Debug("Built dashboard query",
+    "templateStyle", style,
+    "executedQuery", string(sql),
+)
+```
+
+테스트에서는 로그 출력 자체를 검증하기보다, 원본 유지/치환 결과를 검증합니다. 로그는 디버깅 보조 수단으로 둡니다.
+
+---
+
+### [추가 High] FilterConfig 적용 여부 결정 필요
+
+`panelToRun()`은 차트 패널뿐 아니라 `headerL`, `headerR`, `left` 필터 쿼리도 같은 실행 경로로 처리합니다.
+
+현재 코드 흐름:
+```go
+// chart panel
+query.Run.DatasourceName = chartQuery.DatasourceName
+query.Run.Query = chartQuery.Query
+
+// filter panel
+if filter.DatasourceName != nil {
+    query.Run.DatasourceName = *filter.DatasourceName
+}
+if filter.Query != nil {
+    query.Run.Query = *filter.Query
+}
+```
+
+따라서 Grafana 스타일을 필터/변수 쿼리에도 허용하려면 `ChartQuery.schema`뿐 아니라 `FilterConfig.schema`에도 `templateStyle` 필드를 추가해야 합니다.
+
+선택지는 두 가지입니다.
+
+| 선택 | 수정 범위 | 비고 |
+|------|----------|------|
+| 1차 범위: chart panel only | `ChartQuery.schema`만 수정 | 필터 쿼리는 계속 pongo2만 지원한다고 문서화 필요 |
+| chart + filter 모두 지원 | `ChartQuery.schema` + `FilterConfig.schema` 수정 | `panelToRun()`에서 filter의 `TemplateStyle`도 `Run`으로 복사 필요 |
+
+권장: 1차 구현은 chart panel only로 좁히고, `FilterConfig` 지원은 2차 범위로 분리합니다. 단, 이 경우 문서와 UI에 "필터 쿼리는 아직 pongo2 스타일만 지원"이라는 전제를 남겨야 합니다.
+
+---
+
+### [추가 Medium] unsupported format 정책은 Grafana와 다름
+
+실제 Grafana의 `formatVariableValue.ts`는 알 수 없는 format이 들어오면 에러를 던지지 않고 `glob`으로 fallback합니다.
+
+```typescript
+if (!formatItem) {
+  console.error(`Variable format ${format} not found. Using glob format as fallback.`);
+  formatItem = formatRegistry.get(VariableFormatID.Glob);
+}
+```
+
+따라서 최종 정책은 Grafana와 달리 unsupported format을 원본 유지하는 방식으로 통일합니다.
+
+권장 정책:
+- `format`이 명시됐고 지원하지 않는 값이면 원본 토큰 유지 (Pharos 정책 — Grafana는 glob fallback)
+- `format`이 미지정이면 Grafana와 동일하게 `glob` 적용
+- 이 정책은 "Grafana 문법 기반의 Pharos-safe subset"이라고 문서화합니다.
+
+테스트 케이스:
+```go
+// unsupported format: 원본 유지 (Pharos 정책 — Grafana는 glob fallback으로 다름)
+${host:unknownformat} with ctx["host"] exists -> ${host:unknownformat} (unchanged)
+
+// omitted format: glob 기본값
+${hosts} with ["a", "b"] -> {a,b}
+```
+
+---
+
+### [추가 High] context map을 변수 whitelist로 사용
+
+Grafana 스타일 빌더는 별도 whitelist 구조를 만들 필요 없이 `variables`/`ctx` map 자체를 whitelist로 사용하면 됩니다.
+
+백엔드 요청 구조:
+```json
+{
+  "run": {
+    "query": "...",
+    "datasourceName": "..."
+  },
+  "variables": {
+    "job": "production",
+    "pod": "tcp-bridge-1",
+    "sys_id": "sys-001",
+    "__start_time": 1700000000,
+    "__end_time": 1700003600
+  }
+}
+```
+
+정책:
+```go
+func buildGrafana(query string, ctx map[string]any) ([]byte, error) {
+    result := grafanaVariableRegex.ReplaceAllStringFunc(query, func(match string) string {
+        varName, format := extractGrafanaVariable(match)
+
+        val, exists := ctx[varName]
+        if !exists {
+            return match // context에 없는 변수는 원본 토큰 유지
+        }
+
+        return formatGrafanaVariable(val, format)
+    })
+
+    return []byte(result), nil
+}
+```
+
+이 정책은 Grafana의 `template_srv.ts` 동작과도 맞습니다. Grafana도 변수 레지스트리에 없는 이름은 원본 match를 반환합니다.
+
+중요 효과:
+
+| 입력 토큰 | context 조회 | 결과 |
+|----------|--------------|------|
+| `$job` | `ctx["job"]` 존재 | 선택값으로 치환 |
+| `$pod` | `ctx["pod"]` 존재 | 선택값으로 치환 |
+| `$1` | `ctx["1"]` 없음 | `$1` 원본 유지 |
+| `$__unknown` | 대응 context/alias 없음 | 원본 유지 |
+
+따라서 Prometheus `label_replace()`의 capture group인 `$1`은 별도 예외 처리 없이 안전하게 보존됩니다.
+
+예:
+```promql
+label_replace(metric, "sys_id", "$1", "pod", ".*(tcp-bridge-[0-9]+).*")
+```
+
+위 쿼리에서 `$1`은 `ctx["1"]`이 없으므로 원본 그대로 남고, PromQL capture group으로 정상 동작합니다.
+
+단, `ctx에 없으면 원본 유지`는 missing variable 보존 정책이지 unsupported format 정책과는 별개입니다.
+
+권장 에러 정책:
+- 변수명이 context에 없음 → 원본 토큰 유지
+- 변수명은 context에 있지만 명시 format이 미지원 → 원본 토큰 유지
+- format 미지정 → 지원 정책에 따라 기본 `glob` 적용
+
+테스트 케이스:
+```go
+// known variable
+`up{job=~"$job"}` with ctx["job"] = "production"
+=> `up{job=~"production"}`
+
+// Prometheus capture group must be preserved
+`label_replace(metric, "sys_id", "$1", "pod", ".*(tcp-bridge-[0-9]+).*")`
+=> unchanged `$1`
+
+// missing dashboard variable must be preserved
+`up{job=~"$missing"}`
+=> `up{job=~"$missing"}`
+
+// known variable + unsupported explicit format must be preserved
+`${job:unknownformat}` with ctx["job"] exists
+=> `${job:unknownformat}`
+```
+
+---
+
+### [추가 Medium] PromQL 다중값은 `$var` 보존 정책과 별개
+
+`$1` 오치환 문제는 context whitelist 정책으로 해결됩니다. 하지만 PromQL regex matcher에서 다중값 변수를 어떻게 표현할지는 별도 문제입니다.
+
+예:
+```promql
+{job=~"$job"}
+```
+
+`job`이 단일값이면 문제 없습니다.
+```text
+ctx["job"] = "job1"
+{job=~"job1"}
+```
+
+하지만 `job`이 다중값이면 format 미지정 기본값에 따라 PromQL에 맞지 않는 결과가 나올 수 있습니다.
+```text
+ctx["job"] = ["job1", "job2"]
+
+// glob 기본값이면 PromQL regex로는 부적절
+{job=~"{job1,job2}"}
+```
+
+PromQL regex matcher에서는 쿼리 작성자가 명시적으로 `regex` format을 사용하는 것을 권장합니다.
+```promql
+{job=~"${job:regex}"}
+```
+
+예상 결과:
+```text
+{job=~"(job1|job2)"}
+```
+
+정리:
+
+| 문제 | 해결 방법 |
+|------|----------|
+| `$1` 오치환 | context map을 whitelist로 사용하고, 없으면 원본 유지 |
+| PromQL 다중값 | 쿼리 작성 시 `${var:regex}` 명시 |
+
+1차 구현에서는 `$var`를 datasource별로 암묵 변환하지 않는 것이 안전합니다. 즉, `job=~"$job"`에서 다중값을 자동 regex로 바꾸는 정책은 피하고, `${job:regex}`처럼 쿼리 안에서 format을 명시하도록 안내합니다.
+
+---
+
+### [추가 Medium] singlequote / sqlstring 차이 명확화 필요
+
+Grafana 테스트 기준으로 `singlequote`와 `sqlstring`은 둘 다 작은따옴표로 감싸지만 escape 방식이 다릅니다.
+
+| 포맷 | 입력 | 출력 | 비고 |
+|------|------|------|------|
+| `singlequote` | `test'2` | `'test\'2'` | backslash escape |
+| `sqlstring` | `test'value` | `'test''value'` | SQL 표준 quote escape |
+
+SQL 쿼리에서는 `sqlstring`을 기본 권장해야 합니다. `singlequote`는 Grafana 호환용 포맷으로 지원하되, SQL injection 방어 목적의 주 포맷으로 설명하면 안 됩니다.
+
+---
+
+### [추가 Medium] 1차 문법 동작 목록 ← 9번 섹션 정책으로 대체됨
+
+> **주의**: 이 섹션의 "미지원" 표현은 9번 섹션의 "원본 통과" 정책으로 대체되었습니다.
+> 아래 표는 9번 기준으로 재기술한 것입니다.
+
+| 문법 | 예시 | 동작 |
+|------|------|------|
+| field path | `${var.field}` | field != "" → 무조건 원본 유지 |
+| date ISO/custom | `${__from:date}`, `${__from:date:YYYY-MM}` | 구현 B 채택 시 ctx["__from"] 없음 → 원본 유지 |
+| datasource macro | `$__timeFilter(ts)`, `$__timeGroup(ts, '5m')` | ctx["__timeFilter"] 없음 → 원본 유지 |
+| interval macro | `$__interval`, `$__interval_ms` | 프론트 variables 미주입 시 ctx 없음 → 원본 유지 (11-A 참고) |
+| table macro | `$__table` | ctx 없음 → 원본 유지 |
+
+단, `${__from:date:seconds}`와 `${__to:date:seconds}`는 pre-process 1단계에서 지원합니다.
+
+1차 지원 범위:
+```text
+지원 (치환):
+- $var
+- ${var}
+- [[var]]
+- ${var:raw}
+- ${var:csv}
+- ${var:glob}
+- ${var:regex}
+- ${var:json}
+- ${var:singlequote}
+- ${var:sqlstring}
+- $__from / ${__from}
+- $__to / ${__to}
+- ${__from:date:seconds}
+- ${__to:date:seconds}
+
+원본 유지 (통과):
+- ${var.field}          → field path, field != "" 이면 원본 유지
+- ${__from:date}        → pre-process 미매칭, ctx["__from"] 없음
+- ${__from:date:YYYY-MM}→ pre-process 미매칭, ctx["__from"] 없음
+- $__timeFilter()       → ctx["__timeFilter"] 없음
+- $__timeGroup()        → ctx["__timeGroup"] 없음
+- $__interval           → 프론트 variables 미주입 시 ctx["__interval"] 없음 → 원본 유지 (11-A 참고)
+- $__interval_ms        → 프론트 variables 미주입 시 ctx["__interval_ms"] 없음 → 원본 유지 (11-A 참고)
+- $__table              → ctx["__table"] 없음
+- ${var:unknownformat}  → format 미지원, 원본 유지
+```
+
+---
+
+### [추가 High] dashboard-provider / Query Inspector 전파 세부 보강
+
+추가 검토 의견에 동의합니다. 다만 `dashboard-provider/index.ts`의 timeseries 지점은 "세 번째 별도 body 경로"라기보다는 `convertToChartData()` 내부의 timeseries Run mode 경로이며, body 생성 전에 destructure부터 누락되어 있다는 점을 명시하는 것이 정확합니다.
+
+**dashboard-provider/index.ts 수정 체크리스트**
+
+| 위치 | 수정 내용 | 이유 |
+|------|----------|------|
+| `convertToChartData()` destructure | `const { dashboardId, datasourceName, query, args, id, kind, templateStyle } = promQuery;` | timeseries Run mode body에서 사용할 값 확보 |
+| `convertToChartData()` body | `{ run: { datasourceName, query, templateStyle }, variables }` | timeseries 직접 실행 경로 전파 |
+| RAW 경로 `queryObject` destructure | `templateStyle` 추가 | raw Run mode body에서 사용할 값 확보 |
+| RAW 경로 body | `{ run: { datasourceName, query, templateStyle }, variables }` | raw 직접 실행 경로 전파 |
+
+Panel mode body인 `{ panel: { kind, id }, variables }`에는 `templateStyle`을 넣지 않습니다. 저장된 panel 실행은 백엔드 `panelToRun()`이 `ChartQuery.TemplateStyle`을 `Run.TemplateStyle`로 복사해서 처리해야 합니다.
+
+**Query Inspector 수정 체크리스트**
+
+| 위치 | 수정 내용 | 이유 |
+|------|----------|------|
+| `use-query-inspector.ts` `UseQueryInspectorParams` | `templateStyle?: string` 추가 | hook 입력 타입 확장 |
+| `use-query-inspector.ts` destructure | `templateStyle` 추가 | request 구성에 사용 |
+| `use-query-inspector.ts` `queryKey` | `templateStyle` 포함 | 스타일 변경 시 inspect cache 분리 |
+| `use-query-inspector.ts` Run mode body | `{ datasourceName, query, templateStyle }` 포함 | inspect 실행 엔진 일관성 |
+| `QueryInspectorSheet.tsx` props | `templateStyle?: string` 추가 | hook으로 전달 가능하게 함 |
+| `QueryInspectorSheet.tsx` hook 호출 | `templateStyle` 전달 | props → hook 전파 |
+| `left-bottom.tsx` 호출부 | `templateStyle={firstQuery?.templateStyle}` 전달 | 현재 편집 중인 query 스타일 보존 |
+
+이 경로가 빠지면 실제 패널 실행은 Grafana 스타일로 동작하더라도 Inspector의 `executedQuery`가 pongo2 기준으로 만들어져 디버깅 결과가 틀어질 수 있습니다.
+
+---
+
+### [추가 Low] GetQuery()는 유지하고 dashboard 경로만 Build()로 교체
+
+현재 `query_builder.GetQuery()`는 dashboard 외에도 badges, alert 경로에서 직접 사용 중입니다.
+
+확인된 직접 호출 경로:
+- `core/pkg/dashboard/handler/query.go`
+- `core/pkg/badges/handler.go`
+- `core/pkg/alert/handler.go`
+
+따라서 `GetQuery()`를 변경하거나 제거하지 말고, `Build()`를 additive로 추가한 뒤 dashboard query handler의 실행/inspect 경로만 `Build()`로 교체하는 것이 안전합니다.
+
+---
+
+### [추가 테스트 권장]
+
+기존 테스트 목록에 아래 케이스를 추가하는 것을 권장합니다.
+
+**Go**
+
+| 파일 | 추가 케이스 |
+|------|------------|
+| `grafana_test.go` | unsupported format 원본 유지, omitted format glob fallback, `singlequote` vs `sqlstring` escape 차이 |
+| `query_test.go` | chart panel only 정책이면 filter 쿼리는 default pongo2 유지 확인 |
+
+**TypeScript**
+
+| 파일 | 추가 케이스 |
+|------|------------|
+| `SelectVariable.tsx` 관련 테스트 | FilterConfig를 1차 범위에서 제외할 경우 `templateStyle`이 variable run mode에 전파되지 않는 것이 의도된 동작인지 확인 |
+| `chart-editor-layout.test.tsx` | `templateStyle` 변경만으로 hash가 바뀌고 local queries state가 갱신되는지 확인 |
+
+---
+
+## 9. "미지원 변수 없음" 정책 확정 (2026-05-21)
+
+### 결론
+
+`[추가 High] context map을 변수 whitelist로 사용` 정책을 채택하면,
+기존 문서의 "미지원 변수 목록"은 사실상 무의미해집니다.
+
+모든 패턴에 대한 동작은 아래 네 가지로 단순화됩니다.
+
+| 경우 | 동작 |
+|------|------|
+| context에 있는 변수 | 값으로 치환 |
+| context에 없는 변수 (`$1`, `$__unknown` 등) | 원본 토큰 유지 (통과) |
+| 변수는 context에 있으나 명시 format이 미지원 | 원본 토큰 유지 (Pharos 정책 — Grafana는 glob fallback으로 다름) |
+| format 미지정 | glob 기본값 적용 (`{a,b}`) |
+
+따라서 `$__timeFilter`, `$__table` 등은 context에 없으므로 빌더는 원본 그대로 전달합니다.
+`$__interval`, `$__interval_ms`는 프론트에서 variables에 주입하면 치환되고,
+주입하지 않으면 마찬가지로 원본 유지됩니다 (11-A 참고).
+해당 datasource가 이 패턴을 이해하지 못하면 실행 단계에서 오류가 발생합니다 (빌더 레벨 오류가 아님).
+
+---
+
+### 예외 1: `${__from:date}`, `${__from:date:YYYY-MM}`
+
+이 패턴은 `__from` 변수에 `date` format을 명시한 형태입니다.
+구현 방식에 따라 동작이 달라지므로 반드시 **구현 B**를 채택해야 합니다.
+
+**구현 A — `__from`을 context에 직접 넣는 경우 (채택 금지)**
+```
+${__from:date}         → ctx["__from"] 존재 → format "date" 미지원 → 원본 유지 (OK)
+${__from:date:seconds} → ctx["__from"] 존재 → format "date:seconds" 미지원 → 원본 유지 ❌
+                         (seconds alias가 동작하지 않음 — 채택 금지 이유)
+```
+
+**구현 B — `__from`을 context에 넣지 않고 특정 alias 패턴만 pre-process (채택)**
+```
+${__from:date:seconds} → 1단계 pre-process에서 ctx["__start_time"] 치환 ✅
+${__from:date}         → 1단계 미매칭 → 2단계 ctx["__from"] 없음 → 원본 유지 ✅
+$__from / ${__from}    → 1단계 pre-process에서 ctx["__start_time_ms"] 치환 ✅
+```
+
+**구현 B 핵심 제약: ctx에 `__from`, `__to` 키를 절대 추가하지 말 것.**
+`convertInternalContext()`나 alias 매핑 함수가 `__from`/`__to` 키를 ctx에 넣으면
+구현 A의 문제가 그대로 재현됩니다.
+
+권장 구현 구조:
+
+```go
+func buildGrafana(query string, ctx map[string]any) ([]byte, error) {
+    // 1단계: 지원하는 시간 alias 패턴을 정규식보다 먼저 처리
+    //   ${__from:date:seconds} → ctx["__start_time"]
+    //   ${__to:date:seconds}   → ctx["__end_time"]
+    //   $__from / ${__from}    → ctx["__start_time_ms"]
+    //   $__to   / ${__to}      → ctx["__end_time_ms"]
+    query = replaceTimeAliases(query, ctx)
+
+    // 2단계: 일반 변수 치환 (context whitelist)
+    result := grafanaRegex.ReplaceAllStringFunc(query, func(match string) string {
+        varName, _, format := extractGrafanaVariable(match)
+        val, exists := ctx[varName]
+        if !exists {
+            return match // 원본 유지
+        }
+        return formatGrafanaVariable(val, format)
+    })
+
+    return []byte(result), nil
+}
+```
+
+이 구조에서 `${__from:date}`는 1단계 미매칭 → 2단계 ctx 없음 → 원본 유지로
+오류 없이 통과합니다.
+
+---
+
+### 예외 2: `${var.field}` field path
+
+Grafana 정규식은 field path를 별도 캡처그룹으로 처리합니다.
+
+```
+\${(\w+)(?:\.([^:^\}]+))?(?::([^\}]+))?}
+         ↑        ↑
+       varName   field (optional)
+```
+
+`${server.host}` → varName=`server`, field=`host`
+
+field path는 1차 범위에서 지원하지 않습니다.
+`field != ""`이면 varName이 context에 있더라도 무조건 원본 유지합니다.
+(field를 무시하고 varName만 조회하면 `${server.host}`가 server 전체 값으로 오치환됩니다.)
+
+```go
+varName, field, format := extractGrafanaVariable(match)
+
+// field path는 미지원: field가 있으면 원본 반환
+if field != "" {
+    return match
+}
+
+val, exists := ctx[varName]
+if !exists {
+    return match // 원본 유지
+}
+```
+
+`${server.host}` → field="host" != "" → 원본 유지 → 통과.
+`${server}` → field="" → ctx["server"] 조회 → 정상 치환.
+
+---
+
+### 기존 "1차 미지원 문법 목록" 섹션 수정
+
+`[추가 Medium] 1차 미지원 문법 목록 명시` 섹션의 "미지원" 표현은
+context whitelist 정책과 충돌합니다.
+
+올바른 표현으로 수정:
+
+| 문법 | 예시 | 동작 |
+|------|------|------|
+| field path | `${var.field}` | field != "" → 무조건 원본 유지 (varName 조회 안 함) |
+| date ISO/custom | `${__from:date}`, `${__from:date:YYYY-MM}` | 구현 B 채택 시 ctx["__from"] 없음 → 원본 유지 |
+| datasource macro | `$__timeFilter(ts)`, `$__timeGroup(ts, '5m')` | ctx["__timeFilter"] 없음 → 원본 유지 |
+| interval macro | `$__interval`, `$__interval_ms` | 프론트 variables 미주입 시 ctx 없음 → 원본 유지 (11-A 참고) |
+| table macro | `$__table` | ctx 없음 → 원본 유지 |
+
+이 패턴들은 "미지원 → 원본 통과"입니다.
+단, `$__interval`, `$__interval_ms`는 프론트 variables 미주입 시에만 원본 통과이며,
+주입하면 일반 변수와 동일하게 치환됩니다 (11-A 참고).
+빌더 레벨 오류는 발생하지 않으며, datasource가 해석하지 못하면 실행 단계에서 오류가 납니다.
+
+---
+
+### 추가 테스트 케이스
+
+```go
+// 1. PromQL capture group: context에 없으므로 원본 유지
+input:  `label_replace(metric, "sys_id", "$1", "pod", ".*(tcp-bridge-[0-9]+).*")`
+output: (unchanged)
+
+// 2. 대시보드 변수: context에 있으므로 치환
+input:  `up{job=~"$job"}`, ctx["job"] = "production"
+output: `up{job=~"production"}`
+
+// 3. context에 없는 변수: 원본 유지
+input:  `up{job=~"$missing"}`
+output: `up{job=~"$missing"}`
+
+// 4. 시간 alias (지원): pre-process에서 치환
+input:  `${__from:date:seconds}`, ctx["__start_time"] = 1700000000
+output: `1700000000`
+
+// 5. 시간 alias (미지정): context 없음 → 원본 유지
+input:  `${__from:date:YYYY-MM}`
+output: (unchanged)
+
+// 6. datasource macro: context 없음 → 원본 유지
+input:  `$__timeFilter(ts)`
+output: `$__timeFilter(ts)`
+
+// 7. context에 있는 변수 + 미지원 format: 원본 유지 (Pharos 정책)
+input:  `${job:unknownformat}`, ctx["job"] exists
+output: `${job:unknownformat}` (unchanged)
+
+// 8. format 미지정 + 다중값: glob 기본값
+input:  `${hosts}`, ctx["hosts"] = ["a", "b"]
+output: `{a,b}`
+```
+
+---
+
+## 10. Alert rule Grafana 스타일 지원 — 1차 제외, 2차 고려사항 (2026-05-21)
+
+### 1차 범위 확정: Alert rule은 pongo2 유지
+
+Alert rule의 Grafana 스타일 지원은 1차 구현 범위에서 명시적으로 제외합니다.
+
+**제외 근거:**
+
+1. **UI 구조가 다름**
+   Alert 등록 화면에는 대시보드의 VariableBar 같은 변수 정의/선택 UI가 없습니다.
+   현재 화면 구성: `Datasource`, `Query`, `Time Label`, `Variable Label`, `Evaluation Interval`, `Check Type`
+   → 사용자가 `$job`, `$pod` 같은 변수를 등록하거나 선택하는 경로 자체가 없습니다.
+
+2. **설계 패턴이 다름**
+   Alert rule의 `Datasource` 구조체 자체가 "특정 컬럼에서 scalar 값 추출 → 임계값 비교"의 고정 패턴입니다.
+   ```go
+   type Datasource struct {
+       Variables     map[string]any  // UI에서 채울 경로 없음
+       Query         string
+       TimeLabel     string          // 정적: 시간 컬럼명
+       VariableLabel string          // 정적: 값 컬럼명
+   }
+   ```
+   대시보드처럼 "사용자가 필터를 선택 → 쿼리가 달라짐"이 아니라
+   "등록된 쿼리 → 고정 컬럼 → 임계값 비교"가 alert 실행 단위입니다.
+
+3. **백그라운드 스케줄러 실행**
+   대시보드 변수는 사용자 화면 상태/세션 상태에 묶입니다.
+   Alert rule은 사용자가 화면을 보지 않아도 cron으로 계속 실행되므로
+   대시보드 변수 시스템과 자연스럽게 맞지 않습니다.
+
+4. **반쪽 구현 위험**
+   Grafana 스타일만 넣고 저장 포맷과 스케줄러를 그대로 두면
+   rule 등록 → 저장 → 스케줄 실행 전 경로가 불일치합니다.
+   넣으려면 세트로 넣어야 합니다.
+
+**1차 처리 방침:**
+
+| 경로 | 처리 |
+|------|------|
+| `alert/rule/query/datasource.go` `RenderQuery()` | `GetQuery()` 유지 (pongo2) |
+| `alert/handler.go:768` 쿼리 테스트 경로 | `GetQuery()` 유지 (pongo2) |
+| Alert 등록/수정 UI | templateStyle switch 미추가 |
+
+---
+
+### 2차 구현 시 고려사항
+
+Alert에 Grafana 스타일을 추가할 경우 아래 항목을 세트로 설계해야 합니다.
+부분 구현은 저장-실행 불일치를 유발하므로 하나만 넣으면 안 됩니다.
+
+**1. Alert rule 저장 포맷 변경 (JSON payload 계약 변경, DB 컬럼 추가 아님)**
+
+`alert_rule.rule` 컬럼은 JSON 문자열 그대로 저장됩니다.
+DB 스키마(컬럼) 변경은 없고, 그 JSON의 내부 계약이 바뀌는 것입니다.
+기존 row는 `template_style` 없음 → 백엔드 fallback `"pongo2"` 처리로 하위 호환합니다.
+
+`Datasource` 구조체에 `TemplateStyle` 추가:
+```go
+type Datasource struct {
+    Variables     map[string]any `json:"variables,omitempty"`
+    Query         string         `json:"query"`
+    TimeLabel     string         `json:"time_label"`
+    VariableLabel string         `json:"variable_label"`
+    TemplateStyle string         `json:"template_style,omitempty"` // 신규 (없으면 "pongo2" fallback)
+}
+```
+
+**네이밍 규칙: snake_case vs camelCase 분리**
+
+alert 쪽은 저장 포맷과 API 요청 포맷의 네이밍이 다릅니다.
+dashboard와 동일한 규칙을 따릅니다.
+
+| 레이어 | 필드명 | 예시 |
+|--------|--------|------|
+| alert rule 저장 JSON | `template_style` | `"template_style": "grafana"` |
+| API 요청 body | `templateStyle` | `"templateStyle": "grafana"` |
+| Go 구조체 | `TemplateStyle` | `TemplateStyle string` |
+
+`APIAdapter.FromAPIQueryRequest()`에서 camelCase → snake_case 매핑을 처리합니다.
+
+**2. 스케줄러 실행 경로 교체**
+
+```go
+// 현재
+func (d Datasource) RenderQuery() ([]byte, error) {
+    return alert_common.GetQuery(d.Query, d.Variables)
+}
+
+// 변경 후
+func (d Datasource) RenderQuery() ([]byte, error) {
+    return query_builder.Build(
+        query_builder.Style(d.TemplateStyle),
+        d.Query,
+        d.Variables,
+    )
+}
+```
+
+**3. Alert 전용 static variables 설계**
+
+대시보드는 사용자가 화면에서 변수를 선택합니다.
+Alert는 백그라운드 실행이므로 변수를 rule 등록 시 정적으로 지정하는 구조가 필요합니다.
+
+예시 (alert rule JSON 확장):
+```json
+{
+  "datasource": "prometheus",
+  "datasource_query": {
+    "query": "up{job=~\"$job\"}",
+    "variables": {
+      "job": "production"
+    },
+    "template_style": "grafana",
+    "time_label": "timestamp",
+    "variable_label": "value"
+  }
+}
+```
+
+단, 이 방식은 변수 값이 rule 등록 시점에 고정됩니다.
+동적 변수가 필요한 경우(예: 현재 시간 기준 범위) 별도 매크로 지원이 필요합니다.
+
+**4. Alert rule 등록 UI 수정**
+
+| 추가 항목 | 내용 |
+|----------|------|
+| `grafanaStyle` switch | query별 템플릿 스타일 선택 |
+| Static variables 편집 | key-value 형태로 변수 정적 등록 |
+
+현재 UI에 없는 개념이므로 화면 설계부터 시작해야 합니다.
+
+**5. Preview(테스트) 경로 전체 전파**
+
+Alert preview 경로는 단순히 `handler.go`만 바꾸면 안 됩니다.
+`API → adapter → internal spec → handler` 전 구간에 `TemplateStyle`이 흘러야 합니다.
+
+현재 preview 흐름:
+```
+AlertQueryRequest
+  └─ APIAdapter.FromAPIQueryRequest()
+       └─ resources.Query (= query_builder.Query)
+            └─ QuerySpec { Query, Variables, TimeLabel, VariableLabel }
+                 └─ handler.go:768 → GetQuery()
+```
+
+변경 후 흐름:
+```
+AlertQueryRequest (templateStyle 추가)
+  └─ APIAdapter.FromAPIQueryRequest() (templateStyle 매핑 추가)
+       └─ resources.Query (= query_builder.Query)
+            └─ QuerySpec { Query, Variables, TimeLabel, VariableLabel, TemplateStyle } ← 신규
+                 └─ handler.go:768 → Build(style, query, variables)
+```
+
+수정 대상:
+
+| 파일 | 수정 내용 |
+|------|---------|
+| `shared/types/alert/` alert schema | `AlertQueryRequest.query`에 `templateStyle` 필드 추가 |
+| `core/internal/query_builder/query_spec.go` | `QuerySpec`에 `TemplateStyle string` 추가 |
+| `core/pkg/alert/adapters/api_adapter.go` | `FromAPIQueryRequest()`에서 `api.Query.TemplateStyle` → `internal.Query.Query.TemplateStyle` 매핑 |
+| `core/pkg/alert/handler.go:768` | `GetQuery()` → `Build(style, query, variables)` 교체 |
+
+`resources.QuerySpec`과 `resources.Query`는 `query_builder` 패키지의 type alias이므로
+`QuerySpec`에 `TemplateStyle`을 추가하면 자동으로 반영됩니다.
+
+```go
+// query_spec.go 변경 후
+type QuerySpec struct {
+    Variables     map[string]any `json:"variables" mapstructure:"variables"`
+    Query         string         `json:"query" mapstructure:"query"`
+    TimeLabel     string         `json:"time_label" mapstructure:"time_label"`
+    VariableLabel string         `json:"variable_label" mapstructure:"variable_label"`
+    TemplateStyle string         `json:"template_style" mapstructure:"template_style"` // 신규
+}
+
+// api_adapter.go FromAPIQueryRequest() 변경 후
+func (a *APIAdapter) FromAPIQueryRequest(api alert.AlertQueryRequest) *resources.Query {
+    return &resources.Query{
+        Datasource: api.Datasource,
+        Query: resources.QuerySpec{
+            Query:         api.Query.Query,
+            Variables:     api.Query.Variables,
+            TemplateStyle: api.Query.TemplateStyle, // 신규 매핑
+        },
+    }
+}
+
+// handler.go:768 변경 후
+queryResp, err := query_builder.Build(
+    query_builder.Style(res.Query.Query.TemplateStyle),
+    res.Query.Query.Query,
+    res.Query.Query.Variables,
+)
+```
+
+**핵심: preview와 scheduler가 동일한 `TemplateStyle`로 실행되어야 합니다.**
+preview만 Grafana 스타일로 바꾸고 scheduler는 pongo2로 두면
+등록 전 테스트는 성공하는데 실제 alert 실행 결과가 달라지는 문제가 생깁니다.
+
+---
+
+### 2차 작업 순서 (참고)
+
+| 순서 | 작업 | 비고 |
+|------|------|------|
+| 1 | Alert 전용 static variables UI/UX 설계 | 화면 설계부터 시작 |
+| 2 | alert schema(`AlertQueryRequest`)에 `templateStyle` 추가 | camelCase |
+| 3 | `core/internal/query_builder/query_spec.go` `QuerySpec`에 `TemplateStyle` 추가 | `resources.QuerySpec/Query`는 type alias라 자동 반영 |
+| 4 | `APIAdapter.FromAPIQueryRequest()`에 `templateStyle` 매핑 추가 | camelCase → snake_case |
+| 5 | `Datasource` 구조체에 `TemplateStyle string` 추가 (`json:"template_style"`) | alert rule 저장 JSON 계약 변경 (DB 컬럼 추가 아님) |
+| 6 | 기존 rule JSON 하위 호환 확인 (`template_style` 없으면 `"pongo2"` fallback) | — |
+| 7 | `RenderQuery()` (스케줄러) → `Build()` 교체 | scheduler 경로 |
+| 8 | `handler.go:768` (preview) → `Build()` 교체 | preview 경로 |
+| 9 | Alert rule 등록/수정 UI에 `grafanaStyle` switch + static variables 편집 추가 | — |
+| 10 | 테스트 (하단 참고) | — |
+
+**테스트 체크리스트:**
+
+| 케이스 | 검증 내용 |
+|--------|---------|
+| 기존 rule JSON (`template_style` 없음) | scheduler가 pongo2로 정상 실행되는지 |
+| `template_style: "grafana"` rule | scheduler가 Grafana 스타일로 실행되는지 |
+| preview 요청 (`templateStyle: "grafana"`) | preview 결과와 scheduler 실행 결과가 동일한 스타일로 렌더링되는지 |
+| preview 요청 (`templateStyle` 없음) | pongo2 fallback으로 실행되는지 |
+| `APIAdapter.FromAPIQueryRequest()` | `templateStyle` 필드가 `QuerySpec.TemplateStyle`로 올바르게 매핑되는지 |
+
+---
+
+## 11. 1차 개발 미결 사항 (2026-05-21)
+
+1차 구현 전에 정책을 확정하거나 코드를 추가로 확인해야 하는 항목들입니다.
+
+---
+
+### [정책 결정 필요] A. `$__step` / `$__interval` / `$__interval_ms` 처리 여부
+
+Pharos는 Prometheus QueryRange 실행 시 `__step`을 context에서 추출합니다.
+
+```go
+// query.go:197
+step, ok3 := toInt64("__step")
+```
+
+Grafana의 `$__interval` / `$__interval_ms`는 Pharos의 `__step`과 유사한 개념입니다.
+
+**핵심 관점: 백엔드 alias 불필요, 프론트 variables 주입으로 해결 가능**
+
+context whitelist 정책상 프론트엔드에서 variables 맵에 원하는 이름으로 값을 넣으면
+백엔드 빌더는 자동으로 치환합니다. 특별한 alias 처리가 필요 없습니다.
+
+```typescript
+// 프론트엔드에서 variables 맵에 추가
+const variables = {
+  __start_time: startTime,
+  __end_time:   endTime,
+  __step:        stepSeconds,           // 기존 (초 단위 확인 후)
+  __interval:    `${stepSeconds}s`,     // 추가: Grafana $__interval 호환
+  __interval_ms: stepSeconds * 1000,    // 추가: Grafana $__interval_ms 호환
+};
+```
+
+이렇게 하면 `$__interval` → `ctx["__interval"]` = `"30s"` → 자동 치환됩니다.
+`$__interval_ms` → `ctx["__interval_ms"]` = `30000` → 마찬가지로 자동 치환됩니다.
+
+**단, 단위 확인 필요:**
+
+| 변수 | 타입 | 예시 |
+|------|------|------|
+| Grafana `$__interval` | duration 문자열 | `"30s"` |
+| Grafana `$__interval_ms` | 숫자 (밀리초) | `30000` |
+| Pharos `__step` | 숫자 (단위 코드 확인 필요) | `30` or `30000` |
+
+Pharos `__step`이 초 단위인지 확인 후 `__interval` 변환 포맷을 결정합니다.
+
+**선택지:**
+
+| 선택 | 처리 방식 | 변경 위치 |
+|------|----------|---------|
+| A) 지원 안 함 | context 없음 → 원본 유지 (빌더 오류 없음, 실행 오류 가능) | 없음 |
+| B) 프론트 variables 주입 | `__interval: \`${stepSeconds}s\``, `__interval_ms: stepSeconds * 1000` 를 variables에 추가 | 프론트엔드만 |
+| C) 백엔드 alias | `replaceTimeAliases()`에 `$__interval` / `$__interval_ms` → `ctx["__step"]` 기반 매핑 추가 | 백엔드만 |
+
+B가 가장 단순하고 백엔드 변경이 없어 권장합니다.
+단위만 확인되면 프론트 variables 맵 확장으로 즉시 해결됩니다.
+
+---
+
+### [정책 결정 필요] B. `[[var:format]]` 레거시 문법 format 지원 여부
+
+Grafana 정규식은 레거시 문법에서도 format을 캡처합니다.
+
+```
+\[\[(\w+?)(?::(\w+))?\]\]
+      ↑          ↑
+   varName     format (optional)
+```
+
+`[[hosts:csv]]` → varName=`hosts`, format=`csv`
+
+**선택지:**
+
+| 선택 | 처리 |
+|------|------|
+| A) format 미지원 | `[[hosts:csv]]` → format 무시, 값만 치환 |
+| B) format 지원 | `[[hosts:csv]]` → `${hosts:csv}`와 동일하게 처리 |
+
+format을 무시할 경우 사용자가 `[[hosts:csv]]`를 쓰면 예상과 다른 결과가 나옵니다.
+지원하는 것이 일관성 있지만 설계서에 명시되지 않았습니다.
+
+---
+
+### [구현 명세 필요] C. 단일값 / 다중값 판별 로직
+
+`formatGrafanaVariable(val any, format string)` 함수 내부에서
+`val`이 단일값인지 다중값인지에 따라 출력이 달라집니다.
+
+| format | 단일값 (`"job1"`) | 다중값 (`["job1","job2"]`) |
+|--------|-----------------|--------------------------|
+| glob (미지정) | `job1` | `{job1,job2}` |
+| csv | `job1` | `job1,job2` |
+| regex | `job1` | `(job1|job2)` |
+| json | `"job1"` | `["job1","job2"]` |
+| singlequote | `'job1'` | `'job1','job2'` |
+| sqlstring | `'job1'` | `'job1','job2'` |
+
+Go에서 `ctx map[string]any`의 값은 JSON 역직렬화 시 아래 타입으로 들어옵니다.
+
+```go
+// 단일값: string
+// 다중값: []any (JSON array → []interface{})
+
+func formatGrafanaVariable(val any, format string) string {
+    switch v := val.(type) {
+    case string:
+        return formatSingle(v, format)
+    case []any:
+        strs := toStringSlice(v)
+        return formatMulti(strs, format)
+    default:
+        return fmt.Sprintf("%v", val) // number 등 fallback
+    }
+}
+```
+
+이 판별 로직을 `grafana.go` 구현 전에 명세로 확정해야 합니다.
+
+---
+
+### [코드 추가 필요] D. `DatasourceEditor.tsx` — templateStyle prop 누락
+
+현재 `DatasourceEditor` props에 `templateStyle`이 없습니다.
+
+```typescript
+// 현재 DatasourceEditorProps — templateStyle 없음
+interface DatasourceEditorProps {
+  panelId: string;
+  datasourceName: string;
+  datasourceType: string;
+  query: string;
+  onDatasourceChange: (name: string) => void;
+  onQueryChange: (query: string) => void;
+  onRunQuery: () => void;
+  datasourceOptions: Array<{ value: string; label: string; type: string }>;
+  isLoading?: boolean;
+}
+```
+
+추가 필요:
+```typescript
+templateStyle?: string;
+onTemplateStyleChange?: (style: string) => void;
+```
+
+`left-bottom.tsx`에서 `DatasourceEditor` 호출 시 (line 181-195) props 전달 및
+switch 변경 핸들러 연결이 필요합니다.
+
+```typescript
+// left-bottom.tsx 추가 핸들러
+const handleTemplateStyleChange = useCallback((index: number, value: string) => {
+  updateQueryField(index, 'templateStyle', value);
+}, [updateQueryField]);
+```
+
+---
+
+### [코드 추가 필요] E. `QueryInspectorSheet` + `left-bottom.tsx` — templateStyle 미전파
+
+`QueryInspectorSheet` props에 현재 `templateStyle`이 없습니다.
+
+```typescript
+// 현재 QueryInspectorSheetProps — templateStyle 없음
+interface QueryInspectorSheetProps {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  dashboardId: string;
+  datasourceName?: string;
+  query?: string;
+  variables?: Record<string, unknown>;
+}
+```
+
+`left-bottom.tsx` Inspector 호출부 (line 210-217):
+
+```typescript
+// 현재: templateStyle 없음
+<QueryInspectorSheet
+  open={inspectorOpen}
+  onOpenChange={setInspectorOpen}
+  dashboardId={dashboardId || ''}
+  datasourceName={firstQuery?.datasourceName}
+  query={firstQuery?.query}
+  variables={inspectorVariables}
+  // → templateStyle={firstQuery?.templateStyle} 없음
+/>
+```
+
+수정 범위:
+- `QueryInspectorSheetProps`에 `templateStyle?: string` 추가
+- `left-bottom.tsx` 호출부에 `templateStyle={firstQuery?.templateStyle}` 추가
+- `QueryInspectorSheet` → `useQueryInspector` → run body까지 전파
+
+---
+
+### [검증 필요] F. 기존 저장 데이터 하위 호환
+
+기존 DB에 저장된 `ChartQuery`에는 `templateStyle` 필드가 없습니다.
+
+**프론트엔드:** quicktype 재생성 후 Zod가 `templateStyle`을 인식하면
+기존 데이터에 없어도 `undefined`로 파싱 (strip 아님) → 정상 동작 예상.
+
+**백엔드:** `TemplateStyle = ""` → `Build("", ...)` → `default` 케이스 → pongo2 fallback.
+
+```go
+func Build(style Style, query string, ctx map[string]any) ([]byte, error) {
+    switch style {
+    case StyleGrafana:
+        return buildGrafana(query, ctx)
+    default: // "" (미설정) 포함 → pongo2 fallback ✅
+        return GetQuery(query, ctx)
+    }
+}
+```
+
+구현 후 `TemplateStyle = ""` 케이스를 테스트로 명시적 검증 필요.
+
+---
+
+### [UX 개선 권장] G. VariableReferencePanel Grafana 스타일 안내
+
+`DatasourceEditor.tsx`의 "내장 변수 참조" 패널(`VariableReferencePanel`)이 있습니다.
+grafanaStyle switch ON 시 이 패널 내용도 Grafana 문법으로 전환하면 좋습니다.
+
+| grafanaStyle | 표시 내용 |
+|-------------|---------|
+| OFF (pongo2) | `{{ __start_time }}`, `{{ __end_time }}` 등 |
+| ON (grafana) | `$__from`, `${__to}`, `${var:regex}` (다중값 PromQL 필수) 안내 등 |
+
+특히 다중값 변수를 PromQL에 쓸 때 `$job`이 아닌 `${job:regex}`를 써야 하는 이유를
+이 패널에 안내하면 사용자 실수를 줄일 수 있습니다.
+
+---
+
+### 미결 사항 요약
+
+| 항목 | 종류 | 우선순위 |
+|------|------|---------|
+| A. `$__step` / `$__interval` / `$__interval_ms` variables 주입 여부 | 정책 결정 | Medium |
+| B. `[[var:format]]` format 지원 | 정책 결정 | Low |
+| C. 단일값/다중값 판별 로직 명세 | 구현 명세 | High |
+| D. `DatasourceEditor` templateStyle prop 추가 | 코드 추가 | High |
+| E. `QueryInspectorSheet` templateStyle 전파 | 코드 추가 | High |
+| F. 기존 저장 데이터 하위 호환 테스트 | 검증 | Medium |
+| G. VariableReferencePanel Grafana 안내 | UX 개선 | Low |
+
+---
+
+## 12. Variable Query 편집창 — Datasource 자동 감지 및 Validation 분기 (2026-05-22)
+
+### 결정 사항
+
+**FilterConfig에 templateStyle / queryMode 필드를 추가하지 않는다.**
+
+근거: preview → Run 실행 시 datasource 타입으로 이미 실패 경로가 분기되므로,
+추가 필드 없이 datasource 이름/타입 기반 자동 감지로 충분하다.
+명시 필드 추가는 QueryFields UI에서 사용자가 스타일을 수동으로 지정하는 경우에 한해
+나중에 검토한다.
+
+---
+
+### 자동 감지 판별 기준
+
+기존 코드베이스 전체가 datasource 이름에 `"prometheus"` 포함 여부로 판별하고 있다.
+
+```
+core/frontend/src/features/dashboard/hooks/QueryPipeline.ts:286
+  q.datasourceName?.toLowerCase().includes('prometheus')
+
+core/frontend/src/features/dashboard/panels/components/PanelEditor/left-bottom.tsx:38
+  firstQuery?.datasourceName?.toLowerCase().includes('prometheus')
+```
+
+`QueryFields`도 동일 패턴을 따른다.
+`useDatasourceList` 훅이 이미 `type` 필드를 제공하므로 type 우선, 없으면 name fallback으로 확인한다.
+최종 확정된 헬퍼는 아래와 같다 (섹션 12 "type 기반 감지 헬퍼" 참고):
+
+```typescript
+const isPrometheusDatasource = (name: string, type?: string): boolean =>
+  type
+    ? type.toLowerCase() === 'prometheus'
+    : name.toLowerCase().includes('prometheus');
+```
+
+선택된 datasource 조회:
+```typescript
+const selectedDs = dataSourceList.find(ds => ds.value === data.datasourceName);
+const isPrometheus = isPrometheusDatasource(
+  data.datasourceName ?? '',
+  selectedDs?.type,
+);
+```
+
+---
+
+### validateQuery 분기
+
+**현재 (문제):**
+```typescript
+const validateQuery = (query: string): QueryValidationResult => {
+  if (!queryLower.startsWith('select')) {
+    return { isValid: false, message: 'Query must be a SELECT statement' };
+  }
+  // ...
+};
+```
+datasource 무관하게 SELECT 강제 → Prometheus 쿼리 전부 빨간 에러.
+
+**변경 후:**
+```typescript
+const validateQuery = (query: string, isPrometheus: boolean): QueryValidationResult => {
+  if (!query.trim()) {
+    return { isValid: true, message: '' };
+  }
+
+  // Prometheus datasource는 PromQL / Grafana classic variable query 허용
+  if (isPrometheus) {
+    return { isValid: true, message: '' };
+  }
+
+  // SQL datasource: SELECT + value/label 컬럼 검사
+  const queryLower = query.toLowerCase().trim();
+  if (!queryLower.startsWith('select')) {
+    return { isValid: false, message: 'Query must be a SELECT statement' };
+  }
+  const hasValue = queryLower.includes('as value') || queryLower.includes(' value,') || queryLower.includes(' value ');
+  const hasLabel = queryLower.includes('as label') || queryLower.includes(' label,') || queryLower.includes(' label ');
+  if (!hasValue || !hasLabel) {
+    return {
+      isValid: false,
+      message: 'Query must include "value" and "label" columns (e.g., "column_name AS value, column_name AS label")',
+    };
+  }
+
+  return { isValid: true, message: '' };
+};
+```
+
+호출부도 동일하게 `isPrometheus`를 넘겨야 한다:
+```typescript
+// handleChange 내부
+const validation = validateQuery(value, isPrometheus);
+
+// useEffect 내부 (datasource 변경 시 재검증)
+useEffect(() => {
+  if (data.query) {
+    setQueryValidation(validateQuery(data.query, isPrometheus));
+  }
+}, [data.query, isPrometheus]);
+```
+
+datasource가 바뀌면 `isPrometheus` 값이 변하고 `useEffect`가 재실행되어 자동으로 재검증된다.
+
+---
+
+### 가이드 텍스트 분기
+
+SQL datasource일 때 현재 안내 텍스트를 유지하고,
+Prometheus datasource일 때는 아래로 교체한다.
+
+**Prometheus 안내 (isPrometheus = true):**
+```
+Write a PromQL or Grafana classic variable query:
+
+• PromQL: label_replace(...), vector(0), up{job=~"$job"}
+• Grafana classic: label_values(metric, label_name)
+                   label_values(metric{job=~"$job"}, label_name)
+
+Example:
+  label_values(up{job=~"$job"}, instance)
+  → Shows "instance" label values from metrics where job matches $job
+
+Variable references: use $varName or ${varName} syntax.
+Note: query_result() is not yet supported.
+```
+
+**SQL 안내 (isPrometheus = false, 현재 유지):**
+```
+Write a SELECT query that returns "value" and "label" columns:
+  ...
+Example: SELECT system_id AS value, system_name AS label FROM table_name ...
+```
+
+placeholder도 분기한다:
+- SQL: `SELECT column_name AS value, column_name AS label FROM table_name`
+- Prometheus: `label_values(metric, label_name)`
+
+---
+
+### 감지 방식 결정: type 기반으로 통일
+
+`master_config.toml` 기준:
+```toml
+[[provisioning.plugins.datasources]]
+type = "prometheus"
+name = "prometheus-metric"
+```
+
+현재 `name = "prometheus-metric"`이라 name 기반 감지도 동작하지만,
+name이 바뀌어도 type 기반이면 안전하므로 **type 기반으로 통일**한다.
+
+---
+
+### 수정 대상 파일
+
+| 파일 | 수정 내용 |
+|------|---------|
+| `core/frontend/src/features/dashboard/variables/components/VariableEditor/QueryFields.tsx` | `isPrometheusDatasource()` — `dataSourceList`에서 type 우선 확인, `validateQuery(query, isPrometheus)` 분기, 가이드 텍스트 조건부 렌더링, placeholder 분기 |
+| `core/frontend/src/features/dashboard/hooks/slices/types.ts` | `FilterMeta` 인터페이스에 `datasourceType?: string` 추가, `_loadDashboard` options 타입에 `datasourceTypeMap?: Record<string, string>` 추가 |
+| `core/frontend/src/types/charts.ts` | `ChartQueryRequest`에 `datasourceType?: string` 추가 |
+| `core/frontend/src/features/dashboard/hooks/QueryPipeline.ts` | Prometheus 감지 시 `extractVariables()` + `extractGrafanaVariables()` union 사용 — `datasourceType` 우선, name fallback |
+| `core/frontend/src/features/dashboard/utils/dependency-graph.ts` | `Variable` 인터페이스에 `datasourceName?: string`, `datasourceType?: string` 추가, `buildFromVariables()`에서 union 사용 |
+| `core/frontend/src/features/dashboard/hooks/slices/variable-runtime-slice.ts` | `validMetas` 빌드 시 `datasourceType` 포함, `setFilterMeta` 트리거에 `datasourceType` 변경 추가 |
+| `core/frontend/src/features/dashboard/variables/plugins/select/SelectVariable.tsx` | `useDatasourceList`로 type 조회 후 마운트 시 `setFilterMeta({ datasourceType })` 호출 |
+| `core/frontend/src/features/dashboard/hooks/useDashboardQuery.ts` | Filter 초기 등록 `useEffect`(line 243)에서 `datasourceType` 포함, `toChartQueryRequests()` — 아래 참고 |
+| `core/frontend/src/features/dashboard/hooks/slices/dashboard-crud-slice.ts` | 경로 B: `setFilterMetas()` 호출 전 `datasourceTypeMap`을 받아 `FilterMeta.datasourceType` 주입 — 아래 제약 참고 |
+| `core/frontend/src/features/dashboard/hooks/use-dashboard-store.ts` | `useDashboardAutoLoad()`에 `useDatasourceList()` 추가, `isDsLoading` 체크 후 `datasourceTypeMap` 전달 |
+
+FilterConfig 스키마, Go 백엔드, generated 타입은 변경 없음.
+
+---
+
+### type 기반 감지 헬퍼
+
+모든 경로에서 동일한 판별 로직을 사용한다:
+
+```typescript
+const isPrometheusDatasource = (name: string, type?: string): boolean =>
+  type
+    ? type.toLowerCase() === 'prometheus'          // type 있으면 type만 보고 판단
+    : name.toLowerCase().includes('prometheus');   // type 없을 때만 name fallback
+```
+
+`type`이 있으면 type으로만 판단한다. `type`이 없을 때만 name으로 fallback한다.
+이전 코드(`type?.toLowerCase() === 'prometheus' || name.includes('prometheus')`)는
+type이 `"postgresql"`이어도 name에 prometheus가 포함되면 Prometheus로 잘못 판단하는 문제가 있었다.
+
+---
+
+### FilterMeta / ChartQueryRequest — datasourceType 필드 추가
+
+**`types.ts` (FilterMeta):**
+```typescript
+export interface FilterMeta {
+  id: string;
+  query: string;
+  datasourceName: string;
+  datasourceType?: string;  // 추가
+  // ...런타임 상태
+}
+```
+
+**`charts.ts` (ChartQueryRequest):**
+```typescript
+type ChartQueryRequest = {
+  dashboardId: string;
+  id?: string;
+  kind?: Kind;
+  query?: string;
+  datasourceName?: string;
+  datasourceType?: string;  // 추가
+  templateStyle?: string;
+  // ...
+};
+```
+
+`datasourceType`의 값은 `/plugins/datasources` API 응답의 `type` 필드다 (`"prometheus"`, `"postgresql"` 등).
+
+**`toChartQueryRequests()` 경로 (`useDashboardQuery.ts:73`) — name fallback 유지:**
+```typescript
+// 현재: datasourceName만 포함
+return queries.map((q, idx) => ({
+  dashboardId,
+  datasourceName: q.datasourceName || '',
+  templateStyle: q.templateStyle || 'pongo2',
+  // datasourceType 없음
+}));
+```
+
+`toChartQueryRequests()`는 `ChartQuery[]`를 받는데, `ChartQuery`에 `datasourceType`이 없다.
+datasource list를 주입하거나 `ChartQuery`에 type을 추가하지 않는 한,
+**이 경로(패널 쿼리)는 name fallback으로 동작**한다.
+name `"prometheus-metric"`이 있으므로 현재 프로젝트에서는 정상 동작하며,
+필요 시 2차 작업으로 `ChartQuery`에 type 추가를 검토한다.
+
+**Filter 초기 등록 경로 (`useDashboardQuery.ts:243`) — datasourceType 추가:**
+```typescript
+// 현재
+store.setFilterMeta(id, {
+  id,
+  query: queries[0].query || '',
+  datasourceName: queries[0].datasourceName || '',
+});
+
+// 변경 후
+store.setFilterMeta(id, {
+  id,
+  query: queries[0].query || '',
+  datasourceName: queries[0].datasourceName || '',
+  datasourceType: queries[0].datasourceType,  // 추가
+});
+```
+
+---
+
+### QueryPipeline 연쇄 변수 dependency 추출 분기
+
+**현재 코드 (`QueryPipeline.ts:191`):**
+```typescript
+const directVars = [...new Set(this.queries.flatMap((q) => (
+  q.templateStyle === 'grafana'
+    ? extractGrafanaVariables(q.query || '')
+    : extractVariables(q.query || '')
+)))].sort();
+```
+
+**변경 후:**
+```typescript
+const directVars = [...new Set(this.queries.flatMap((q) => {
+  const query = q.query || '';
+  if (q.templateStyle === 'grafana') {
+    return extractGrafanaVariables(query);
+  }
+  if (isPrometheusDatasource(q.datasourceName || '', q.datasourceType)) {
+    // Prometheus: {{ }} (pongo2)와 $var (Grafana) 모두 추출 (union)
+    return [...new Set([...extractVariables(query), ...extractGrafanaVariables(query)])];
+  }
+  return extractVariables(query);
+}))].sort();
+```
+
+기존 Prometheus 쿼리의 `{{ job }}` pongo2 변수가 깨지지 않는다.
+
+---
+
+### DependencyGraph cascade 분기
+
+dependency graph는 cascade reset의 핵심이다.
+`job` 변경 → `pod`/`sys_id` 초기화는 `getAllDependents()`가 그래프를 순회해 결정하는데,
+그래프가 `extractVariables()`(pongo2)로만 만들어지면 `$job` 엣지 자체가 없어 cascade가 동작하지 않는다.
+
+**현재 코드 (`dependency-graph.ts:43`):**
+```typescript
+export interface Variable {
+  id: string;
+  query: string;
+}
+const deps = extractVariables(variable.query);
+```
+
+**변경 후:**
+```typescript
+export interface Variable {
+  id: string;
+  query: string;
+  datasourceName?: string;   // 추가
+  datasourceType?: string;   // 추가
+}
+
+const isPrometheus = isPrometheusDatasource(
+  variable.datasourceName || '',
+  variable.datasourceType,
+);
+const deps = isPrometheus
+  ? [...new Set([...extractVariables(variable.query), ...extractGrafanaVariables(variable.query)])]
+  : extractVariables(variable.query);
+```
+
+**variable-runtime-slice.ts 연결 — datasourceType 추가:**
+```typescript
+// setFilterMeta 트리거 조건: datasourceType 변경도 graph rebuild 유발
+if (updates.query || updates.datasourceName || updates.datasourceType) { ... }
+
+// validMetas 빌드 시 datasourceType 포함
+const validMetas = Array.from(filterMetas.values())
+  .filter(m => m.query && m.datasourceName)
+  .map(m => ({
+    id: m.id,
+    query: m.query,
+    datasourceName: m.datasourceName,
+    datasourceType: m.datasourceType,  // 추가
+  }));
+```
+
+**datasourceType 등록 전략 — viewer/run mode 분리**
+
+`SelectVariable`에서 `datasourceName` prop은 Run Mode(editor/owner)에서만 실제 값이 들어온다.
+Viewer/Panel Mode에서는 `datasourceName: ''`로 query request가 구성되므로
+`if (!datasourceName) return` 조건이 type 등록을 건너뛴다.
+
+따라서 **두 가지 경로**로 type 등록을 보장해야 한다:
+
+**경로 A — Run Mode (SelectVariable.tsx 마운트 시):**
+```typescript
+const { dataSourceList } = useDatasourceList();
+
+useEffect(() => {
+  if (!datasourceName) return;  // viewer에서는 skip — 경로 B로 보완
+  const ds = dataSourceList.find(d => d.value === datasourceName);
+  if (ds?.type) {
+    useDashboardStore.getState().setFilterMeta(id, { datasourceType: ds.type });
+  }
+}, [id, datasourceName, dataSourceList]);
+```
+
+**경로 B — Viewer/Panel Mode 포함 전체 (setFilterMetas 주입):**
+
+대시보드 로드 시 FilterConfig 기반으로 `setFilterMetas()`를 호출하는 지점에서
+datasource type map을 함께 주입하는 방식이 더 안정적이다.
+
+```typescript
+// FilterConfig → FilterMeta 변환 시 type map 조회
+const dsTypeMap = Object.fromEntries(
+  dataSourceList.map(ds => [ds.value, ds.type])
+);
+
+const filterMetas = filters.map(f => ({
+  id: f.id,
+  query: f.query ?? '',
+  datasourceName: f.datasourceName ?? '',
+  datasourceType: dsTypeMap[f.datasourceName ?? ''],  // type map에서 조회
+  kind: f.kind,
+  // ...
+}));
+store.setFilterMetas(filterMetas);
+```
+
+이 방식이면 viewer/run mode 구분 없이 최초 graph부터 type 기반으로 만들어진다.
+
+**초기 graph build 타이밍:**
+
+| 전략 | 첫 graph | viewer 지원 |
+|------|---------|------------|
+| 경로 A만 (SelectVariable) | name fallback → 마운트 후 rebuild | viewer에서 type 미등록 가능 |
+| 경로 B (setFilterMetas 주입) | type 기반으로 정확히 생성 | viewer 포함 전체 지원 |
+| A + B 병행 | 첫 graph 정확, SelectVariable이 재확인 | 가장 안전 |
+
+권장: **경로 B를 기본으로 구현**하고, 경로 A를 보조로 유지.
+
+**[경로 B 구현 제약] dashboard-crud-slice.ts는 store slice라 useDatasourceList() 직접 사용 불가**
+
+경로 B의 실제 변환 지점은 `dashboard-crud-slice.ts`의 `setFilterMetas()` 호출부다.
+그런데 이 파일은 store slice이므로 React hook(`useDatasourceList()`)을 직접 호출할 수 없다.
+
+세 가지 구현 선택지:
+
+| 방법 | 설명 | 장단점 |
+|------|------|--------|
+| A) 호출부에서 map 전달 | 대시보드 로딩 컴포넌트에서 `dataSourceList`를 가져와 `datasourceTypeMap`을 slice 액션에 같이 넘김 | 간단하나 호출부에 의존 |
+| B) 별도 store 참조 | datasource list를 별도 store/atom에 저장하고 slice 내부에서 참조 | 추가 store 설계 필요 |
+| C) 컴포넌트 레벨 merge | `setFilterMetas()` 직전에 화면 컴포넌트에서 type을 merge 후 전달 | 경로 A와 유사, slice 변경 불필요 |
+
+권장: **방법 A** — 대시보드 로딩을 담당하는 컴포넌트/hook에서 `useDatasourceList()`로 type map을 만들어
+`dashboard-crud-slice.ts`의 `_loadDashboard()` 호출 시 함께 전달한다.
+
+**방법 A 구체 구현 — `_loadDashboard` options 확장:**
+
+`options` 타입은 `types.ts`에 정의되어 있으므로, **`types.ts`에 `datasourceTypeMap` 추가가 먼저** 필요하다.
+
+```typescript
+// types.ts (line 149 근처) — _loadDashboard options 타입 확장
+interface LoadDashboardOptions {
+  forceReload?: boolean;
+  urlParams?: URLSearchParams;
+  datasourceTypeMap?: Record<string, string>;  // 추가
+}
+```
+
+호출부 구현 — **`use-dashboard-store.ts`의 `useDashboardAutoLoad()` (line 116) 수정:**
+
+실제 `_loadDashboard()` 자동 호출 경로는 `use-dashboard-store.ts:132`다.
+이 훅에 `useDatasourceList()`를 추가하고 `isLoading` 완료 후 호출해야 한다.
+
+```typescript
+// use-dashboard-store.ts — useDashboardAutoLoad() 수정
+export const useDashboardAutoLoad = (dashboardId: string) => {
+  const _loadDashboard = useDashboardStore((state) => state._loadDashboard);
+  const currentId = useDashboardStore((state) => state.id);
+  const { search } = useLocation();
+  const { dataSourceList, isLoading: isDsLoading } = useDatasourceList();
+  // error 시 dataSourceList=[] → datasourceTypeMap={} → name fallback 허용 (별도 처리 불필요)
+  const searchRef = React.useRef(search);
+  searchRef.current = search;
+
+  const datasourceTypeMap = React.useMemo(
+    () => Object.fromEntries(dataSourceList.map(ds => [ds.value, ds.type])),
+    [dataSourceList],
+  );
+
+  React.useEffect(() => {
+    if (!dashboardId || dashboardId === currentId) return;
+    if (isDsLoading) return;  // datasource 목록 로딩 전엔 호출하지 않음
+    // datasource list error 시: dataSourceList=[] → datasourceTypeMap={} → name fallback 허용
+    void _loadDashboard(dashboardId, {
+      urlParams: new URLSearchParams(searchRef.current),
+      datasourceTypeMap,
+    });
+  }, [dashboardId, currentId, _loadDashboard, isDsLoading, datasourceTypeMap]);
+};
+```
+
+`datasourceTypeMap`을 `useMemo`로 메모이제이션하고 deps에 포함해야
+`dataSourceList`가 변경될 때 `useEffect`가 재실행된다.
+
+**datasource list 로딩 실패 시 정책:**
+`isLoading=false` + `error` 상태이면 `dataSourceList=[]` → `datasourceTypeMap={}` → name fallback.
+name에 `"prometheus"`가 포함된 현재 프로젝트 설정(`prometheus-metric`)에서는 name fallback으로도 정상 동작하므로
+로딩 실패를 별도 오류로 처리하지 않고 name fallback 허용으로 정책을 단순화한다.
+
+`dashboard-crud-slice.ts:43` — options에서 map 추출 후 `filterMetasData` 빌드 시 type 주입:
+
+```typescript
+_loadDashboard: async (dashboardId, options) => {
+  const datasourceTypeMap = options?.datasourceTypeMap ?? {};  // 추가
+
+  // line 94-100 — type 주입
+  const filterMetasData = filters
+    .filter(f => f.query && f.datasourceName)
+    .map(f => ({
+      id: f.id,
+      query: f.query || '',
+      datasourceName: f.datasourceName || '',
+      datasourceType: datasourceTypeMap[f.datasourceName || ''],  // 추가
+    }));
+}
+```
+
+**`_loadDashboard` 다중 호출부 — 전달 여부 구분:**
+
+`options`가 optional이라 기존 호출이 깨지진 않는다. 단, `datasourceTypeMap`을 넘기지 않으면
+해당 경로에서는 type 기반 첫 graph 보장이 안 된다.
+
+| 호출 위치 | datasourceTypeMap 전달 | 이유 |
+|----------|----------------------|------|
+| `use-dashboard-store.ts` `useDashboardAutoLoad()` | **필수** | 실제 자동 로딩 경로 (line 132). 여기에만 전달해도 초기 graph 보장 |
+| `dashboardDialog.tsx:47` | best-effort (추후 정리) | reload 경로, 경로 A(SelectVariable)로 보완 가능 |
+| `use-handle-general-save.ts:27` | best-effort (추후 정리) | 저장 후 reload 경로, 동일 |
+
+초기 로딩 경로에서만 반드시 전달하고, 나머지 reload 경로는 경로 A(SelectVariable 마운트 시 setFilterMeta)로 보완한다.
+
+이렇게 하면 `setFilterMetas(filterMetasData)` 호출 시 이미 `datasourceType`이 포함된 상태로
+dependency graph가 첫 빌드부터 type 기반으로 만들어진다.
+
+**useDashboardQuery.ts Filter 초기 등록 (best-effort):**
+
+```typescript
+// line 243 — queries[0].datasourceType은 SelectVariable이 채우기 전엔 undefined일 수 있음
+store.setFilterMeta(id, {
+  id,
+  query: queries[0].query || '',
+  datasourceName: queries[0].datasourceName || '',
+  datasourceType: queries[0].datasourceType,  // best-effort: undefined 가능
+});
+```
+
+초기 등록은 best-effort이며, 최종 확정은 SelectVariable 마운트(경로 A) 또는 setFilterMetas 주입(경로 B) 후다.
+`name = "prometheus-metric"`이면 name fallback이 정상 동작하므로 현재 프로젝트에서는 실질적 문제 없다.
+
+---
+
+### 주의: label_values 실행 어댑터는 별도 작업
+
+`validateQuery` 분기와 가이드 텍스트 변경, QueryPipeline/DependencyGraph dependency 추출은 모두 프론트 UI 레이어 수정이다.
+실제로 `label_values(metric, label_name)` 쿼리를 실행하면 Prometheus가 해당 함수를
+PromQL 함수로 인식하지 못해 오류를 반환하므로, 실행 어댑터는 별도 작업이 필요하다.
+
+작업 순서:
+1. **이번**: `QueryFields` validation + 가이드 텍스트, `QueryPipeline` + `DependencyGraph` dependency 추출 분기
+2. **다음**: 어댑터에서 `label_values(...)` 파싱 → Prometheus API 변환
+   - `query_result()`는 어댑터 구현 전까지 미지원 (안내 텍스트에서 제외)
+   - **중요**: `label_values(up{job=~"$job"}, instance)` 형태는 API 호출 전에 `$job`을 실제 값으로 치환해야 한다.
+     FilterConfig에 templateStyle을 추가하지 않으므로 어댑터가 직접 `extractGrafanaVariables()`로 변수를 식별하고 치환한다.
+     치환 데이터 소스는 구현 위치에 따라 다르다:
+     - **프론트 어댑터**: filterMetas에서 현재 선택값을 조회해 `$job` → 실제 값으로 치환 후 Prometheus API 호출
+     - **백엔드 어댑터**: 이미 resolve된 `variables` map(`{"job": "tcp-bridge", ...}`)으로 `$job` 치환 후 Prometheus API 호출
+   - **Prometheus API 호출 방식**: 인자 구성에 따라 3가지로 분기
+
+     | 쿼리 형태 | Prometheus API |
+     |----------|---------------|
+     | `label_values(pod)` — label만 | `GET /api/v1/label/pod/values` |
+     | `label_values(up, pod)` — metric + label | `GET /api/v1/label/pod/values?match[]=up` |
+     | `label_values(up{job=~"tcp-bridge"}, pod)` — metric + selector + label | `GET /api/v1/label/pod/values?match[]=up{job=~"tcp-bridge"}` |
+
+     metric이 있으면 항상 `match[]`를 붙여야 한다. 생략하면 metric 필터가 무시되어 전체 label 값이 반환된다.
+     `match[]`로 원하는 결과가 나오지 않는 경우 `/api/v1/series?match[]=...` 후 해당 label 값을 추출하는 방식도 가능하다.
+
+   - **파싱 주의 — 최상위 comma 기준 인자 분리:**
+     `label_values(up{job=~"$job", instance=~"$instance"}, pod)` 처럼
+     selector 내부에도 comma가 들어간다. 단순 `split(',')` 로 구현하면 인자 분리가 깨진다.
+     먼저 `label_values(` prefix와 마지막 `)`를 제거한 뒤, 내부 인자 문자열에서
+     괄호/중괄호 depth가 0이고 quoted string 바깥인 comma만 인자 구분자로 사용해야 한다:
+     ```
+     inner: up{job=~"$job", instance=~"$instance"}, pod
+                              ↑ selector 내부 comma이므로 무시
+                                                       ↑ depth 0 + quote 바깥이므로 인자 구분자
+     ```
+     PromQL label matcher 안에는 quoted string이 들어가므로 quote/escape 상태도 함께 추적한다.
+     예를 들어 `"..."` 안의 comma, `{`, `}`는 depth 계산과 인자 분리에 영향을 주면 안 되고,
+     `\"`, `\\` 같은 escape sequence는 quote 종료로 오인하지 않아야 한다.
+
+   - **`match[]` URL 인코딩 주의:**
+     `match[]` 값은 URL query parameter이므로 HTTP 클라이언트에서 query param으로 설정해 자동 인코딩되게 해야 한다.
+     문자열 직접 concatenation으로 URL을 만들면 `{`, `}`, `=~` 등이 인코딩되지 않아 Prometheus가 파싱 오류를 낼 수 있다.
+
+---
+
+## 13. Variable 쿼리 Run 실행 시 templateStyle:"pongo2" 전파 분석 (2026-05-22)
+
+### 관찰
+
+Variable preview → Run 실행 시 아래 request body가 전송된다:
+
+```json
+{
+  "run": {
+    "datasourceName": "prometheus-metric",
+    "query": "label_replace(\r\n  label_replace(\r\n    label_replace(\r\n      vector(0), ...",
+    "templateStyle": "pongo2"
+  },
+  "variables": {
+    "__start_time": 1779422425,
+    "__end_time": 1779426025,
+    "__step": 0
+  }
+}
+```
+
+`FilterConfig`에 `templateStyle` 필드가 없는데도 `"pongo2"`가 명시 전송된다.
+
+---
+
+### 원인: dashboard-provider의 fallback
+
+`core/frontend/src/providers/dashboard-provider/index.ts:207`
+
+```typescript
+body = {
+  run: {
+    datasourceName: datasourceName || '',
+    query: query || '',
+    templateStyle: templateStyle || 'pongo2',   // ← FilterConfig엔 없는 필드 → undefined → 'pongo2'
+  },
+  variables,
+};
+```
+
+`ChartQueryRequest`의 `templateStyle`은 ChartQuery(패널용)에서 오는 경우만 실제 값을 갖는다.
+`FilterConfig`(변수용)는 `templateStyle` 필드 자체가 없으므로 `ChartQueryRequest.templateStyle`이 `undefined`가 되고,
+`undefined || 'pongo2'`가 `"pongo2"`로 채워진다.
+
+---
+
+### 백엔드 실행 경로 추적
+
+**1단계: query.go:88 — 쿼리 빌드**
+```go
+sql, err := query_builder.Build(query_builder.Style("pongo2"), query, variables)
+```
+pongo2가 실행되지만 `label_replace(vector(0), ...)` 쿼리에는 `{{ }}` 패턴이 없으므로 **쿼리 원본 그대로 통과**.
+
+**2단계: query.go:201 — 시간 범위 판단**
+```go
+// step > 0 조건 확인
+if ok1 && ok2 && ok3 && start > 0 && end > start && step > 0 {
+    // QueryRange 사용
+}
+```
+variables에서 `__step = 0`이므로 `step > 0` 실패 → `extractTimeRange()` false 반환.
+Prometheus QueryRange가 아닌 **Instant Query** (`/api/v1/query`) 경로로 실행된다.
+
+**3단계: Prometheus Instant Query 결과 형태**
+
+`label_replace(vector(0), "value", "tcp-bridge", ...)` 실행 결과는 Prometheus vector 형태:
+```json
+{
+  "resultType": "vector",
+  "result": [{
+    "metric": { "job": "tcp-bridge", "value": "tcp-bridge", "label": "tcp-bridge" },
+    "value": [1234567890, "0"]
+  }]
+}
+```
+
+이 결과가 `makeDatabaseResponseForPrometheus()`에서 `{ value, label }` row 포맷으로 변환되어야
+프론트 variable selector가 옵션 목록으로 인식할 수 있다.
+
+---
+
+### 정리: templateStyle:"pongo2"가 문제인 상황 vs 아닌 상황
+
+| 쿼리 유형 | templateStyle:"pongo2" 영향 | 결과 |
+|---|---|---|
+| `label_replace(vector(0), ...)` (현재) | 무해 — `{{ }}` 없으므로 통과 | pongo2 이후 Prometheus Instant Query 실행 |
+| `up{job=~"$job"}` (Grafana 스타일) | 무해 — pongo2는 `$job` 무시, 쿼리 통과 | Prometheus에 `$job` 문자열 그대로 전달 → 실행 오류 |
+| `SELECT ... {{ host }} ...` (pongo2 스타일) | 의도한 동작 | `{{ host }}` → 실제 값으로 치환 |
+
+**현재 `label_replace(vector(0), ...)` 쿼리는 pongo2가 무해하게 통과하므로**
+`templateStyle:"pongo2"` 자체가 직접적인 실패 원인은 아니다.
+
+실패 원인은 Prometheus Instant Query 결과를 `{ value, label }` row로 변환하는
+`makeDatabaseResponseForPrometheus()` 처리 방식에 달려 있다.
+
+---
+
+### [정정 완료] 섹션 12 label_values 실패 원인
+
+섹션 12 주의 항목의 설명이 정정되었다.
+Prometheus datasource는 SQL이 아닌 `makeDatabaseResponseForPrometheus()`로 라우팅되며,
+`label_values()` 실패 원인은 Prometheus가 해당 함수를 PromQL로 인식하지 못하기 때문이다 (`unknown function "label_values"`).
+
+---
+
+### 향후 Grafana classic variable query 지원 시 추가 고려
+
+`label_values(up{job=~"$job"}, instance)` 같은 Grafana classic 쿼리는
+pongo2로는 `$job`을 치환하지 못하므로 실행 단계에서 Prometheus가 해석 불가 오류를 낸다.
+
+이 경우 해결 방안:
+- **프론트 어댑터**: `label_values(...)` 패턴을 감지해 Prometheus `/api/v1/label/<label>/values` (+ 필요 시 `match[]`) 직접 호출
+- **백엔드 어댑터**: query.go에서 Grafana classic variable query 감지 후 별도 Prometheus API 라우팅
+- **templateStyle 분기(변수 치환 보조)**: FilterConfig에 templateStyle 필드를 추가해 `"grafana"` 스타일로 전달하면
+  `buildGrafana()`가 `$job`을 grafana 문법으로 치환할 수 있다.
+  단, 이 방식만으로 `label_values(...)`가 실행 가능해지는 것은 아니다.
+  `label_values(...)`는 Prometheus 함수가 아니므로, 실제 실행은 반드시 프론트/백엔드 어댑터에서
+  Prometheus label API(+ 필요 시 `match[]`)로 변환해야 한다.
+## 0. Recent Update - label_values() dependency fallback (2026-05-22)
+
+### Context
+
+Observed log:
+
+```text
+rawQuery:      label_values(tcp_bridge:ready_connection_state:max{job=~"$job", pod=~"$pod"}, sys_id)
+executedQuery: label_values(tcp_bridge:ready_connection_state:max{job=~"tcp-bridge", pod=~""}, sys_id)
+variables:     job:tcp-bridge  pod:
+```
+
+`buildGrafana()` itself worked as designed. `$job` was replaced with `tcp-bridge`, and `$pod` was replaced with the value currently present in the variables map: an empty string.
+
+The issue shown by this log is not string interpolation itself. It is that the `pod` variable value was still empty when the `sys_id` variable query ran.
+
+### Expected variable flow
+
+For this query:
+
+```promql
+label_values(tcp_bridge:ready_connection_state:max{job=~"$job", pod=~"$pod"}, sys_id)
+```
+
+the expected cascade is:
+
+```text
+job -> pod -> sys_id
+```
+
+`sys_id` should not re-run the `pod` query and use the full option list. It should use the current selected value of the already executed `pod` variable.
+
+If the `pod` variable is set to All, the value should be the configured custom all value, normally:
+
+```promql
+pod=~".*"
+```
+
+If the executed query contains `pod=~""`, check dependency waiting, auto-select, default All handling, saved value, or URL parameter override.
+
+### Added fallback
+
+Existing design used Grafana variable extraction when the datasource is detected as Prometheus:
+
+```typescript
+extractVariables(query) + extractGrafanaVariables(query)
+```
+
+That is still correct, but datasource detection can be late or unavailable in some paths, especially when `datasourceType` has not yet been injected or viewer responses hide `filters[].datasourceName` / `filters[].query`.
+
+To make `label_values(...)` safer, the query text itself is now also used as a hint:
+
+```typescript
+export function isGrafanaClassicVariableQuery(query: string): boolean {
+  return /^\s*label_values\s*\(/.test(query);
+}
+```
+
+Dependency extraction should use Grafana extraction when either condition is true:
+
+```typescript
+const needsGrafanaExtract =
+  isPrometheusDatasource(datasourceName, datasourceType) ||
+  isGrafanaClassicVariableQuery(query);
+
+const deps = needsGrafanaExtract
+  ? [...new Set([...extractVariables(query), ...extractGrafanaVariables(query)])]
+  : extractVariables(query);
+```
+
+Applied areas:
+
+- `variable-parser.ts`: add `isGrafanaClassicVariableQuery()`
+- `dependency-graph.ts`: use Prometheus datasource detection OR `label_values(...)` query detection
+- `QueryPipeline.ts`: same fallback for direct dependency extraction
+
+This ensures `$job` and `$pod` are registered as dependencies for:
+
+```promql
+label_values(tcp_bridge:ready_connection_state:max{job=~"$job", pod=~"$pod"}, sys_id)
+```
+
+even if datasource type/name metadata is not ready at graph-build time.
+
+### Remaining checks if pod remains empty
+
+If `pod=~""` still appears after this fallback:
+
+- verify that the `pod` variable query returns rows with `{ value, label }`
+- verify auto-select first option runs after `pod` query success
+- verify All option stores `.*` instead of an empty string
+- verify URL params or saved values are not overriding `pod` with an empty string
+- verify `pod` is not marked `isQuerySuccess=true` while `value` is still empty
+
+---
+
+## 0-A. Runtime default value fallback for multi-value All variables (2026-05-22)
+
+### Decision
+
+When a downstream query references `$pod`, do not re-run the `pod` variable query just to fill the missing value.
+Use the variable configuration's default policy instead.
+
+The chosen fallback is:
+
+```text
+if $pod is required
+and pod.value is empty
+and pod.options.showAllOption === true
+and pod.options.defaultAllSelected === true
+and pod.options.customAllValue is not empty
+then set pod.value = [pod.options.customAllValue]
+```
+
+For the current Prometheus variable case this means:
+
+```text
+pod.value = [".*"]
+```
+
+and the downstream `sys_id` query should receive:
+
+```promql
+pod=~".*"
+```
+
+### Why this is preferred
+
+The alternative idea was to inspect `$pod`, find the `pod` variable definition, execute the `pod` label query again, and use the returned label values.
+That is technically possible, but it is not the desired runtime model.
+
+Reasons:
+
+- Variable query results are option lists, not selected values.
+- Re-running the label query from the downstream variable duplicates requests.
+- It can diverge from what the user sees in the select box.
+- It complicates cycle handling (`a` depends on `$b`, `b` depends on `$a`).
+
+The cleaner model is:
+
+```text
+variable query result -> option list
+variable config/default policy -> selected runtime value
+downstream query -> uses selected runtime value
+```
+
+So when `pod` is configured as:
+
+```text
+Enable multi-select: true
+Show "All" option: true
+Default to "All" selected: true
+Custom "All" value: .*
+```
+
+the runtime store should initialize `pod.value` to:
+
+```typescript
+['.*']
+```
+
+without waiting for a manual select-box action.
+
+### Implementation target
+
+This fallback belongs in the frontend runtime variable layer, not in the backend query builder.
+
+Candidate locations:
+
+- `useDashboardQuery.ts`: after variable query success, before marking dependent variables ready
+- `variable-runtime-slice.ts`: inside `setFilterMeta()` or a small helper that applies default values
+- `SelectVariable.tsx`: when the variable config clearly requests default All and the current value is empty
+
+Recommended direction:
+
+Use a shared helper so both initial load and later cascade refresh use the same rule.
+
+Pseudo-code:
+
+```typescript
+function getDefaultRuntimeValue(metaOrConfig) {
+  const options = metaOrConfig.options;
+  if (
+    options?.isMulti === true &&
+    options?.showAllOption === true &&
+    options?.defaultAllSelected === true &&
+    options?.customAllValue
+  ) {
+    return [options.customAllValue];
+  }
+  return undefined;
+}
+```
+
+Then, when a variable is required but has no value:
+
+```typescript
+const defaultValue = getDefaultRuntimeValue(meta);
+if (defaultValue !== undefined) {
+  setFilter(variableId, defaultValue);
+}
+```
+
+### Important distinction
+
+This fallback should only set the **selected runtime value**.
+It should not replace the query result option list.
+
+For example, the `pod` select box may still display:
+
+```text
+All
+tcp-bridge-0-857d58f65c-fvv7z
+tcp-bridge-1-748579d9-hwp9t
+```
+
+but the store value used by `$pod` should be:
+
+```typescript
+['.*']
+```
+
+unless the user explicitly selects a concrete pod value.
+
+### Expected result
+
+With this fallback, the saved variable query can stay dynamic:
+
+```promql
+label_values(tcp_bridge:ready_connection_state:max{job=~"$job", pod=~"$pod"}, sys_id)
+```
+
+and when `pod` has no explicit selection but is configured as default All, `sys_id` should execute as:
+
+```promql
+label_values(tcp_bridge:ready_connection_state:max{job=~"tcp-bridge", pod=~".*"}, sys_id)
+```
+
+instead of:
+
+```promql
+label_values(tcp_bridge:ready_connection_state:max{job=~"tcp-bridge", pod=~""}, sys_id)
+```

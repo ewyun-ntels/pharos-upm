@@ -10,6 +10,7 @@ interface UseQueryInspectorParams {
   // Run mode (for unsaved panels in panel editor)
   datasourceName?: string;
   query?: string;
+  templateStyle?: string;
   variables?: Record<string, any>;
   enabled?: boolean;
 }
@@ -26,6 +27,7 @@ export const useQueryInspector = ({
   kind,
   datasourceName,
   query,
+  templateStyle,
   variables,
   enabled = true,
 }: UseQueryInspectorParams) => {
@@ -51,6 +53,7 @@ export const useQueryInspector = ({
     panelId,
     datasourceName,
     query, // Include query content in cache key
+    templateStyle,
     variables,
   ].filter(Boolean);
 
@@ -77,7 +80,7 @@ export const useQueryInspector = ({
             // Panel mode: use panelId + kind
             ...(panelId && kind ? { id: panelId, kind } : {}),
             // Run mode: use datasourceName + query
-            ...(datasourceName && query ? { datasourceName, query } : {}),
+            ...(datasourceName && query ? { datasourceName, query, templateStyle: templateStyle || 'pongo2' } : {}),
             args: argsMap,
           }
         ]

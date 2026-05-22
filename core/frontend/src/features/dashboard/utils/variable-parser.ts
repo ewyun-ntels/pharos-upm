@@ -9,6 +9,9 @@ const PATTERNS = {
   basic:    /\{\{\s*([a-zA-Z_][a-zA-Z0-9_]*)\s*}}/g,
   field:    /\{\{\s*([a-zA-Z_][a-zA-Z0-9_]*)\.[a-zA-Z0-9_.]+\s*}}/g,
   filter:   /\{\{\s*([a-zA-Z_][a-zA-Z0-9_]*)\s*\|[^}]+}}/g,
+  grafanaBrace: /\$\{([a-zA-Z_][a-zA-Z0-9_]*)(\.[a-zA-Z_][a-zA-Z0-9_.]*)?(?::[^}]+)?}/g,
+  grafanaBracket: /\[\[([a-zA-Z_][a-zA-Z0-9_]*)(?::[^\]]+)?\]\]/g,
+  grafanaDollar: /\$([a-zA-Z_][a-zA-Z0-9_]*)/g,
   rawBlock: /\{%\s*raw\s*%}[\s\S]*?\{%\s*endraw\s*%}/g,
   escaped:  /\\\{\\\{[^}]*\\}\\}/g,
 };
@@ -17,6 +20,8 @@ import {
   QUERY_PARAM_START_TIME,
   QUERY_PARAM_END_TIME,
   QUERY_PARAM_STEP,
+  QUERY_PARAM_INTERVAL,
+  QUERY_PARAM_INTERVAL_MS,
   QUERY_PARAM_REFRESH_COUNT,
 } from '@lib/query-params';
 
@@ -25,6 +30,13 @@ const BUILTIN_VARIABLES: Set<string> = new Set([
   QUERY_PARAM_START_TIME,
   QUERY_PARAM_END_TIME,
   QUERY_PARAM_STEP,
+  QUERY_PARAM_INTERVAL,
+  QUERY_PARAM_INTERVAL_MS,
+  '__from',
+  '__to',
+  '__timeFilter',
+  '__timeGroup',
+  '__table',
   QUERY_PARAM_REFRESH_COUNT,
 ]);
 
@@ -61,6 +73,39 @@ export function extractVariables(query: string): string[] {
   }
 
   return [...found].sort();
+}
+
+export function extractGrafanaVariables(query: string): string[] {
+  if (!query) return [];
+
+  const clean = query
+    .replace(PATTERNS.rawBlock, '')
+    .replace(PATTERNS.escaped, '');
+
+  const found = new Set<string>();
+
+  for (const match of clean.matchAll(PATTERNS.grafanaBrace)) {
+    const varName = match[1];
+    const fieldPath = match[2];
+    if (!fieldPath && !BUILTIN_VARIABLES.has(varName)) {
+      found.add(varName);
+    }
+  }
+
+  for (const pattern of [PATTERNS.grafanaBracket, PATTERNS.grafanaDollar]) {
+    for (const match of clean.matchAll(pattern)) {
+      const varName = match[1];
+      if (!BUILTIN_VARIABLES.has(varName)) {
+        found.add(varName);
+      }
+    }
+  }
+
+  return [...found].sort();
+}
+
+export function isGrafanaClassicVariableQuery(query: string): boolean {
+  return /^\s*label_values\s*\(/.test(query);
 }
 
 /**

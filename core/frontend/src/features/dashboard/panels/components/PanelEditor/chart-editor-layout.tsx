@@ -19,6 +19,7 @@ const createEmptyQuery = (): ChartQuery => ({
   datasourceName: '',
   query: '',
   label: '',
+  templateStyle: 'pongo2',
 });
 
 export default function ChartEditorLayout({ id: dashboardId, panelId, filters }: ChartEditorLayoutProps) {
@@ -62,6 +63,7 @@ export default function ChartEditorLayout({ id: dashboardId, panelId, filters }:
         datasourceName: q.datasourceName,
         query: q.query,
         label: q.label,
+        templateStyle: q.templateStyle || 'pongo2',
       })),
     );
   }, [panel?.dataProvider?.chartQuery]);
@@ -102,6 +104,7 @@ export default function ChartEditorLayout({ id: dashboardId, panelId, filters }:
           datasourceName: q.datasourceName || '',
           query: q.query || '',
           label: q.label || '',
+          templateStyle: q.templateStyle || 'pongo2',
         })),
       );
     }

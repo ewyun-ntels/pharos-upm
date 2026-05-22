@@ -43,6 +43,7 @@ export const createDashboardCrudSlice = (set: StoreSet, get: StoreGet): Dashboar
   _loadDashboard: async (dashboardId, options) => {
     const forceReload = options?.forceReload ?? false;
     const urlParams = options?.urlParams;
+    const datasourceTypeMap = options?.datasourceTypeMap ?? {};
     const { id: loadedId } = get();
 
     // 같은 대시보드 이미 로드됨: skip (강제 reload는 forceReload=true)
@@ -97,6 +98,8 @@ export const createDashboardCrudSlice = (set: StoreSet, get: StoreGet): Dashboar
           id: f.id,
           query: f.query || '',
           datasourceName: f.datasourceName || '',
+          datasourceType: datasourceTypeMap[f.datasourceName || ''],
+          options: f.options,
         }));
 
       // datasource filter 유무와 무관하게 항상 datetime/step 초기 상태를 적용한다.
@@ -417,4 +420,3 @@ export const createDashboardCrudSlice = (set: StoreSet, get: StoreGet): Dashboar
     });
   },
 });
-

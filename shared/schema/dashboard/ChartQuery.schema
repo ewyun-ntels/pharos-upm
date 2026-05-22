@@ -16,6 +16,10 @@
       "type": "string",
       "description": "Query string"
     },
+    "templateStyle": {
+      "type": "string",
+      "description": "Template interpolation style"
+    },
     "forceRefresh": {
       "type": "number",
       "description": "Timestamp to force cache invalidation"

@@ -22,6 +22,7 @@ import React from 'react';
 import { useLocation } from 'react-router-dom';
 import { registerOnLogout } from '@pharos/shared/features/auth';
 import type { Panel } from '@pharos/shared/types/dashboard';
+import { useDatasourceList } from '@hooks/use-datasource-list';
 import { setupUrlSync } from './url';
 import { createDashboardCrudSlice } from './slices/dashboard-crud-slice';
 import { createPanelSlice } from './slices/panel-slice';
@@ -117,6 +118,7 @@ export const useDashboardAutoLoad = (dashboardId: string) => {
   const _loadDashboard = useDashboardStore((state) => state._loadDashboard);
   const currentId = useDashboardStore((state) => state.id);
   const { search } = useLocation();
+  const { dataSourceList, isLoading: isDsLoading } = useDatasourceList();
 
   // search는 deps에 포함하지 않음:
   // Store→URL sync는 use-url-sync.ts subscribe(window.history.replaceState)가 처리하며,
@@ -127,10 +129,19 @@ export const useDashboardAutoLoad = (dashboardId: string) => {
   const searchRef = React.useRef(search);
   searchRef.current = search;
 
+  const datasourceTypeMap = React.useMemo(
+    () => Object.fromEntries(dataSourceList.map(ds => [ds.value, ds.type])),
+    [dataSourceList],
+  );
+
   React.useEffect(() => {
     if (!dashboardId || dashboardId === currentId) return;
-    void _loadDashboard(dashboardId, { urlParams: new URLSearchParams(searchRef.current) });
-  }, [dashboardId, currentId, _loadDashboard]);
+    if (isDsLoading) return;
+    void _loadDashboard(dashboardId, {
+      urlParams: new URLSearchParams(searchRef.current),
+      datasourceTypeMap,
+    });
+  }, [dashboardId, currentId, _loadDashboard, isDsLoading, datasourceTypeMap]);
 };
 
 // ─── 전역 설정 ───────────────────────────────────────────────────────────────

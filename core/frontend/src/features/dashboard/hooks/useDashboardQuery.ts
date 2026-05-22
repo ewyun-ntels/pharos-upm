@@ -76,6 +76,7 @@ export function toChartQueryRequests(
     label: q.label || '',
     query: q.query || '',
     datasourceName: q.datasourceName || '',
+    templateStyle: q.templateStyle || 'pongo2',
     forceRefresh: q.forceRefresh,
   }));
 }
@@ -243,6 +244,7 @@ export function useDashboardQuery<TData = unknown>(
         id,
         query: queries[0].query || '',
         datasourceName: queries[0].datasourceName || '',
+        datasourceType: queries[0].datasourceType,
       });
     }
   }, [id, queries, useFilterMeta]);

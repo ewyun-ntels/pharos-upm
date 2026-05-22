@@ -9,6 +9,7 @@ import {Plus, X, ChevronDown, ChevronRight} from 'lucide-react';
 import {InlineEdit} from './InlineEdit';
 import {QueryInspectorSheet} from './QueryInspector';
 import {usePanelArgs} from '@features/dashboard/hooks/use-panel-args';
+import {isPrometheusDatasource} from '@features/dashboard/utils/datasource';
 
 interface LeftBottomPanelProps {
   panelId: string;
@@ -21,6 +22,7 @@ const createEmptyQuery = (): ChartQuery => ({
   datasourceName: '',
   query: '',
   label: '',
+  templateStyle: 'pongo2',
 });
 
 const LeftBottomPanel = ({panelId, queries, onQueriesChange, onRunQueries}: LeftBottomPanelProps) => {
@@ -34,7 +36,8 @@ const LeftBottomPanel = ({panelId, queries, onQueriesChange, onRunQueries}: Left
 
   const { filterValues, filterIds, datetime, step, refreshCount } = useVariableState();
   const firstQuery = queries[0];
-  const isPrometheus = firstQuery?.datasourceName?.toLowerCase().includes('prometheus') ?? false;
+  const firstQueryDatasourceType = dataSourceList.find(ds => ds.value === firstQuery?.datasourceName)?.type;
+  const isPrometheus = isPrometheusDatasource(firstQuery?.datasourceName || '', firstQueryDatasourceType);
   const args = usePanelArgs(filterValues, filterIds, datetime, step, refreshCount, isPrometheus ? 'regex' : 'sql');
   const inspectorVariables = Object.fromEntries(args) as Record<string, unknown>;
 
@@ -185,6 +188,8 @@ const LeftBottomPanel = ({panelId, queries, onQueriesChange, onRunQueries}: Left
                     query={query.query}
                     onDatasourceChange={(value) => handleDatasourceChange(index, value)}
                     onQueryChange={(value) => updateQueryField(index, 'query', value)}
+                    templateStyle={query.templateStyle || 'pongo2'}
+                    onTemplateStyleChange={(value) => updateQueryField(index, 'templateStyle', value)}
                     onRunQuery={handleRunQuery}
                     datasourceOptions={dataSourceList.map((ds) => ({
                       value: ds.value,
@@ -213,6 +218,7 @@ const LeftBottomPanel = ({panelId, queries, onQueriesChange, onRunQueries}: Left
         dashboardId={dashboardId || ''}
         datasourceName={firstQuery?.datasourceName}
         query={firstQuery?.query}
+        templateStyle={firstQuery?.templateStyle || 'pongo2'}
         variables={inspectorVariables}
       />
     </div>

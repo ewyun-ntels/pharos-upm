@@ -6,7 +6,8 @@
  * - 토폴로지 정렬 (Kahn's algorithm)
  */
 
-import { extractVariables } from './variable-parser';
+import { extractGrafanaVariables, extractVariables, isGrafanaClassicVariableQuery } from './variable-parser';
+import { isPrometheusDatasource } from './datasource';
 
 /**
  * Variable 인터페이스 — 의존성 분석용
@@ -16,6 +17,8 @@ import { extractVariables } from './variable-parser';
 export interface Variable {
   id: string;
   query: string;
+  datasourceName?: string;
+  datasourceType?: string;
 }
 
 export class DependencyGraph {
@@ -40,7 +43,10 @@ export class DependencyGraph {
 
     // 의존성 추출 및 그래프 구축
     variables.forEach(variable => {
-      const deps = extractVariables(variable.query);
+      const deps = isPrometheusDatasource(variable.datasourceName || '', variable.datasourceType) ||
+        isGrafanaClassicVariableQuery(variable.query)
+        ? [...new Set([...extractVariables(variable.query), ...extractGrafanaVariables(variable.query)])]
+        : extractVariables(variable.query);
       
       deps.forEach(depId => {
         // depId가 실제 존재하는 variable인 경우만 의존성 추가

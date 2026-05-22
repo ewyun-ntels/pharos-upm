@@ -1,7 +1,9 @@
-import React, {useMemo, useCallback} from 'react';
+import React, {useMemo, useCallback, useEffect} from 'react';
 import {VariablePlugin, variablePluginRegistry, VariableProps} from '@features/dashboard/variables';
 import {VariableSelect} from '@pharos/shared/components/ui-extension';
 import {useDashboardQuery} from '@features/dashboard/hooks/useDashboardQuery';
+import {useDashboardStore} from '@features/dashboard/hooks/use-dashboard-store';
+import {useDatasourceList} from '@hooks/use-datasource-list';
 import {DASHBOARD_RESOURCES} from '@providers/dashboard-provider';
 import {SelectVariableEditor} from './SelectVariableEditor';
 import {SelectVariablePreview} from './SelectVariablePreview';
@@ -16,11 +18,27 @@ export const SelectVariable: React.FC<VariableProps<SelectFilterOptions>> = (pro
   const isMultiSelect = options?.isMulti === true;
   const shouldDefaultToAll = isMultiSelect && options?.showAllOption && options?.defaultAllSelected;
   const shouldAutoSelectFirst = options?.autoSelectFirstOption !== false && !shouldDefaultToAll;
+  const {dataSourceList} = useDatasourceList();
 
   // Query object 구성: 권한에 따라 Panel Mode vs Run Mode
   // - editor/owner (Run Mode): query + datasourceName로 직접 실행
   // - viewer (Panel Mode): id + kind로 저장된 variable 실행
   const useRunMode = permission === ActionSchema.enum.editor || permission === ActionSchema.enum.owner;
+  const datasourceType = useMemo(
+    () => dataSourceList.find(ds => ds.value === datasourceName)?.type,
+    [dataSourceList, datasourceName],
+  );
+
+  useEffect(() => {
+    if (!useRunMode || !datasourceName) return;
+    useDashboardStore.getState().setFilterMeta(id, {
+      id,
+      query: query ?? '',
+      datasourceName,
+      datasourceType,
+      options,
+    });
+  }, [id, query, useRunMode, datasourceName, datasourceType, options]);
   
   const queries = useMemo(() => {
     if (useRunMode) {
@@ -28,6 +46,7 @@ export const SelectVariable: React.FC<VariableProps<SelectFilterOptions>> = (pro
       return [{
         query: query ?? '',
         datasourceName: datasourceName ?? '',
+        datasourceType,
         dashboardId: dashboardId,
       }];
     } else {
@@ -40,7 +59,7 @@ export const SelectVariable: React.FC<VariableProps<SelectFilterOptions>> = (pro
         datasourceName: '',
       }];
     }
-  }, [useRunMode, query, id, dashboardId, datasourceName, kind]);
+  }, [useRunMode, query, id, dashboardId, datasourceName, datasourceType, kind]);
 
   // ✅ useDashboardQuery 사용 (DAG Pipeline + Direct Provider)
   // dependency values는 내부에서 자동으로 queryKey에 추가됨

@@ -52,7 +52,7 @@ export const DASHBOARD_RESOURCES = {
 
 const convertToChartData = async (promQueries: ChartQueryRequest[], signal?: AbortSignal): Promise<ChartMetricData> => {
   const queryPromises = promQueries.map((promQuery) => {
-    const { dashboardId, datasourceName, query, args, id, kind } = promQuery;
+    const { dashboardId, datasourceName, query, templateStyle, args, id, kind } = promQuery;
     const url = `${API_URL}/${dashboardId}/query`;
     const resolved = resolveArgs(args);
     const startTime = getNumber(resolved.get(QUERY_PARAM_START_TIME));
@@ -70,7 +70,7 @@ const convertToChartData = async (promQueries: ChartQueryRequest[], signal?: Abo
     // Run 모드: query+datasourceName이 있으면 직접 실행 (non-viewer용)
     const body = id && kind && !query
       ? { panel: { kind, id }, variables }
-      : { run: { datasourceName: datasourceName || '', query: query || '' }, variables };
+      : { run: { datasourceName: datasourceName || '', query: query || '', templateStyle: templateStyle || 'pongo2' }, variables };
 
     return {
       queryName: promQuery.queryName,
@@ -176,7 +176,7 @@ export const dashboardProvider: DataProvider = {
           );
         }
         
-        const { dashboardId, query, datasourceName, args, id, kind } = queryObject;
+        const { dashboardId, query, datasourceName, templateStyle, args, id, kind } = queryObject;
         let url = `${API_URL}/${dashboardId}/query`;
 
         // 🔍 Inspector 모드: URL 쿼리 파라미터 추가
@@ -204,7 +204,7 @@ export const dashboardProvider: DataProvider = {
           body = { panel: { kind, id }, variables };
         } else {
           // Run 모드: query 직접 실행 (write 권한 필요)
-          body = { run: { datasourceName: datasourceName || '', query: query || '' }, variables };
+          body = { run: { datasourceName: datasourceName || '', query: query || '', templateStyle: templateStyle || 'pongo2' }, variables };
         }
 
         const response = await axiosInstance.post(url, body, { headers, signal });

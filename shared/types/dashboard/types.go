@@ -307,6 +307,8 @@ type ChartQuery struct {
 	Label string `json:"label"`
 	// Query string
 	Query string `json:"query"`
+	// Template interpolation style
+	TemplateStyle *string `json:"templateStyle,omitempty"`
 }
 
 // Grid layout configuration for react-grid-layout
