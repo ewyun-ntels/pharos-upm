@@ -2520,3 +2520,841 @@ instead of:
 ```promql
 label_values(tcp_bridge:ready_connection_state:max{job=~"tcp-bridge", pod=~""}, sys_id)
 ```
+
+---
+
+## 0-B. Grafana `$__rate_interval` 지원 설계 (2026-05-26)
+
+### 배경
+
+Grafana style PromQL에서 다음과 같은 쿼리를 사용할 수 있다.
+
+```promql
+increase(metric[$__rate_interval])
+```
+
+현재 Pharos frontend payload에는 대략 다음 variables가 전달된다.
+
+```json
+{
+  "__interval": "30s",
+  "__interval_ms": 30000,
+  "__step": 30,
+  "__start_time": 1779780294,
+  "__end_time": 1779783894,
+  "__start_time_ms": 1779780294887,
+  "__end_time_ms": 1779783894887,
+  "job": "tcp-bridge",
+  "pod": ".*",
+  "sys_id": ".*"
+}
+```
+
+하지만 `__rate_interval`과 `__rate_interval_ms`는 없다.
+
+현재 `buildGrafana()`는 context에 없는 Grafana variable을 원문 그대로 유지한다.
+
+```go
+if !exists {
+    return match
+}
+```
+
+따라서 `$__rate_interval`이 치환되지 않고 Prometheus로 전달될 수 있고, 이 경우 다음과 같은 오류가 발생한다.
+
+```text
+bad_response: struct Decode: expect }, but found ",
+parse error: bad number or duration syntax
+```
+
+### Grafana 공식
+
+Grafana의 `$__rate_interval` 계산식은 다음과 같다.
+
+```text
+$__rate_interval = max($__interval + scrape_interval, 4 * scrape_interval)
+```
+
+예시:
+
+```text
+__interval = 30s
+scrape_interval = 15s
+
+max(30s + 15s, 4 * 15s)
+= max(45s, 60s)
+= 60s
+= 1m
+```
+
+따라서 현재 payload 기준에서 scrape interval fallback을 `15s`로 잡으면 기대값은 다음과 같다.
+
+```json
+{
+  "__rate_interval": "1m",
+  "__rate_interval_ms": 60000
+}
+```
+
+### scrape interval 정책
+
+Grafana가 Prometheus 서버에서 실제 scrape interval을 자동 조회하는 것은 아니다.
+
+Grafana는 사실상 다음 우선순위로 scrape interval을 결정한다.
+
+1. Query option의 `Min step`이 있으면 그 값을 사용
+2. 없으면 Prometheus datasource 설정의 `Scrape interval` 사용
+3. 그것도 없으면 일반적으로 `15s` fallback
+
+현재 Pharos payload에는 datasource scrape interval이 없다.
+
+권장 정책:
+
+```text
+scrape_interval = context["__scrape_interval"]이 있고 유효하면 그 값 사용
+scrape_interval = 없거나 유효하지 않으면 15s fallback
+```
+
+`__scrape_interval`은 지금 당장 frontend가 보내지 않아도 되는 예약 확장 변수로 둔다.
+나중에 datasource 설정에 scrape interval이 추가되면 variables map에 다음 값을 넣어주면 된다.
+
+```json
+{
+  "__scrape_interval": "15s"
+}
+```
+
+### 구현 위치
+
+권장 구현 위치:
+
+```text
+core/internal/query_builder/grafana.go
+```
+
+이유:
+
+- `$__rate_interval`은 Grafana style 전용 built-in variable이다.
+- `$__from`, `$__to`도 현재 `grafana.go`에서 pre-processing으로 처리한다.
+- Backend에서 처리하면 panel 실행, 직접 Run Query, Query Inspect 경로가 일관된다.
+- Frontend에만 넣으면 실행 경로별로 중복되거나 누락될 수 있다.
+
+현재 흐름:
+
+```text
+buildGrafana(query, queryContext)
+  -> convertInternalContext(queryContext)
+  -> replaceGrafanaTimeAliases()
+  -> grafanaVariablePattern.ReplaceAllStringFunc()
+```
+
+권장 흐름:
+
+```text
+buildGrafana(query, queryContext)
+  -> convertInternalContext(queryContext)
+  -> enrichGrafanaBuiltins()
+       - __rate_interval 없으면 추가
+       - __rate_interval_ms 없으면 추가
+       - __scrape_interval 있으면 우선 사용
+       - 없으면 15s fallback
+  -> replaceGrafanaTimeAliases()
+  -> grafanaVariablePattern.ReplaceAllStringFunc()
+```
+
+`enrichGrafanaBuiltins()`와 `replaceGrafanaTimeAliases()`의 순서는 현재 기능상 큰 차이가 없다.
+단, Grafana variable replacement 전에 `__rate_interval`이 context에 들어가 있어야 한다.
+
+### 명시 값 보존
+
+Backend fallback은 명시적으로 전달된 값을 덮어쓰지 않는다.
+
+정책:
+
+```text
+context["__rate_interval"]이 이미 있으면 유지한다.
+context["__rate_interval_ms"]가 이미 있으면 유지한다.
+없는 값만 계산해서 추가한다.
+```
+
+권장 보완:
+
+```text
+__rate_interval은 있고 __rate_interval_ms가 없으면:
+  __rate_interval을 parsePromDuration()으로 파싱해서 __rate_interval_ms를 추가한다.
+
+__rate_interval_ms는 있고 __rate_interval이 없으면:
+  __rate_interval_ms를 duration으로 변환한 뒤 __rate_interval을 추가한다.
+```
+
+### `enrichGrafanaBuiltins()` 설계
+
+역할:
+
+- Grafana context map에 backend에서 계산 가능한 built-in variable을 보강한다.
+- 초기 대상은 `$__rate_interval`과 `$__rate_interval_ms`이다.
+
+권장 동작:
+
+```text
+1. context가 nil이면 초기화한다.
+2. __interval을 parsePromDuration()으로 파싱한다.
+3. __interval이 없거나 유효하지 않으면 interval = 0으로 처리한다.
+4. __scrape_interval을 parsePromDuration()으로 파싱한다.
+5. __scrape_interval이 없거나 유효하지 않으면 scrape = 15s로 처리한다.
+6. rate = max(interval + scrape, 4 * scrape)를 계산한다.
+7. __rate_interval이 없으면 formatPromDuration(rate)로 추가한다.
+8. __rate_interval_ms가 없으면 rate.Milliseconds()로 추가한다.
+9. 이미 존재하는 명시 값은 덮어쓰지 않는다.
+```
+
+의사 코드:
+
+```go
+func enrichGrafanaBuiltins(context map[string]any) map[string]any {
+    if context == nil {
+        context = map[string]any{}
+    }
+
+    interval, ok := parsePromDuration(context["__interval"])
+    if !ok {
+        interval = 0
+    }
+
+    scrape, ok := parsePromDuration(context["__scrape_interval"])
+    if !ok {
+        scrape = 15 * time.Second
+    }
+
+    rate := interval + scrape
+    minRate := 4 * scrape
+    if rate < minRate {
+        rate = minRate
+    }
+
+    if _, exists := context["__rate_interval"]; !exists {
+        context["__rate_interval"] = formatPromDuration(rate)
+    }
+
+    if _, exists := context["__rate_interval_ms"]; !exists {
+        context["__rate_interval_ms"] = rate.Milliseconds()
+    }
+
+    return context
+}
+```
+
+### `parsePromDuration()` 설계
+
+역할:
+
+- Prometheus/Grafana duration 값을 `time.Duration`으로 파싱한다.
+- 문자열과 숫자 값을 모두 지원한다.
+
+지원해야 하는 입력:
+
+```text
+"30s"   -> 30s
+"1m"    -> 1m
+"5m30s" -> 5m30s
+"1h"    -> 1h
+"1d"    -> 24h
+"7d"    -> 168h
+"1w"    -> 168h
+30      -> 30s
+30.0    -> 30s
+```
+
+중요:
+
+- Go `time.ParseDuration()`은 `s`, `m`, `h`를 지원한다.
+- Go `time.ParseDuration()`은 `d`, `w`를 지원하지 않는다.
+- PromQL duration에서는 `d`, `w`가 현실적으로 등장할 수 있다.
+- 따라서 커스텀 파서가 권장된다.
+
+권장 지원 단위:
+
+```text
+ms, s, m, h, d, w
+```
+
+`y` 지원은 선택 사항이다. 초기 `$__rate_interval` 구현에는 필수는 아니다.
+
+숫자 scalar 값은 초 단위로 해석한다.
+
+```text
+parsePromDuration(15)    -> 15s
+parsePromDuration("15s") -> 15s
+```
+
+### `formatPromDuration()` 설계
+
+역할:
+
+- 계산된 duration을 PromQL range selector에 넣기 좋은 compact 문자열로 포맷한다.
+
+Go `time.Duration.String()`은 `1m0s` 같은 문자열을 만들 수 있다.
+PromQL에서 동작할 수는 있지만 Grafana style 출력으로는 `1m`이 더 자연스럽다.
+따라서 명시적인 compact formatter를 둔다.
+
+기대 출력:
+
+```text
+45s     -> "45s"
+60s     -> "1m"
+90s     -> "1m30s"
+3600s   -> "1h"
+3660s   -> "1h1m"
+86400s  -> "1d"
+86415s  -> "1d15s"
+604800s -> "1w"
+```
+
+권장 단위 우선순위:
+
+```text
+w, d, h, m, s
+```
+
+`$__rate_interval` 용도로는 millisecond 출력이 필수는 아니다.
+계산 결과가 1초보다 작으면 `1s`로 올림 또는 clamp 처리하는 것을 권장한다.
+
+이유:
+
+```text
+rate(metric[0s])
+```
+
+같은 값은 실사용 의미가 없다.
+또한 scrape fallback이 `15s`이면 정상 경로에서는 1초 미만 값이 나오지 않는다.
+
+### `__interval`이 없을 때
+
+`__interval`이 없거나 유효하지 않으면:
+
+```text
+interval = 0
+```
+
+공식:
+
+```text
+rate = max(0 + scrape, 4 * scrape)
+     = 4 * scrape
+```
+
+scrape fallback이 `15s`이면:
+
+```text
+rate = 60s = 1m
+```
+
+따라서 `__interval`이 없을 때 기본 `$__rate_interval`은 `1m`이다.
+이 동작은 코드 주석과 테스트에 명시한다.
+
+### 현재 payload 기준 기대 결과
+
+입력 variables:
+
+```json
+{
+  "__interval": "30s",
+  "__step": 30,
+  "job": "tcp-bridge",
+  "pod": ".*",
+  "sys_id": ".*"
+}
+```
+
+`__scrape_interval` 없음:
+
+```text
+scrape = 15s fallback
+```
+
+계산:
+
+```text
+rate = max(30s + 15s, 4 * 15s)
+     = max(45s, 60s)
+     = 60s
+```
+
+보강된 context:
+
+```json
+{
+  "__rate_interval": "1m",
+  "__rate_interval_ms": 60000
+}
+```
+
+치환 전:
+
+```promql
+increase(tcp_bridge_inbound_outcomes_total{job=~"$job", pod=~"$pod", reason!="ok"}[$__rate_interval])
+```
+
+치환 후:
+
+```promql
+increase(tcp_bridge_inbound_outcomes_total{job=~"tcp-bridge", pod=~".*", reason!="ok"}[1m])
+```
+
+### 테스트 케이스
+
+최소 테스트:
+
+```text
+1. __interval=30s, __scrape_interval 없음
+   -> __rate_interval=1m
+   -> __rate_interval_ms=60000
+
+2. __interval=30s, __scrape_interval=30s
+   -> max(30s + 30s, 4 * 30s)
+   -> max(60s, 120s)
+   -> __rate_interval=2m
+   -> __rate_interval_ms=120000
+
+3. __interval 없음, __scrape_interval 없음
+   -> max(0 + 15s, 4 * 15s)
+   -> __rate_interval=1m
+   -> __rate_interval_ms=60000
+
+4. __interval=1d, __scrape_interval=15s
+   -> max(1d + 15s, 1m)
+   -> __rate_interval=1d15s
+
+5. __rate_interval이 이미 존재함
+   -> 덮어쓰지 않음
+
+6. __rate_interval=2m, __rate_interval_ms 없음
+   -> __rate_interval 유지
+   -> 선택적으로 __rate_interval_ms=120000 추가
+
+7. __rate_interval_ms=90000, __rate_interval 없음
+   -> 선택적으로 __rate_interval=1m30s 추가
+
+8. formatPromDuration()
+   45s -> 45s
+   60s -> 1m
+   90s -> 1m30s
+   3600s -> 1h
+   86400s -> 1d
+
+9. parsePromDuration()
+   30 -> 30s
+   "30s" -> 30s
+   "1m30s" -> 90s
+   "1d" -> 24h
+   "1w" -> 168h
+```
+
+### 구현 시 주의 사항
+
+1. Grafana style에서만 처리한다.
+
+```text
+templateStyle == "grafana"
+```
+
+`buildGrafana()` 내부에 넣으면 이 조건을 자연스럽게 만족한다.
+
+2. 기존 Pongo2 쿼리는 변경하지 않는다.
+
+```text
+{{ __interval }}
+{{ job }}
+```
+
+이 쿼리들은 계속 `GetQuery()` 경로를 사용한다.
+
+3. unknown Grafana variable 정책은 유지한다.
+
+```go
+if !exists {
+    return match
+}
+```
+
+단, `$__rate_interval`은 built-in enriching 단계에서 context에 추가되므로 더 이상 unknown으로 남지 않아야 한다.
+
+4. `$__rate_interval_ms`도 같이 지원한다.
+
+```text
+$__rate_interval
+$__rate_interval_ms
+```
+
+예:
+
+```text
+__rate_interval = 1m
+__rate_interval_ms = 60000
+```
+
+### 최종 설계 요약
+
+```text
+1. core/internal/query_builder/grafana.go에 enrichGrafanaBuiltins()를 추가한다.
+2. buildGrafana() 내부에서 convertInternalContext() 직후 호출한다.
+3. __rate_interval이 없을 때만 계산한다.
+4. __rate_interval_ms가 없을 때만 계산한다.
+5. __scrape_interval이 있고 유효하면 우선 사용한다.
+6. __scrape_interval이 없으면 15s fallback을 사용한다.
+7. __interval이 없거나 유효하지 않으면 0으로 처리한다.
+8. 따라서 __interval이 없을 때는 rate interval = 4 * scrape = 1m이 된다.
+9. parsePromDuration()은 s/m/h/d/w와 숫자 초 단위를 지원한다.
+10. formatPromDuration()은 compact PromQL duration 문자열을 출력한다.
+11. 명시적으로 전달된 기존 값은 덮어쓰지 않는다.
+12. Grafana templateStyle 경로에만 적용한다.
+```
+
+---
+
+## 0-C. TimeSeries Legend의 `msg_type` hex 문자열 처리 수정 정리 (2026-05-26)
+
+### 배경
+
+TimeSeries 패널에서 Legend rule을 아래처럼 설정했다.
+
+```text
+{msg_type} {reason}
+```
+
+쿼리는 아래 형태였다.
+
+```promql
+sum by (msg_type, reason) (
+  increase(tcp_bridge_inbound_outcomes_total{job=~"$job", pod=~"$pod", reason!="ok"}[$__rate_interval])
+)
+```
+
+백엔드 응답에는 `msg_type`, `reason`, `value`가 모두 포함되어 있었다.
+
+예:
+
+```json
+{
+  "msg_type": "0x0f",
+  "reason": "nats_request_failed",
+  "timestamp": "2026-05-26T08:49:00Z",
+  "value": "0"
+}
+```
+
+그런데 화면의 legend는 설정한 `{msg_type} {reason}` 형식이 아니라 `reason=nats_request_failed`처럼 출력되었다.
+
+### 원인
+
+프론트엔드의 차트 데이터 변환 로직이 문자열 값을 숫자로 분류할 때 JavaScript `Number()` 변환을 사용하고 있었다.
+
+기존 로직:
+
+```ts
+typeof value === 'string' && !isNaN(Number(value)) && value !== ''
+```
+
+JavaScript에서는 아래 변환이 유효하다.
+
+```ts
+Number("0x0f") === 15
+```
+
+따라서 Prometheus label 값인 `"0x0f"`가 문자열 label이 아니라 numeric field로 잘못 분류되었다.
+
+결과적으로 내부 데이터는 대략 아래처럼 만들어졌다.
+
+```text
+numericFields:
+  msg_type = 15
+  value = 0
+
+stringFields:
+  reason = nats_request_failed
+```
+
+TimeSeries legend label은 `stringFields`를 기준으로 metric label을 구성한다.
+
+따라서 `msg_type`이 metric label에서 빠졌고, Legend rule의 `{msg_type}` placeholder가 치환되지 않았다.
+
+`formatLegendLabel()`은 치환 후에도 `{...}` placeholder가 남아 있으면 custom rule 적용 실패로 보고 기본 포맷으로 fallback한다.
+
+그래서 최종 출력이 아래처럼 보였다.
+
+```text
+reason=nats_request_failed
+```
+
+### 수정 방향
+
+문자열 숫자 판별을 `Number()`의 느슨한 변환에 의존하지 않도록 변경했다.
+
+`0x0f` 같은 hex 문자열은 Prometheus label로 유지되어야 하므로 numeric field로 분류하지 않는다.
+
+대신 일반 decimal 숫자 문자열만 numeric field로 인정한다.
+
+허용 예:
+
+```text
+0
+12
+-12
+12.3
+.5
+1e-3
+```
+
+비허용 예:
+
+```text
+0x0f
+0xff
+nats_request_failed
+normal
+```
+
+### 구현 내용
+
+수정 파일:
+
+```text
+core/frontend/src/lib/convert.ts
+```
+
+추가된 헬퍼:
+
+```ts
+const numericStringPattern = /^[+-]?(?:(?:\d+\.?\d*)|(?:\.\d+))(?:e[+-]?\d+)?$/i;
+
+const isNumericString = (value: string): boolean => numericStringPattern.test(value.trim());
+```
+
+변경 전:
+
+```ts
+} else if (typeof value === 'string' && !isNaN(Number(value)) && value !== '') {
+  numericFields[key] = Number(value);
+}
+```
+
+변경 후:
+
+```ts
+} else if (typeof value === 'string' && isNumericString(value)) {
+  numericFields[key] = Number(value);
+}
+```
+
+### 기대 동작
+
+응답:
+
+```json
+{
+  "msg_type": "0x0f",
+  "reason": "nats_request_failed",
+  "value": "0"
+}
+```
+
+변환 후 기대 구조:
+
+```text
+numericFields:
+  value = 0
+
+stringFields:
+  msg_type = 0x0f
+  reason = nats_request_failed
+```
+
+Legend rule:
+
+```text
+{msg_type} {reason}
+```
+
+기대 출력:
+
+```text
+0x0f nats_request_failed
+```
+
+### 회귀 테스트 추가
+
+수정 파일:
+
+```text
+core/frontend/src/lib/convert.test.ts
+```
+
+추가 테스트:
+
+```text
+should keep hexadecimal string labels out of numeric fields
+```
+
+테스트 의도:
+
+1. `msg_type: "0x0f"`가 numeric field로 분류되지 않아야 한다.
+2. `msg_type`은 metric label에 문자열로 남아야 한다.
+3. `reason`도 metric label에 남아야 한다.
+4. `value: "0"`은 numeric field로 분류되어 차트 값으로 사용되어야 한다.
+
+### 검증 상태
+
+`git diff --check`는 통과했다.
+
+단위 테스트 실행은 생략했다.
+
+사유:
+
+```text
+사용자가 단위 테스트 실행은 필요 없다고 명시했다.
+```
+
+### 최종 요약
+
+```text
+1. 문제는 PromQL이나 백엔드 응답이 아니라 프론트엔드 타입 분류 로직에 있었다.
+2. 응답에는 msg_type이 정상 포함되어 있었다.
+3. "0x0f"가 Number("0x0f")에 의해 15로 변환되면서 label에서 빠졌다.
+4. msg_type placeholder가 치환되지 않아 legend formatter가 기본 포맷으로 fallback했다.
+5. 문자열 숫자 판별을 decimal 전용 정규식으로 변경했다.
+6. 이제 hex 문자열 label은 문자열 label로 유지된다.
+7. 따라서 `{msg_type} {reason}` legend rule이 정상 출력될 수 있다.
+```
+
+---
+
+## 0-D. Grafana `$__rate_interval` 기본 scrape interval 30s 정렬 (2026-05-27)
+
+### 배경
+
+Grafana Query Inspector에서 같은 tcp-bridge inbound outcome 쿼리가 아래처럼 실행되는 것을 확인했다.
+
+```text
+increase(tcp_bridge_inbound_outcomes_total{...}[2m0s])
+Step: 30s
+```
+
+패널 Query options에는 다음 값이 있었다.
+
+```text
+Min interval = 30s
+Interval     = 30s
+```
+
+Pharos inspect payload도 `__interval`과 `__step`은 Grafana와 동일하게 30초였다.
+
+```json
+{
+  "__interval": "30s",
+  "__interval_ms": 30000,
+  "__step": 30
+}
+```
+
+하지만 Pharos에는 Prometheus datasource의 scrape interval 또는 Grafana panel min step에 해당하는 값이
+`__scrape_interval`로 전달되지 않았다.
+
+기존 Pharos backend fallback은 15초였으므로:
+
+```text
+$__rate_interval = max(30s + 15s, 4 * 15s)
+                 = max(45s, 60s)
+                 = 1m
+```
+
+Grafana는 30초 min step/scrape 기준으로 계산되어:
+
+```text
+$__rate_interval = max(30s + 30s, 4 * 30s)
+                 = max(60s, 120s)
+                 = 2m
+```
+
+따라서 Grafana style 쿼리에서는 `[1m]`, pong2 또는 Grafana Inspector에서는 `[2m]`가 되어
+결과 series 수가 40개와 80개로 달라질 수 있었다.
+
+### 결정
+
+현재 Pharos는 Grafana panel의 Prometheus query min step을 별도 UI/설정으로 관리하지 않는다.
+또한 해당 Grafana style 동작은 Prometheus 쿼리에서만 의미가 있다.
+
+따라서 datasource 설정을 새로 추가하기 전에, Pharos Grafana style의 기본 Prometheus scrape interval fallback을
+15초에서 30초로 변경했다.
+
+```text
+defaultGrafanaScrapeInterval = 30s
+```
+
+이 결정은 쿼리마다 `[2m]`를 직접 박는 방식보다 `$__rate_interval` 사용을 유지하면서 Grafana와 결과를 맞추기 위한 것이다.
+
+### 수정 파일
+
+```text
+core/internal/query_builder/grafana.go
+core/internal/query_builder/grafana_test.go
+```
+
+### 변경 후 기대 동작
+
+입력 context:
+
+```json
+{
+  "__interval": "30s",
+  "__interval_ms": 30000,
+  "__step": 30
+}
+```
+
+치환 전:
+
+```promql
+increase(tcp_bridge_inbound_outcomes_total{job=~"$job", pod=~"$pod", reason!="ok"}[$__rate_interval])
+```
+
+치환 후:
+
+```promql
+increase(tcp_bridge_inbound_outcomes_total{job=~"tcp-bridge", pod=~".*", reason!="ok"}[2m])
+```
+
+`__rate_interval_ms`는 다음 값이 된다.
+
+```text
+120000
+```
+
+### 명시 값 우선순위
+
+기존 정책은 유지한다.
+
+```text
+1. context에 __rate_interval과 __rate_interval_ms가 이미 있으면 그대로 사용한다.
+2. __rate_interval만 있으면 __rate_interval_ms를 역산한다.
+3. __rate_interval_ms만 있으면 __rate_interval을 역산한다.
+4. 둘 다 없을 때만 __interval과 __scrape_interval 또는 fallback 30s로 계산한다.
+5. __scrape_interval이 명시되어 있으면 fallback 30s보다 우선한다.
+```
+
+따라서 향후 datasource 설정에서 `__scrape_interval`을 전달하게 되면 그 값이 자동으로 우선 적용된다.
+
+### 테스트 변경
+
+기존 fallback 테스트 기대값:
+
+```text
+increase(metric[1m]) 60000
+```
+
+변경 후 fallback 테스트 기대값:
+
+```text
+increase(metric[2m]) 120000
+```
+
+`__scrape_interval = "30s"`를 명시한 테스트는 기존과 동일하게 `[2m]`를 기대한다.

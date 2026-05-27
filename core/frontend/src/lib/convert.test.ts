@@ -149,6 +149,45 @@ describe('responseConvert', () => {
       // 현재는 region, status가 문자열이므로 keyColumn에 포함되어 columnName이 설정되지 않음
     });
 
+    it('should keep hexadecimal string labels out of numeric fields', () => {
+      const inputData: Index = {
+        meta: [
+          { name: "timestamp" },
+          { name: "msg_type" },
+          { name: "reason" },
+          { name: "value" }
+        ],
+        data: [
+          {
+            "timestamp": "2026-05-26T08:49:00Z",
+            "msg_type": "0x0f",
+            "reason": "nats_request_failed",
+            "value": "0"
+          }
+        ],
+        rows: 1,
+        statistics: { elapsed: 0.1 }
+      };
+
+      const result = responseConvert(
+        { ...mockEmptyResult },
+        inputData,
+        'test query',
+        'test name',
+        'test label',
+        1779785340,
+        1779785400,
+        30
+      );
+
+      expect(result.uniqueKeys).toHaveLength(1);
+
+      const parsedLabel = JSON.parse((result.uniqueKeys || [])[0]);
+      expect(parsedLabel.metric).toHaveProperty('msg_type', '0x0f');
+      expect(parsedLabel.metric).toHaveProperty('reason', 'nats_request_failed');
+      expect(result.chartMetric[0][(result.uniqueKeys || [])[0]]).toBe(0);
+    });
+
     it('should handle empty data gracefully', () => {
       const inputData: Index = {
         meta: [],

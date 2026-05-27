@@ -224,17 +224,17 @@ path = "./bin/plugins"
 # Cache TTL for GET /badges/:name responses; set to "0s" to disable caching
 cache_ttl = "1m"
 
-[[provisioning.plugins.datasources]]
-type = "postgresql"
-name = "postgresql-alert"
-[provisioning.plugins.datasources.data]
-host = "10.255.254.22"
-port = 30432
-database = "upmalert"
-username = "upmalert"
-password = "upmalert"
-max_open_connection = 10
-max_lifetime = 14400
+#[[provisioning.plugins.datasources]]
+#type = "postgresql"
+#name = "postgresql-alert"
+#[provisioning.plugins.datasources.data]
+#host = "10.255.254.22"
+#port = 30432
+#database = "upmalert"
+#username = "upmalert"
+#password = "upmalert"
+#max_open_connection = 10
+#max_lifetime = 14400
 
 [[provisioning.plugins.datasources]]
 type = "prometheus"
@@ -242,15 +242,15 @@ name = "prometheus-metric"
 [provisioning.plugins.datasources.data]
 address = "http://10.255.254.22:30232"
 
-[[provisioning.plugins.datasources]]
-type = "elasticsearch"
-name = "elasticsearch-log"
-[provisioning.plugins.datasources.data]
-version = 9
-addresses = ["http://192.168.15.105:9200"]
-[provisioning.plugins.datasources.data.bulk]
-flush_bytes = 5000000
-flush_interval = "30s"
+#[[provisioning.plugins.datasources]]
+#type = "elasticsearch"
+#name = "elasticsearch-log"
+#[provisioning.plugins.datasources.data]
+#version = 9
+#addresses = ["http://192.168.15.105:9200"]
+#[provisioning.plugins.datasources.data.bulk]
+#flush_bytes = 5000000
+#flush_interval = "30s"
 
 
 [collect.statistics]
