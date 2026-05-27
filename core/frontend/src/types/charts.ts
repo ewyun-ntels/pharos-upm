@@ -52,6 +52,8 @@ type ChartQueryRequest = {
   // Run Mode 필드 (editor/owner용)
   query?: string;
   datasourceName?: string;
+  datasourceType?: string;
+  templateStyle?: string;
   
   // 공통 선택 필드
   label?: string;
@@ -96,5 +98,3 @@ export type {
   // - ChartMetricData (from shared)
   // - ChartMetricLabel (from shared)
 };
-
-

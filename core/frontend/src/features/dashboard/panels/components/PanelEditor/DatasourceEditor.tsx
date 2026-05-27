@@ -1,6 +1,6 @@
 import React, { useMemo } from 'react';
 import { SelectBox } from '@pharos/shared/components/ui-extension/select/box';
-import { Button, Collapsible, CollapsibleContent, CollapsibleTrigger } from '@pharos/shared/components/ui';
+import { Button, Collapsible, CollapsibleContent, CollapsibleTrigger, Switch } from '@pharos/shared/components/ui';
 import { ChevronRight, Database } from 'lucide-react';
 import { datasourceEditorRegistry, DefaultSQLEditor } from '@features/dashboard/datasources';
 import { VariableReferencePanel } from './VariableReferencePanel';
@@ -13,8 +13,10 @@ interface DatasourceEditorProps {
   datasourceName: string;
   datasourceType: string;
   query: string;
+  templateStyle?: string;
   onDatasourceChange: (name: string) => void;
   onQueryChange: (query: string) => void;
+  onTemplateStyleChange?: (style: string) => void;
   onRunQuery: () => void;
   datasourceOptions: Array<{ value: string; label: string; type: string }>;
   isLoading?: boolean;
@@ -25,8 +27,10 @@ export const DatasourceEditor: React.FC<DatasourceEditorProps> = ({
   datasourceName,
   datasourceType,
   query,
+  templateStyle = 'pongo2',
   onDatasourceChange,
   onQueryChange,
+  onTemplateStyleChange,
   onRunQuery,
   datasourceOptions,
   isLoading = false,
@@ -39,6 +43,8 @@ export const DatasourceEditor: React.FC<DatasourceEditorProps> = ({
   const editorPlugin = useMemo(() => {
     return datasourceEditorRegistry.get(datasourceType) ?? datasourceEditorRegistry.get('default');
   }, [datasourceType]);
+
+  const grafanaStyle = templateStyle === 'grafana';
 
   const renderQueryEditor = () => {
     const props = { panelId, datasourceName, query, onQueryChange, onRunQuery, isLoading };
@@ -68,6 +74,17 @@ export const DatasourceEditor: React.FC<DatasourceEditorProps> = ({
               className="w-full"
             />
           </div>
+          <div className="shrink-0 pt-6 flex items-center gap-1.5">
+            <span className="text-xs font-medium text-muted-foreground">
+              Grafana
+            </span>
+            <Switch
+              checked={grafanaStyle}
+              onCheckedChange={(checked) => onTemplateStyleChange?.(checked ? 'grafana' : 'pongo2')}
+              className="scale-75"
+              title="Use Grafana variable syntax"
+            />
+          </div>
           <div className="shrink-0 pt-6">
             <Button
               onClick={onRunQuery}
@@ -94,7 +111,7 @@ export const DatasourceEditor: React.FC<DatasourceEditorProps> = ({
               </CollapsibleTrigger>
             </div>
             <CollapsibleContent>
-              <VariableReferencePanel />
+              <VariableReferencePanel grafanaStyle={grafanaStyle} />
             </CollapsibleContent>
           </Collapsible>
         )}

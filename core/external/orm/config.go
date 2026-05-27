@@ -314,6 +314,10 @@ func (databaseConfig *DatabaseConfig) makeDatabaseResponseForPrometheus(ctx cont
 
 	start := time.Now()
 
+	if labelResponse, handled, err := makeDatabaseResponseForPrometheusLabelValues(ctx, v1api, query, start); handled || err != nil {
+		return labelResponse, err
+	}
+
 	// context에 시간 범위가 있으면 QueryRange, 없으면 기존 Query(instant) 사용
 	var (
 		result   model.Value

@@ -19,6 +19,7 @@ interface QueryInspectorSheetProps {
   dashboardId: string;
   datasourceName?: string;
   query?: string;
+  templateStyle?: string;
   variables?: Record<string, unknown>;
 }
 
@@ -28,6 +29,7 @@ export function QueryInspectorSheet({
   dashboardId,
   datasourceName,
   query,
+  templateStyle,
   variables,
 }: QueryInspectorSheetProps) {
   const {
@@ -36,6 +38,7 @@ export function QueryInspectorSheet({
     dashboardId,
     datasourceName,
     query,
+    templateStyle,
     variables,
     enabled: open && !!datasourceName && !!query && !!dashboardId,
   });

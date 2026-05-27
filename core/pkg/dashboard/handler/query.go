@@ -28,6 +28,7 @@ type Query struct {
 	Run struct {
 		DatasourceName string `json:"datasourceName"`
 		Query          string `json:"query"`
+		TemplateStyle  string `json:"templateStyle"`
 		Timeout        int    `json:"timeout"`
 
 		permission string
@@ -84,7 +85,7 @@ func (query *Query) PostHandler(c *gin.Context) (int, any) {
 }
 
 func (query *Query) getPostResponse(ctx context.Context) (int, orm.DatabaseResponse, error) {
-	if sql, err := query_builder.GetQuery(query.Run.Query, query.Variables); err != nil {
+	if sql, err := query.buildRunQuery(); err != nil {
 		return http.StatusInternalServerError, orm.DatabaseResponse{}, err
 	} else if databaseResponse, err := query.getDatabaseResponse(ctx, string(sql)); errors.Is(err, context.DeadlineExceeded) || errors.Is(err, context.Canceled) {
 		return http.StatusRequestTimeout, orm.DatabaseResponse{}, err
@@ -106,7 +107,7 @@ func (query *Query) getInspectResponse(ctx context.Context) (int, dashboard.Quer
 	rawQuery := query.Run.Query
 
 	// Variable 치환
-	executedSQL, err := query_builder.GetQuery(query.Run.Query, query.Variables)
+	executedSQL, err := query.buildRunQuery()
 	if err != nil {
 		return http.StatusInternalServerError, dashboard.QueryInspectResponse{}, err
 	}
@@ -146,6 +147,20 @@ func (query *Query) getInspectResponse(ctx context.Context) (int, dashboard.Quer
 	}
 
 	return http.StatusOK, inspectResponse, nil
+}
+
+func (query *Query) buildRunQuery() ([]byte, error) {
+	style := query_builder.Style(query.Run.TemplateStyle)
+	builtQuery, err := query_builder.Build(style, query.Run.Query, query.Variables)
+	if err != nil {
+		return nil, err
+	}
+
+	if style != query_builder.StyleGrafana && orm.IsGrafanaLabelValuesQuery(string(builtQuery)) {
+		return query_builder.Build(query_builder.StyleGrafana, string(builtQuery), query.Variables)
+	}
+
+	return builtQuery, nil
 }
 
 func (query *Query) setFromReader(reader io.Reader) error {
@@ -299,6 +314,9 @@ func (query *Query) panelToRun(dashboardConfig *dashboard.DashboardConfig) error
 					slog.Info("ChartQuery extracted", "datasource", chartQuery.DatasourceName, "queryLen", len(chartQuery.Query))
 					query.Run.DatasourceName = chartQuery.DatasourceName
 					query.Run.Query = chartQuery.Query
+					if chartQuery.TemplateStyle != nil {
+						query.Run.TemplateStyle = *chartQuery.TemplateStyle
+					}
 					return nil
 				}
 

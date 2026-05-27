@@ -21,6 +21,32 @@ export type VariableRuntimeSlice = Pick<
   | 'setFilterMetas' | 'setStepOptions' | 'setRangeStepOptions'
 >;
 
+const hasNoRuntimeValue = (value: FilterMeta['value']): boolean =>
+  value === undefined || value === '';
+
+const getDefaultAllRuntimeValue = (meta: Pick<FilterMeta, 'options'>): FilterMeta['value'] | undefined => {
+  const options = meta.options;
+  if (
+    options?.isMulti === true &&
+    options?.showAllOption === true &&
+    options?.defaultAllSelected === true &&
+    typeof options?.customAllValue === 'string' &&
+    options.customAllValue !== ''
+  ) {
+    return [options.customAllValue];
+  }
+
+  return undefined;
+};
+
+const valueOrDefaultAll = (
+  value: FilterMeta['value'],
+  meta: Pick<FilterMeta, 'options'>,
+): FilterMeta['value'] => {
+  if (!hasNoRuntimeValue(value)) return value;
+  return getDefaultAllRuntimeValue(meta) ?? value;
+};
+
 export const createVariableRuntimeSlice = (set: StoreSet, get: StoreGet): VariableRuntimeSlice => ({
   filterState: createFilterState(),
 
@@ -55,7 +81,7 @@ export const createVariableRuntimeSlice = (set: StoreSet, get: StoreGet): Variab
             allDependents.forEach((depId: string) => {
               const depMeta = draft.filterState.filterMetas.get(depId);
               if (depMeta) {
-                depMeta.value = undefined;
+                depMeta.value = getDefaultAllRuntimeValue(depMeta);
                 depMeta.isQuerySuccess = false;
               }
             });
@@ -88,11 +114,12 @@ export const createVariableRuntimeSlice = (set: StoreSet, get: StoreGet): Variab
         }
 
         Object.assign(meta, updates);
+        meta.value = valueOrDefaultAll(meta.value, meta);
       }),
     );
 
     // Self-registration 시 query가 추가되면 graph rebuild
-    if (updates.query || updates.datasourceName) {
+    if (updates.query || updates.datasourceName || updates.datasourceType) {
       queueMicrotask(() => {
         const state = get();
         const filterMetas = state.filterState.filterMetas;
@@ -103,6 +130,7 @@ export const createVariableRuntimeSlice = (set: StoreSet, get: StoreGet): Variab
             id: m.id,
             query: m.query,
             datasourceName: m.datasourceName,
+            datasourceType: m.datasourceType,
           }));
 
         if (validMetas.length > 0) {
@@ -176,7 +204,7 @@ export const createVariableRuntimeSlice = (set: StoreSet, get: StoreGet): Variab
             const existing = existingMetas.get(meta.id);
             draft.filterState.filterMetas.set(meta.id, {
               ...meta,
-              value: existing?.value,
+              value: valueOrDefaultAll(existing?.value, meta),
               isFetching: existing?.isFetching ?? false,
               isQuerySuccess: existing?.isQuerySuccess ?? false,
               error: existing?.error,

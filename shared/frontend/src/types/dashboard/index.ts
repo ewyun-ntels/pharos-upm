@@ -81,6 +81,7 @@ export const ChartQuerySchema = z.object({
     "forceRefresh": z.number().optional(),
     "label": z.string(),
     "query": z.string(),
+    "templateStyle": z.string().optional(),
 });
 export type ChartQuery = z.infer<typeof ChartQuerySchema>;
 

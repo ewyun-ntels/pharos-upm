@@ -16,10 +16,11 @@
  */
 
 import { DependencyGraph } from '../utils/dependency-graph';
-import { extractVariables } from '@features/dashboard/utils/variable-parser';
+import { extractGrafanaVariables, extractVariables, isGrafanaClassicVariableQuery } from '@features/dashboard/utils/variable-parser';
+import { isPrometheusDatasource } from '@features/dashboard/utils/datasource';
 import { dashboardProvider } from '@providers/dashboard-provider';
 import { transformVariableValue } from '../variables/variable-value-transformer';
-import { QUERY_PARAM_START_TIME, QUERY_PARAM_END_TIME, QUERY_PARAM_START_TIME_MS, QUERY_PARAM_END_TIME_MS } from '@lib/query-params';
+import { QUERY_PARAM_START_TIME, QUERY_PARAM_END_TIME, QUERY_PARAM_START_TIME_MS, QUERY_PARAM_END_TIME_MS, QUERY_PARAM_STEP, QUERY_PARAM_INTERVAL, QUERY_PARAM_INTERVAL_MS } from '@lib/query-params';
 import { getAbsoluteValueTimestamp, getAbsoluteValueTimestampMs } from '@pharos/shared/components/ui-extension';
 import type { DateTimeRangeValue } from '@pharos/shared/components/ui-extension';
 import type { ChartQueryRequest, ChartQueryArgs } from '@types';
@@ -187,8 +188,19 @@ export class QueryPipeline {
     const { graph } = this.config;
 
     // 쿼리에서 변수 추출
-    const allQueries = this.queries.map(q => q.query || '').join('\n');
-    const directVars = extractVariables(allQueries);
+    const directVars = [...new Set(this.queries.flatMap((q) => {
+      const query = q.query || '';
+      if (q.templateStyle === 'grafana') {
+        return extractGrafanaVariables(query);
+      }
+      if (
+        isPrometheusDatasource(q.datasourceName || '', q.datasourceType) ||
+        isGrafanaClassicVariableQuery(query)
+      ) {
+        return [...new Set([...extractVariables(query), ...extractGrafanaVariables(query)])];
+      }
+      return extractVariables(query);
+    }))].sort();
 
     // Graph가 없거나 변수가 없으면 바로 반환
     if (!graph || directVars.length === 0) {
@@ -280,13 +292,13 @@ export class QueryPipeline {
     // SQL datasource는 기존 'val1','val2' 포맷 유지
     // 패널 쿼리 datasource 기준으로 판단 (변수 datasource보다 더 신뢰할 수 있음)
     const isPanelPrometheus = this.queries.some(
-      q => q.datasourceName?.toLowerCase().includes('prometheus')
+      q => isPrometheusDatasource(q.datasourceName || '', q.datasourceType)
     );
     argsVars.forEach(varName => {
       const meta = filterMetas.get(varName);
       if (meta?.value !== undefined) {
         const isPrometheus = isPanelPrometheus ||
-          meta.datasourceName?.toLowerCase().includes('prometheus');
+          isPrometheusDatasource(meta.datasourceName || '', meta.datasourceType);
         const transformed = transformVariableValue(meta.value, {
           format: isPrometheus ? 'regex' : 'sql',
         });
@@ -309,6 +321,12 @@ export class QueryPipeline {
     } else {
       args.set(QUERY_PARAM_END_TIME, () => Math.floor(Date.now() / 1000));
       args.set(QUERY_PARAM_END_TIME_MS, () => Date.now());
+    }
+
+    const step = panelArgs?.get(QUERY_PARAM_STEP);
+    if (typeof step === 'number' && step > 0) {
+      args.set(QUERY_PARAM_INTERVAL, `${step}s`);
+      args.set(QUERY_PARAM_INTERVAL_MS, step * 1000);
     }
 
     return args;

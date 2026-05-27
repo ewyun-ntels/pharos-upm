@@ -15,6 +15,10 @@ interface ChartPoint {
   value: number;
 }
 
+const numericStringPattern = /^[+-]?(?:(?:\d+\.?\d*)|(?:\.\d+))(?:e[+-]?\d+)?$/i;
+
+const isNumericString = (value: string): boolean => numericStringPattern.test(value.trim());
+
 // 1단계: 시간 파싱 (항상 밀리초 반환)
 /**
  * 타임스탬프를 밀리초로 파싱
@@ -38,7 +42,7 @@ const classifyFields = (row: Record<string, unknown>): ProcessedRow => {
 
     if (typeof value === 'number') {
       numericFields[key] = value;
-    } else if (typeof value === 'string' && !isNaN(Number(value)) && value !== '') {
+    } else if (typeof value === 'string' && isNumericString(value)) {
       numericFields[key] = Number(value);
     } else if (typeof value === 'string') {
       stringFields[key] = value;
@@ -265,4 +269,3 @@ export function responseConvert(
 
   return src;
 }
-

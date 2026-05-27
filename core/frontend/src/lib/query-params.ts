@@ -13,6 +13,8 @@ export const QUERY_PARAM_STEP = '__step' as const;
 export const QUERY_PARAM_START_TIME_MS = '__start_time_ms' as const;
 export const QUERY_PARAM_END_TIME_MS = '__end_time_ms' as const;
 export const QUERY_PARAM_STEP_MS = '__step_ms' as const;
+export const QUERY_PARAM_INTERVAL = '__interval' as const;
+export const QUERY_PARAM_INTERVAL_MS = '__interval_ms' as const;
 
 /** 기타 시스템 쿼리 파라미터 */
 export const QUERY_PARAM_REFRESH_COUNT = '__refreshCount' as const;
@@ -41,5 +43,17 @@ export const QUERY_PARAM_DESCRIPTIONS = {
     desc: '시간 간격 (초)',
     example: '300',
     unit: 'seconds',
+  },
+  [QUERY_PARAM_INTERVAL]: {
+    name: '$__interval',
+    desc: 'Grafana interval',
+    example: '300s',
+    unit: 'duration',
+  },
+  [QUERY_PARAM_INTERVAL_MS]: {
+    name: '$__interval_ms',
+    desc: 'Grafana interval (milliseconds)',
+    example: '300000',
+    unit: 'milliseconds',
   },
 } as const;

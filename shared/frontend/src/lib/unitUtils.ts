@@ -12,6 +12,7 @@ export type UnitType =
   | 'short'
   | 'numeric'
   | 'Base64_decoding'
+  | '%(0-1)'
   | '%(1-100)'
   | UnitData
   | UnitDateRate
@@ -26,6 +27,7 @@ export const tableUnitTypeList = [
   'short',
   'numeric',
   'Base64_decoding',
+  '%(0-1)',
   '%(1-100)',
   'bytes(IEC)',
   'bytes(SI)',
@@ -184,6 +186,14 @@ function convertUnit(
         unit: '%',
         toString: () => `${(value as number).toFixed(decimalPlaces)}%`,
       };
+    case '%(0-1)': {
+      const scaledValue = Number(value) * 100;
+      return {
+        quantity: scaledValue,
+        unit: '%',
+        toString: () => `${scaledValue.toFixed(decimalPlaces)}%`,
+      };
+    }
     case 'local_time':
       const localTimeStr = convertToLocalTime(String(value));
       return {
