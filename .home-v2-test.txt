@@ -1,0 +1,253 @@
+================================================================================
+  HOME-V2 페이지 개발 내용 정리
+  경로: /home-v2
+  브랜치: feature/upm-base
+================================================================================
+
+--------------------------------------------------------------------------------
+1. 개요
+--------------------------------------------------------------------------------
+
+Kubernetes 클러스터 모니터링 전용 홈 화면.
+기존 대시보드 시스템에 의존하지 않고 Prometheus에 직접 쿼리하는 독립 페이지.
+
+주요 기능:
+  - Cluster Summary (CPU/MEM 전체 사용률)
+  - Node Topology (노드별 Pod 상태 시각화)
+  - Pod 상세 패널 (클릭 시 CPU/MEM/Storage/Network 표시)
+  - Active Alarms (Alerta 알람 목록, open 상태만)
+  - Namespace/Node 멀티셀렉트 필터 (동적 조회)
+  - Refresh 주기 선택 (Off / 10s / 30s / 1m / 5m)
+
+--------------------------------------------------------------------------------
+2. 아키텍처
+--------------------------------------------------------------------------------
+
+[React 프론트엔드]
+  → GET  /home-v2           : datasource 이름 조회 (백엔드 config)
+  → POST /plugins/ds/query  : Prometheus PromQL 쿼리 (배치)
+  → GET  /alarm/alerts      : Alerta 알람 목록
+
+[백엔드 Go]
+  → GET /home-v2            : master_config.toml [home_v2] 섹션 반환
+  → POST /plugins/ds/query  : datasource proxy (기존 엔드포인트 재사용)
+
+Prometheus datasource: prometheus-metric
+  address: http://10.255.254.22:30232
+
+--------------------------------------------------------------------------------
+3. 신규/수정 파일 목록
+--------------------------------------------------------------------------------
+
+[백엔드 Go]
+  core/config/master_config.toml
+    - [home_v2] 섹션 추가
+      datasource = "prometheus-metric"
+
+  core/pkg/common/config.go
+    - HomeV2Config struct 추가 { Datasource string }
+    - Config struct에 HomeV2 HomeV2Config 필드 추가
+
+  core/pkg/homev2/api.go          (신규)
+    - GET /home-v2 엔드포인트 등록
+
+  core/pkg/homev2/handler.go      (신규)
+    - ConfigResponse { datasource } JSON 반환
+
+  core/pkg/server/http/api/api.go
+    - &homev2.Api{} 등록
+
+[프론트엔드]
+  core/frontend/src/features/home-dashboard/types.ts
+    - KubernetesConfig: namespace(단일) → namespaces([]string), nodes([]string) 변경
+    - PodInfo에 storagePercent, networkRxBps, networkTxBps 필드 추가
+
+  core/frontend/src/features/home-dashboard/hooks/use-kubernetes-data.ts
+    - POST /plugins/ds/query 직접 호출로 완전 재작성
+    - buildQueries: 멀티 namespace/node 정규식 필터 지원
+      단일: namespace="default"
+      복수: namespace=~"default|upm-app"
+      전체: namespace!=""
+    - 추가 PromQL 쿼리 3개
+      storageUsage: kubelet_volume_stats_used/capacity
+      networkRx: rate(container_network_receive_bytes_total[5m])
+      networkTx: rate(container_network_transmit_bytes_total[5m])
+    - useClusterMeta() 신규: namespace/node 목록 동적 조회 (staleTime 5분)
+      namespaces: group by (namespace) (kube_namespace_status_phase{phase="Active"})
+      nodes: group by (node) (kube_node_info)
+
+  core/frontend/src/features/home-dashboard/hooks/use-active-alerts.ts
+    - GET /alarm/alerts 직접 호출 (Alerta API)
+    - status === 'open' 필터링
+    - severity: critical/major/minor 카운트
+
+  core/frontend/src/features/home-dashboard/hooks/use-home-v2-config.ts (신규)
+    - GET /home-v2 호출 → datasource 이름 반환
+
+  core/frontend/src/features/home-dashboard/components/MultiSelectFilter.tsx (신규)
+    - Popover + Checkbox 기반 멀티셀렉트 컴포넌트
+    - 선택 없음 → "All" 표시
+    - 1개 선택 → 이름 표시
+    - N개 선택 → "N개 선택" 표시
+    - "전체" 체크박스로 선택 초기화
+
+  core/frontend/src/features/home-dashboard/components/PodDetailPanel.tsx
+    - Storage 사용률 UsageRow 추가
+    - Network Rx/Tx 표시 추가 (B/s, KB/s, MB/s 자동 단위)
+    - 알람은 AlarmItem 타입 사용 (Alerta 형식)
+
+  core/frontend/src/features/home-dashboard/components/NodeTopology.tsx
+    - 데이터 없음 / 에러 / 로딩 상태 처리
+
+  core/frontend/src/features/home-dashboard/components/ActiveAlerts.tsx
+    - AlarmItem 타입으로 변경
+    - severity 소문자 비교
+    - "전체 알람" 버튼 → /extensions/alarm/alerta 이동
+
+  core/frontend/src/features/home-dashboard/index.ts
+    - 신규 export 추가
+
+  core/frontend/src/routes/home-v2/page.tsx
+    - 대시보드 의존성 완전 제거
+    - useHomeV2Config: datasource 이름
+    - useClusterMeta: namespace/node 목록
+    - selectedNamespaces, selectedNodes 상태 (기본: [] = All)
+    - Refresh 셀렉터 (Off/10s/30s/1m/5m, 기본 30s)
+
+--------------------------------------------------------------------------------
+4. PromQL 쿼리 목록
+--------------------------------------------------------------------------------
+
+[Pod 데이터 - 배치 쿼리 9+3개]
+  podInfo      : kube_pod_info{namespace=~"...", node=~"..."}
+  podPhase     : kube_pod_status_phase{namespace=~"..."}
+  podRestarts  : sum by (pod) (kube_pod_container_status_restarts_total)
+  cpuUsage     : node_namespace_pod_container:container_cpu_usage / kube_pod_container_resource_limits(cpu)
+  memUsage     : container_memory_working_set_bytes / kube_pod_container_resource_limits(memory)
+  clusterCpuReq: 전체 CPU requests 대비 사용률
+  clusterCpuLim: 전체 CPU limits 대비 사용률
+  clusterMemReq: 전체 Memory requests 대비 사용률
+  clusterMemLim: 전체 Memory limits 대비 사용률
+  storageUsage : kubelet_volume_stats_used_bytes / kubelet_volume_stats_capacity_bytes
+  networkRx    : rate(container_network_receive_bytes_total[5m])
+  networkTx    : rate(container_network_transmit_bytes_total[5m])
+
+[클러스터 메타 - 별도 쿼리 (staleTime 5분)]
+  namespaces   : group by (namespace) (kube_namespace_status_phase{phase="Active"})
+  nodes        : group by (node) (kube_node_info)
+
+--------------------------------------------------------------------------------
+5. Pod 상태 판정 기준
+--------------------------------------------------------------------------------
+
+  error   : phase=Failed/Unknown, 재시작>=5회, CPU>=95%, MEM>=95%
+  warning : phase=Pending, 재시작>=3회, CPU>=80%, MEM>=80%
+  normal  : 그 외
+
+Node 상태:
+  error   : pod 중 error 존재 or CPU>=90% or MEM>=90%
+  warning : pod 중 warning 존재 or CPU>=70% or MEM>=70%
+  normal  : 그 외
+
+--------------------------------------------------------------------------------
+6. 테스트 체크리스트
+--------------------------------------------------------------------------------
+
+[ ] 백엔드 빌드 정상 여부 확인
+    - go build ./core/...
+    - GET /home-v2 → { "datasource": "prometheus-metric" } 응답 확인
+
+[ ] Namespace/Node 멀티셀렉트
+    - 드롭다운 클릭 시 클러스터 실제 목록 표시
+    - 전체 선택 (기본): namespace!="" 쿼리 사용
+    - 복수 선택: namespace=~"ns1|ns2" 쿼리 사용
+    - 선택 변경 시 Pod 클릭 상태 초기화
+
+[ ] Node Topology
+    - 노드 카드에 Pod 목록 표시
+    - Pod 상태에 따른 아이콘 색상 (초록/노랑/빨강)
+    - 데이터 없을 때 메시지 표시
+
+[ ] Pod 상세 패널
+    - Pod 클릭 시 패널 열림
+    - CPU/MEM/Storage/Network 4개 메트릭 표시
+    - Storage: volume 없는 pod는 0% 표시
+    - Network: B/s ~ GB/s 자동 단위
+
+[ ] Active Alarms
+    - /alarm/alerts API 호출, status=open 필터
+    - critical/major/minor 카운트 표시
+    - "전체 알람" 버튼 → /extensions/alarm/alerta 이동
+
+[ ] Refresh 주기
+    - Off 선택 시 자동 갱신 중지
+    - 30s 기본값, 로딩 중 스피너 표시
+
+[ ] 에러 처리
+    - Prometheus 연결 실패 시 에러 메시지 표시
+    - datasource 이름이 잘못된 경우 안내 문구 표시
+
+--------------------------------------------------------------------------------
+7. 알려진 이슈 / 확인 필요 사항
+--------------------------------------------------------------------------------
+
+- CPU/MEM 사용률이 0%로 나올 경우
+  → kube-prometheus-stack recording rule 존재 여부 확인
+     node_namespace_pod_container:container_cpu_usage_seconds_total:sum_rate5m
+     cluster:namespace:pod_cpu:active:kube_pod_container_resource_limits
+     cluster:namespace:pod_memory:active:kube_pod_container_resource_limits
+
+- Storage 사용률이 0%로 나올 경우
+  → kubelet_volume_stats_used_bytes 메트릭 존재 여부 확인
+  → volume이 없는 pod는 정상적으로 0% 표시됨
+
+- Network 수치가 0으로 나올 경우
+  → container_network_receive/transmit_bytes_total 메트릭 확인
+
+- cluster 필터 기본값: "" (빈 문자열 = 전체)
+ → 특정 cluster만 보려면 URL 파라미터: ?cluster=upm-ems
+
+--------------------------------------------------------------------------------
+8. 코드 리뷰 후 보완 사항 (2026-05-28)
+--------------------------------------------------------------------------------
+
+[수정 완료]
+  1) 멀티 namespace 환경에서 동일 Pod 이름 충돌 방지
+     - Pod 메트릭 매핑 기준을 pod 단독 키에서 namespace/pod 복합 키로 변경
+     - podPhase, podRestarts, cpuUsage, memUsage, storageUsage, networkRx, networkTx 모두
+       namespace + pod 기준으로 group/lookup 수행
+     - NodeCard의 React key도 namespace/pod 기준으로 변경
+
+  2) datasource / PromQL 에러 노출
+     - /plugins/ds/query 결과 중 Error가 있거나 query result가 누락되면 빈 데이터로 숨기지 않고 throw 처리
+     - React Query의 isError로 전달되어 NodeTopology 에러 화면에 실제 에러 메시지 표시
+     - datasource 이름 오류, PromQL 문법 오류, datasource proxy 오류를 화면에서 확인 가능
+
+  3) Node 필터 적용 범위 보완
+     - node 선택 시 podInfo만 줄어드는 문제가 없도록 podInfo selector를 기준으로 다른 Pod 메트릭도 필터링
+     - PromQL에 and on (namespace, pod) kube_pod_info{...node...} 패턴 적용
+     - Cluster Summary의 request/limit 비율도 선택된 node의 Pod 기준으로 계산되도록 보완
+
+  4) namespace/node label matcher escaping
+     - exact matcher 값의 backslash, double quote escape 처리
+     - regex matcher 값의 정규식 특수문자 escape 처리
+     - node 이름에 "." 등 regex 문자가 포함되어도 의도치 않은 광범위 매칭이 발생하지 않도록 보완
+
+[변경 파일]
+  core/frontend/src/features/home-dashboard/hooks/use-kubernetes-data.ts
+    - PromQL 생성 로직 보완
+    - namespace/pod 복합 키 매핑 적용
+    - datasource query 에러 throw 처리
+    - label matcher escaping 함수 추가
+
+  core/frontend/src/features/home-dashboard/components/NodeCard.tsx
+    - Pod item key를 namespace/pod 기준으로 변경
+
+  core/frontend/src/features/home-dashboard/components/NodeTopology.tsx
+    - errorMessage prop 추가
+    - Prometheus 조회 실패 시 실제 에러 메시지 표시
+
+  core/frontend/src/routes/home-v2/page.tsx
+    - useKubernetesData의 error를 NodeTopology에 전달
+
+================================================================================

@@ -299,6 +299,9 @@ enable_metrics = false
 # alerta NodePort service: 10.109.99.161  8080:30880/TCP
 # NodeIP: 10.255.254.22
 # ---------------------------------------------------------------------------
+[home_v2]
+datasource = "prometheus-metric"
+
 [alarm.alerta]
 url = "http://10.255.254.22:30880"
 
