@@ -1,4 +1,4 @@
-package homev2
+package homeupm
 
 import (
 	"github.com/gin-gonic/gin"
@@ -30,5 +30,5 @@ func (a *Api) RegisterRoutes(routes gin.IRoutes) {
 }
 
 func (a *Api) GetRelativePath() string {
-	return "/home-v2"
+	return "/home-upm"
 }

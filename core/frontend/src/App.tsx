@@ -22,8 +22,7 @@ const queryClient = new QueryClient({
 });
 
 // Import actual page components
-const HomePage = React.lazy(() => import('@/routes/home/page'));
-const HomeV2Page = React.lazy(() => import('@/routes/home-v2/page'));
+const HomeUPMPage = React.lazy(() => import('@/routes/home-upm/page'));
 const LoginPage = React.lazy(() => import('@/routes/login/page'));
 const DashboardsPage = React.lazy(() => import('@/routes/dashboards/page'));
 const AlertPage = React.lazy(() => import('@/routes/alert/page'));
@@ -47,9 +46,9 @@ function App() {
           <React.Suspense fallback={<LoadingIndicator className="h-screen" />}>
             <Routes>
               <Route path="/login" element={<LoginPage />} />
-              <Route path="/" element={<Navigate to="/home" replace />} />
-              <Route path="/home" element={<HomePage />} />
-              <Route path="/home-v2" element={<HomeV2Page />} />
+              <Route path="/" element={<Navigate to="/home-upm" replace />} />
+              <Route path="/home" element={<Navigate to="/home-upm" replace />} />
+              <Route path="/home-upm" element={<HomeUPMPage />} />
               <Route path="/dashboards/*" element={<DashboardsPage />} />
               <Route path="/alert/edit" element={<AlertRuleEditPage />} />
               <Route path="/alert/*" element={<AlertPage />} />

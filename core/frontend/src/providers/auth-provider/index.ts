@@ -32,7 +32,7 @@ export const authProvider: AuthProvider = {
       });
 
       // 쿠키가 자동 설정됨, 저장할 것 없음
-      return { success: true, redirectTo: '/home' };
+      return { success: true, redirectTo: '/home-upm' };
     } catch (error: unknown) {
       console.error('Login error:', error);
 

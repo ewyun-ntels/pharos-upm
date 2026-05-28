@@ -494,7 +494,7 @@ export const AppSidebar = () => {
     <Sidebar collapsible="offcanvas" className='border-r'>
       <SidebarHeader>
         <div ref={ref} className="flex items-center justify-between gap-2">
-          <Link to="/home" className="hidden item-center gap-3 md:flex">
+          <Link to="/home-upm" className="hidden item-center gap-3 md:flex">
             {(() => {
               const LogoComponent = getSidebarLogo();
               return LogoComponent ? <LogoComponent className="h-7 w-auto" /> : null;

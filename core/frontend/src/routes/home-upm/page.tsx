@@ -9,7 +9,7 @@ import {
   MultiSelectFilter,
   useKubernetesData,
   useActiveAlerts,
-  useHomeV2Config,
+  useHomeUPMConfig,
   useClusterMeta,
 } from '@features/home-dashboard';
 import type { PodInfo, KubernetesConfig, AlarmItem } from '@features/home-dashboard';
@@ -33,13 +33,13 @@ function findRelatedAlerts(pod: PodInfo, alerts: AlarmItem[]): AlarmItem[] {
   );
 }
 
-export default function HomeV2Page() {
+export default function HomeUPMPage() {
   const [selectedPod, setSelectedPod] = useState<PodInfo | null>(null);
   const [refreshInterval, setRefreshInterval] = useState(30_000);
   const [selectedNamespaces, setSelectedNamespaces] = useState<string[]>([]);
   const [selectedNodes, setSelectedNodes] = useState<string[]>([]);
 
-  const { data: homeConfig } = useHomeV2Config();
+  const { data: homeConfig } = useHomeUPMConfig();
   const datasourceName = homeConfig?.datasource ?? 'prometheus-metric';
 
   const { data: clusterMeta, isLoading: metaLoading } = useClusterMeta(datasourceName);

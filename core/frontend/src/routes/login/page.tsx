@@ -148,13 +148,13 @@ export default function AuthPage() {
           return;
         }
 
-        navigate('/home');
+        navigate('/home-upm');
       } catch (error) {
         console.error('Failed to fetch user info:', error);
       }
     } else {
       // required action 완료 → 홈으로
-      navigate('/home');
+      navigate('/home-upm');
     }
   };
 

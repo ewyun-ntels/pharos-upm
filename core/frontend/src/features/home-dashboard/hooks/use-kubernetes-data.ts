@@ -220,7 +220,7 @@ function processResults(data: Record<string, IndexRow[]>): {
 
 export function useClusterMeta(datasourceName: string) {
   return useQuery({
-    queryKey: ['home-v2-cluster-meta', datasourceName],
+    queryKey: ['home-upm-cluster-meta', datasourceName],
     queryFn: async () => {
       const data = await runBatchQuery(datasourceName, {
         namespaces: 'group by (namespace) (kube_namespace_status_phase{phase="Active"})',
@@ -242,7 +242,7 @@ export function useClusterMeta(datasourceName: string) {
 
 export function useKubernetesData(config: KubernetesConfig, refetchInterval = 30_000) {
   return useQuery({
-    queryKey: ['home-v2-kubernetes', config],
+    queryKey: ['home-upm-kubernetes', config],
     queryFn: async () => {
       const { datasourceName, namespaces, nodes, cluster } = config;
       const queries = buildQueries(namespaces, cluster, nodes);

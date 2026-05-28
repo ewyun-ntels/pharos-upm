@@ -1,4 +1,4 @@
-package homev2
+package homeupm
 
 import (
 	"net/http"
@@ -13,7 +13,7 @@ type ConfigResponse struct {
 
 func GetConfigHandler(config common.Config) gin.HandlerFunc {
 	resp := ConfigResponse{
-		Datasource: config.HomeV2.Datasource,
+		Datasource: config.HomeUPM.Datasource,
 	}
 	return func(c *gin.Context) {
 		c.JSON(http.StatusOK, resp)

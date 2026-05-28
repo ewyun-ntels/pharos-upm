@@ -7,7 +7,7 @@ export default function IndexPage() {
   return (
     <Suspense>
       <Authenticated key="home-page">
-        <Navigate to="/home" replace />
+        <Navigate to="/home-upm" replace />
       </Authenticated>
     </Suspense>
   );
