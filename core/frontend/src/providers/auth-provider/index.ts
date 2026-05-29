@@ -3,6 +3,7 @@ import { useAuthStore } from '@pharos/shared/features/auth';
 import { t } from 'i18next';
 import { axiosInstance } from '@lib/axios';
 import { UserSchema } from '@pharos/shared/types/user';
+import { HOME_PATH } from '@pharos/meta/site-config';
 
 // OAuth2 client_id (백엔드에서 필요)
 const CLIENT_ID = '7a1e1782d4162e17dfc6f2bedd2c74ca';
@@ -32,7 +33,7 @@ export const authProvider: AuthProvider = {
       });
 
       // 쿠키가 자동 설정됨, 저장할 것 없음
-      return { success: true, redirectTo: '/home-upm' };
+      return { success: true, redirectTo: HOME_PATH };
     } catch (error: unknown) {
       console.error('Login error:', error);
 

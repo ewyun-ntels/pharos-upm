@@ -435,10 +435,6 @@ type ETLConfig struct {
 	Elasticsearch orm.ElasticsearchConfig `mapstructure:"elasticsearch"`
 }
 
-type HomeUPMConfig struct {
-	Datasource string `mapstructure:"datasource"`
-}
-
 type Config struct {
 	Serve         ServeConfig              `mapstructure:"serve"`
 	Servers       map[string]ServerConfig  `mapstructure:"servers"`
@@ -465,5 +461,4 @@ type Config struct {
 	Catv          CatvConfig               `mapstructure:"catv"`
 	Metrics       MetricsConfig            `mapstructure:"metrics"`
 	ETL           ETLConfig                `mapstructure:"etl"`
-	HomeUPM       HomeUPMConfig            `mapstructure:"home_upm"`
 }

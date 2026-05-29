@@ -3,7 +3,8 @@
   "description": "UPM",
   "icon": "default/images/favicon.svg",
   "login-extension": "default/login",
-  "extensions": ["alarm", "log"],
+  "home-extension": "home-upm",
+  "extensions": ["alarm", "log", "home-upm"],
   "menu-order": [
     {
       "label": "Dashboard",

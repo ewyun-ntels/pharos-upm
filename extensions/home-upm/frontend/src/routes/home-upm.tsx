@@ -11,8 +11,9 @@ import {
   useActiveAlerts,
   useHomeUPMConfig,
   useClusterMeta,
-} from '@features/home-dashboard';
-import type { PodInfo, KubernetesConfig, AlarmItem } from '@features/home-dashboard';
+  usePodVolumeDetail,
+} from '@pharos/core/features/home-dashboard';
+import type { PodInfo, KubernetesConfig, AlarmItem } from '@pharos/core/features/home-dashboard';
 
 const DEFAULT_CLUSTER = '';
 
@@ -56,6 +57,7 @@ export default function HomeUPMPage() {
 
   const { data: k8sData, isLoading: k8sLoading, isError: k8sError, error: k8sErrorDetail } = useKubernetesData(k8sConfig, refreshInterval);
   const { alerts, criticalCount, majorCount, minorCount, isLoading: alertsLoading } = useActiveAlerts(refreshInterval);
+  const { data: volumeDetails, isLoading: isVolumeLoading } = usePodVolumeDetail(selectedPod, datasourceName);
 
   const relatedAlerts = selectedPod ? findRelatedAlerts(selectedPod, alerts) : [];
 
@@ -84,19 +86,16 @@ export default function HomeUPMPage() {
           </div>
 
           <div className="flex items-center gap-3 flex-wrap">
-            {/* Refresh */}
+            {/* Node multi-select */}
             <div className="flex items-center gap-1.5">
-              <span className="text-xs text-muted-foreground">Refresh</span>
-              <Select value={String(refreshInterval)} onValueChange={(v) => setRefreshInterval(Number(v))}>
-                <SelectTrigger className="h-8 w-20 text-sm">
-                  <SelectValue>{currentRefreshLabel}</SelectValue>
-                </SelectTrigger>
-                <SelectContent>
-                  {REFRESH_OPTIONS.map((o) => (
-                    <SelectItem key={o.value} value={String(o.value)}>{o.label}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <span className="text-sm text-muted-foreground">Node</span>
+              <MultiSelectFilter
+                label="Node"
+                options={clusterMeta?.nodes ?? []}
+                selected={selectedNodes}
+                onChange={handleNodesChange}
+                isLoading={metaLoading}
+              />
             </div>
 
             {/* Namespace multi-select */}
@@ -111,16 +110,19 @@ export default function HomeUPMPage() {
               />
             </div>
 
-            {/* Node multi-select */}
+            {/* Refresh */}
             <div className="flex items-center gap-1.5">
-              <span className="text-sm text-muted-foreground">Node</span>
-              <MultiSelectFilter
-                label="Node"
-                options={clusterMeta?.nodes ?? []}
-                selected={selectedNodes}
-                onChange={handleNodesChange}
-                isLoading={metaLoading}
-              />
+              <span className="text-xs text-muted-foreground">Refresh</span>
+              <Select value={String(refreshInterval)} onValueChange={(v) => setRefreshInterval(Number(v))}>
+                <SelectTrigger className="h-8 w-20 text-sm">
+                  <SelectValue>{currentRefreshLabel}</SelectValue>
+                </SelectTrigger>
+                <SelectContent>
+                  {REFRESH_OPTIONS.map((o) => (
+                    <SelectItem key={o.value} value={String(o.value)}>{o.label}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
           </div>
         </div>
@@ -151,6 +153,8 @@ export default function HomeUPMPage() {
             pod={selectedPod}
             relatedAlerts={relatedAlerts}
             onClose={() => setSelectedPod(null)}
+            volumeDetails={volumeDetails}
+            isVolumeLoading={isVolumeLoading}
           />
         )}
 

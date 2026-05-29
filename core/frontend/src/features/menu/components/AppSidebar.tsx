@@ -50,6 +50,7 @@ import { useUser, useAuthStore } from '@pharos/shared/features/auth';
 import { UserPasswordDialog } from '@components/header/_components/userPasswordDialog';
 import { MyInfoDialog } from '@components/header/_components/myInfoDialog';
 import { useTheme } from '@providers/theme-provider';
+import { HOME_PATH } from '@pharos/meta/site-config';
 
 type IdentityUser = {
   id: string;
@@ -494,7 +495,7 @@ export const AppSidebar = () => {
     <Sidebar collapsible="offcanvas" className='border-r'>
       <SidebarHeader>
         <div ref={ref} className="flex items-center justify-between gap-2">
-          <Link to="/home-upm" className="hidden item-center gap-3 md:flex">
+          <Link to={HOME_PATH} className="hidden item-center gap-3 md:flex">
             {(() => {
               const LogoComponent = getSidebarLogo();
               return LogoComponent ? <LogoComponent className="h-7 w-auto" /> : null;

@@ -8,6 +8,7 @@ import {RefineContext} from '@/routes/_refine_context';
 import {getExtensionPages} from '@features/extension/registry';
 import {Toaster} from '@pharos/shared/components/ui/sonner';
 import {LoadingIndicator} from '@pharos/shared/components/ui-extension';
+import {HOME_PATH} from '@pharos/meta/site-config';
 
 import './locales/i18next';
 
@@ -22,7 +23,7 @@ const queryClient = new QueryClient({
 });
 
 // Import actual page components
-const HomeUPMPage = React.lazy(() => import('@/routes/home-upm/page'));
+const HomePage = React.lazy(() => import('@/routes/home/page'));
 const LoginPage = React.lazy(() => import('@/routes/login/page'));
 const DashboardsPage = React.lazy(() => import('@/routes/dashboards/page'));
 const AlertPage = React.lazy(() => import('@/routes/alert/page'));
@@ -46,9 +47,8 @@ function App() {
           <React.Suspense fallback={<LoadingIndicator className="h-screen" />}>
             <Routes>
               <Route path="/login" element={<LoginPage />} />
-              <Route path="/" element={<Navigate to="/home-upm" replace />} />
-              <Route path="/home" element={<Navigate to="/home-upm" replace />} />
-              <Route path="/home-upm" element={<HomeUPMPage />} />
+              <Route path="/" element={<Navigate to={HOME_PATH} replace />} />
+              <Route path="/home" element={<HomePage />} />
               <Route path="/dashboards/*" element={<DashboardsPage />} />
               <Route path="/alert/edit" element={<AlertRuleEditPage />} />
               <Route path="/alert/*" element={<AlertPage />} />

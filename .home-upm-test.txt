@@ -336,3 +336,693 @@ home-upm 화면 적용 후 URL 이동이 꼬이거나 기존 홈 화면으로 �
     이 경우 App.tsx의 `<Route path="/home-upm" element={<HomeUPMPage />} />`는 남겨둔다.
   - `/home-upm` 화면을 완전히 제거하려면 routes/home-upm, home-dashboard hook/API,
     백엔드 `/home-upm` API, [home_upm] 설정까지 함께 정리해야 한다.
+
+--------------------------------------------------------------------------------
+10. 추가 기능 개발 (2026-05-28)
+--------------------------------------------------------------------------------
+
+[기능 1] Pod 상세 패널 - PV 사용률 상세 조회
+--------------------------------------------------------------------------------
+
+  개요:
+    Pod 클릭 시 해당 Pod에 마운트된 PVC별 스토리지 사용 현황을
+    Grafana "Kubernetes / Persistent Volumes" 대시보드 수준으로 표시한다.
+
+  현재 구현과의 차이:
+    - 현재: storageUsage (used/capacity 비율) 단일 수치만 표시
+    - 목표: PVC별 Used/Free bytes + 사용률(%) + inode 사용량 표시
+
+  쿼리 방식:
+    kubelet_volume_stats_* 메트릭에 pod label이 포함되어 있으므로
+    namespace + pod 이름으로 직접 조회 가능. 별도 PVC 변수 불필요.
+
+    Used bytes   : kubelet_volume_stats_capacity_bytes{namespace, pod}
+                   - kubelet_volume_stats_available_bytes{namespace, pod}
+    Free bytes   : kubelet_volume_stats_available_bytes{namespace, pod}
+    Used %       : (capacity - available) / capacity * 100
+    inode used   : kubelet_volume_stats_inodes_used{namespace, pod}
+    inode free   : kubelet_volume_stats_inodes{namespace, pod}
+                   - kubelet_volume_stats_inodes_used{namespace, pod}
+    inode %      : inodes_used / inodes * 100
+
+  구현 방식: on-demand 조회 (Pod 클릭 시 별도 hook 호출)
+    - 배치 쿼리에 포함하지 않고 selectedPod 세팅 시 별도 쿼리 실행
+    - 이유: Pod 미선택 상태에서 불필요한 메트릭 조회 방지, PVC 복수 표시 용이
+
+  신규/수정 파일:
+    core/frontend/src/features/home-dashboard/hooks/use-pod-volume-detail.ts (신규)
+      - usePodVolumeDetail(pod, datasourceName) hook
+      - pod 선택 시 4개 메트릭 on-demand 조회
+      - PVC별 { pvcName, usedBytes, freeBytes, usedPercent,
+               inodesUsed, inodesFree, inodesPercent } 반환
+
+    core/frontend/src/features/home-dashboard/components/PodDetailPanel.tsx (수정)
+      - volumeDetails prop 추가
+      - Storage UsageRow → PVC별 상세 표시로 확장
+      - bytes 단위 자동 변환 (B/KB/MB/GB)
+      - inode 사용률 표시 추가
+
+    core/frontend/src/routes/home-upm/page.tsx (수정)
+      - usePodVolumeDetail 호출 후 PodDetailPanel에 전달
+
+  확인 사항:
+    - kubelet_volume_stats_used_bytes 메트릭 존재 여부 확인
+      (없을 경우 kubelet_volume_stats_available_bytes 기반으로 계산)
+    - volume 없는 pod는 PV 섹션 미표시 처리
+
+[기능 2] Pod 상세 패널 - Force Delete 버튼
+--------------------------------------------------------------------------------
+
+  개요:
+    Pod 상세 패널 우측 상단의 '대시보드' 버튼을 'Force Delete' 버튼으로 교체.
+    클릭 시 패스워드 확인 다이얼로그를 거친 후 Pod를 강제 삭제한다.
+
+  UI 흐름:
+    1) Force Delete 버튼 클릭
+    2) 확인 다이얼로그 표시 (shadcn/ui Dialog 컴포넌트)
+       - 삭제 대상 pod 이름 / namespace 안내 문구
+       - 패스워드 입력 필드 (type="password")
+       - 확인 / 취소 버튼
+    3) 확인 클릭 → 패스워드 검증 API 호출
+       - 성공: pod force delete API 호출 → 패널 닫힘 + 토스트 알림
+       - 실패: "패스워드가 일치하지 않습니다" 인라인 에러 표시
+    4) 취소 클릭 → 다이얼로그 닫힘, 아무 동작 없음
+
+  패스워드 검증 방식 (옵션 A 권장):
+    - 기존 로그인 API에 현재 사용자 ID + 입력 패스워드로 재인증 시도
+    - 별도 백엔드 추가 없이 기존 인증 흐름 재사용
+    - 인증 방식(Keycloak / 자체 로그인)에 따라 엔드포인트 결정 필요
+
+  백엔드 신규 개발 필요:
+    - 현재 백엔드에 k8s pod 관리 API 없음 (client-go 미포함)
+    - 추가 필요 사항:
+        client-go 패키지 추가
+        kubeconfig 또는 in-cluster 인증 설정
+        DELETE /k8s/pods/{namespace}/{pod}?force=true 엔드포인트
+        → gracePeriodSeconds=0, propagationPolicy=Background
+
+  선행 확인 사항:
+    - pharos 서버가 k8s 클러스터 내부(in-cluster) 배포인지,
+      외부에서 kubeconfig 파일로 접근하는지 확인 필요
+      (인증 방식 및 RBAC 권한 설정이 달라짐)
+
+  신규/수정 파일:
+    [백엔드]
+      core/pkg/k8s/api.go                     (신규)
+      core/pkg/k8s/handler.go                 (신규)
+        - DELETE /k8s/pods/{namespace}/{pod} 엔드포인트
+      core/pkg/server/http/api/api.go         (수정)
+        - &k8s.Api{} 등록
+
+    [프론트엔드]
+      core/frontend/src/features/home-dashboard/components/PodDetailPanel.tsx (수정)
+        - '대시보드' 버튼 → 'Force Delete' 버튼 교체
+        - ForceDeleteDialog 컴포넌트 추가 (인라인 또는 별도 파일)
+        - 패스워드 검증 + delete API 호출 로직
+
+================================================================================
+--------------------------------------------------------------------------------
+11. 홈화면 소스 이관 설계
+--------------------------------------------------------------------------------
+
+--------------------------------------------------------------------------------
+11-1. 목적 및 설계 방침
+--------------------------------------------------------------------------------
+
+  목적:
+    현재 core에 고정 배선된 home-upm 화면을 extension으로 분리하여,
+    프로젝트(UPM, CATV 등)마다 독립적인 홈 화면을 가질 수 있도록 한다.
+
+  설계 방침 (login-extension 선례 기반):
+    - meta/configs/{mode}.json에 "home-extension" 필드(선택)를 추가한다.
+    - 실제 extension 로딩/빌드 포함 여부는 기존 "extensions" 배열이 단일 기준이다.
+    - home-extension은 extensions에 포함된 extension 중 홈 화면으로 사용할 대상을 지정한다.
+    - home-extension이 지정된 경우 해당 값은 extensions 배열에도 반드시 포함되어야 한다.
+      예: "home-extension": "home-upm", "extensions": ["alarm", "log", "home-upm"]
+    - home-path 필드는 선택 override로만 둔다.
+      미지정 시 HOME_PATH는 "/extensions/{home-extension}"으로 자동 생성한다.
+    - home-extension이 없는 경우 core 기존 대시보드 홈(/home)으로 fallback한다.
+    - 홈 경로는 빌드 시점에 meta/generated/frontend/site-config.ts로 생성하여
+      런타임 하드코딩을 제거한다.
+    - 주의: /home 라우트 자체는 기존 HomePage를 렌더링해야 한다.
+      HOME_PATH가 '/home'인 경우 /home → /home self-redirect 루프가 발생할 수 있으므로
+      / 라우트만 HOME_PATH로 redirect한다.
+
+  참고:
+    - login-extension도 동일한 패턴. 모든 config(upm/catv/default)에 명시되어 있음.
+    - home-extension 없는 config는 기존 대시보드 홈이 자연스러운 기본값이다.
+
+--------------------------------------------------------------------------------
+11-2. 완성 후 디렉토리 구조
+--------------------------------------------------------------------------------
+
+  [신규 extension]
+    extensions/home-upm/
+    ├── extension.go                  # Extension 인터페이스 구현 + API 등록
+    ├── api.go                        # GET /home-upm 엔드포인트 (core에서 이동)
+    ├── go.mod
+    ├── go.sum
+    └── frontend/
+        ├── package.json              # name: @pharos/extension-home-upm
+        ├── tsconfig.json
+        └── src/
+            ├── index.ts              # registerExtension() 호출
+            └── routes/
+                └── home-upm.tsx     # page.tsx에서 이동
+
+  [빌드 생성 파일]
+    meta/generated/frontend/
+    ├── extension-loader.ts           # 기존 (home-upm import 추가됨)
+    └── site-config.ts                # 신규 생성
+
+      site-config.ts 내용 예시 (home-extension: "home-upm" 설정 시):
+        export const HOME_PATH = '/extensions/home-upm';
+
+      site-config.ts 내용 예시 (home-extension 없는 경우):
+        export const HOME_PATH = '/home';
+
+--------------------------------------------------------------------------------
+11-3. 변경 파일 목록
+--------------------------------------------------------------------------------
+
+  [신규 생성]
+
+    extensions/home-upm/extension.go
+      package homeupm
+
+      import (
+          core_server "ntels.com/pharos/core/pkg/server"
+          core_http_api "ntels.com/pharos/core/pkg/server/http/api"
+          common "ntels.com/pharos/core/pkg/common"
+      )
+
+      type Extension struct{}
+
+      func init() {
+          core_server.Register(&Extension{})
+      }
+
+      func (e *Extension) Name() string { return "home-upm" }
+
+      func (e *Extension) Load(cfg common.Config) error {
+          core_http_api.AddApi(&Api{})
+          return nil
+      }
+
+    extensions/home-upm/api.go
+      core/pkg/homeupm/api.go + handler.go 내용 그대로 이동.
+      패키지 선언: package homeupm
+      (현재 core/pkg/homeupm도 이미 package homeupm이므로 package main 변경은 없음)
+
+    extensions/home-upm/go.mod
+      module ntels.com/pharos/extensions/home-upm
+      (alarm extension의 go.mod 구조 참고)
+
+    extensions/home-upm/frontend/package.json
+      { "name": "@pharos/extension-home-upm", ... }
+      (alarm extension의 package.json 구조 참고)
+
+    extensions/home-upm/frontend/tsconfig.json
+      (alarm extension의 tsconfig.json 구조 참고)
+
+    extensions/home-upm/frontend/src/index.ts
+      import { registerExtension } from '@pharos/core/extension-registry';
+      import HomeUPMPage from './routes/home-upm';
+
+      registerExtension({
+        name: 'home-upm',
+        version: '1.0.0',
+        displayName: 'Kubernetes Home',
+        description: 'UPM Kubernetes cluster home page',
+        pages: [
+          {
+            path: '/extensions/home-upm',
+            component: HomeUPMPage,
+            title: 'Home',
+            requireAuth: true,
+          },
+        ],
+      });
+
+    extensions/home-upm/frontend/src/routes/home-upm.tsx
+      core/frontend/src/routes/home-upm/page.tsx 내용 그대로 이동.
+      import 경로 변경:
+        '@features/home-dashboard' → '@pharos/core/features/home-dashboard'
+
+  [수정]
+
+    meta/configs/upm.json
+      "home-extension": "home-upm" 필드를 추가하고,
+      "extensions" 배열에 "home-upm"을 포함한다.
+
+      변경 전:
+        {
+          "title": "UPM",
+          "login-extension": "default/login",
+          "extensions": ["alarm", "log"],
+          ...
+        }
+
+      변경 후:
+        {
+          "title": "UPM",
+          "login-extension": "default/login",
+          "home-extension": "home-upm",
+          "extensions": ["alarm", "log", "home-upm"],
+          ...
+        }
+
+    meta/scripts/generate-metadata.ts
+      1) SiteModeMeta 인터페이스에 필드 추가:
+            'home-extension'?: string;
+            'home-path'?: string;
+
+      2) validateHomeExtension() 함수 추가 (validateLoginExtension 참고):
+            home-extension 지정 시 해당 경로의 package.json 존재 여부 확인.
+            home-extension 값이 extensions 배열에도 포함되어 있는지 확인.
+
+      3) generateSiteConfig() 함수 추가:
+            meta/generated/frontend/site-config.ts 파일 생성.
+            home-path 지정 시:      export const HOME_PATH = '{home-path}';
+            home-extension 지정 시: export const HOME_PATH = '/extensions/{home-extension}';
+            둘 다 미지정 시:        export const HOME_PATH = '/home';
+            검증:
+              - home-path는 "/"로 시작해야 한다.
+              - home-path가 "/home"인 경우 App.tsx의 /home 라우트는 redirect가 아니라
+                기존 HomePage 렌더링이어야 한다.
+              - extensions 배열은 로딩용이고, home-extension은 홈 선택용이다.
+
+            [주의] HOME_PATH와 extension pages[].path 일치 필수
+              generateSiteConfig()가 생성하는 HOME_PATH 값과
+              extensions/{name}/frontend/src/index.ts에서 registerExtension()에
+              넘기는 pages[].path 값이 반드시 동일해야 한다.
+
+              불일치 예시 (잘못된 경우):
+                HOME_PATH        → "/extensions/home-upm"
+                index.ts pages   → path: '/extensions/k8s-home'
+                결과: App.tsx가 /extensions/home-upm으로 redirect하지만
+                      실제 라우트는 /extensions/k8s-home에만 등록되어 404 발생.
+
+              기본 규칙은 "/extensions/{home-extension}"이다.
+              특수 경로가 필요한 경우에만 home-path override를 추가한다.
+
+      4) generateViteExtensions()의 targetExtensions 배열에
+         extensions 배열만 포함한다.
+         home-extension은 로딩 대상 추가가 아니라 홈 선택용 검증 필드이다:
+           const targetExtensions = [
+             ...(meta['login-extension'] ? [meta['login-extension']] : []),
+             ...(meta.extensions ?? []),
+           ];
+
+      5) 메인 실행부에서 validateHomeExtension(), generateSiteConfig() 호출 추가.
+
+    meta/scripts/generate-metadata.go
+      Go 측 메타 생성도 extensions 배열만 import 대상으로 사용한다.
+      home-extension이 지정되어 있는데 extensions에 포함되지 않은 경우 에러 처리한다.
+
+    core/frontend/src/App.tsx
+      1) @pharos/meta/site-config에서 HOME_PATH import 추가:
+            import { HOME_PATH } from '@pharos/meta/site-config';
+
+      2) 기존 HomePage lazy import는 복구/유지:
+           const HomePage = React.lazy(() => import('@/routes/home/page'));
+
+      3) 라우트 구성:
+           <Route path="/" element={<Navigate to={HOME_PATH} replace />} />
+           <Route path="/home" element={<HomePage />} />
+           const HomeUPMPage = React.lazy(...)  →  삭제 (extension 동적 로딩으로 대체)
+           <Route path="/home-upm" element={<HomeUPMPage />} />  →  삭제
+
+         주의:
+           <Route path="/home" element={<Navigate to={HOME_PATH} replace />} /> 로 바꾸면
+           HOME_PATH가 '/home'인 default/demo 모드에서 self-redirect 루프가 발생한다.
+
+    core/frontend/src/routes/login/page.tsx
+      navigate('/home-upm')  →  navigate(HOME_PATH) 로 교체 (2곳).
+      파일 상단에 import { HOME_PATH } from '@pharos/meta/site-config'; 추가.
+
+    core/frontend/src/providers/auth-provider/index.ts
+      redirectTo: '/home-upm'  →  redirectTo: HOME_PATH 로 교체.
+      파일 상단에 import { HOME_PATH } from '@pharos/meta/site-config'; 추가.
+
+    core/frontend/src/routes/page.tsx
+      <Navigate to="/home-upm" replace />  →  <Navigate to={HOME_PATH} replace />.
+      import { HOME_PATH } from '@pharos/meta/site-config'; 추가.
+
+    core/frontend/src/features/menu/components/AppSidebar.tsx
+      <Link to="/home-upm" ...>  →  <Link to={HOME_PATH} ...>.
+      import { HOME_PATH } from '@pharos/meta/site-config'; 추가.
+
+    core/frontend/src/features/home-dashboard/index.ts
+      변경 없음. export 경로 그대로 유지.
+      (extension이 '@pharos/core/features/home-dashboard'로 import함)
+
+    core/frontend/tsconfig.json
+      '@pharos/meta/site-config' alias 추가:
+        "@pharos/meta/site-config": ["../../meta/generated/frontend/site-config"]
+      (기존 "@pharos/meta/*" alias가 이미 커버할 경우 추가 불필요. 확인 필요)
+
+    core/frontend/vite.config.ts
+      '@pharos/meta/site-config' alias 추가 필요:
+        '@pharos/meta/site-config': path.resolve(__dirname, '../../meta/generated/frontend/site-config.ts')
+
+      이유:
+        현재 vite.config.ts는 '@pharos/meta/extension-loader',
+        '@pharos/meta/userJSONSchema', '@pharos/meta/menu-order'를 exact alias로 등록한다.
+        tsconfig의 "@pharos/meta/*"만으로는 Vite resolve가 보장되지 않는다.
+
+  [삭제]
+
+    core/pkg/homeupm/api.go      → extensions/home-upm/api.go로 이동 후 삭제
+    core/pkg/homeupm/handler.go  → extensions/home-upm/api.go에 통합 후 삭제
+    core/frontend/src/routes/home-upm/page.tsx
+                                 → extensions/home-upm/frontend/src/routes/home-upm.tsx로
+                                   이동 후 삭제
+
+    core/pkg/server/http/api/api.go
+      - &homeupm.Api{} 등록 제거
+      - import 제거
+
+    core/pkg/common/config.go / core/config/master_config.toml
+      선택지 A: HomeUPMConfig와 [home_upm]을 core에 유지한다.
+        - 장점: 기존 config 구조 변경이 적다.
+        - 단점: UPM 전용 설정이 core에 남는다.
+
+      선택지 B: alarm/log extension처럼 extensions/home-upm/api.go에서 TOML을 직접 parse한다.
+        - 장점: core 설정 오염을 줄이고 extension 독립성이 높다.
+        - 단점: config parsing 코드가 extension에 추가된다.
+
+      권장:
+        진짜 프로젝트별 홈 분리가 목적이면 B를 우선 검토한다.
+
+--------------------------------------------------------------------------------
+11-4. 구현 순서
+--------------------------------------------------------------------------------
+
+  Step 1. meta/scripts/generate-metadata.ts 수정
+    - SiteModeMeta에 'home-extension', 'home-path' 필드 추가
+    - validateHomeExtension(), generateSiteConfig() 함수 구현
+    - validateHomeExtension()에서 home-extension이 extensions에 포함됐는지 검증
+    - targetExtensions는 login-extension + extensions 기준으로 구성
+
+  Step 2. extensions/home-upm/ 디렉토리 생성
+    - go.mod, extension.go, api.go 작성
+    - frontend/package.json, tsconfig.json 작성
+    - frontend/src/index.ts, routes/home-upm.tsx 작성 (소스 이동 + import 경로 수정)
+
+  Step 3. go.work에 extensions/home-upm 추가
+    - go.work의 use 블록에 ./extensions/home-upm 추가
+
+  Step 4. meta/configs/upm.json에 홈 설정 추가
+    - "home-extension": "home-upm"
+    - "extensions": ["alarm", "log", "home-upm"]
+
+  Step 5. 메타데이터 생성 실행
+    - SITE_MODE=upm pnpm exec tsx meta/scripts/generate-metadata.ts
+    - meta/generated/frontend/site-config.ts 생성 확인
+    - meta/generated/frontend/extension-loader.ts에 home-upm import 추가 확인
+
+  Step 6. core 하드코딩 5곳 HOME_PATH로 교체
+    - App.tsx
+      (/ 라우트만 HOME_PATH redirect, /home 라우트는 HomePage 렌더링 유지)
+    - routes/login/page.tsx (2곳)
+    - providers/auth-provider/index.ts
+    - routes/page.tsx
+    - features/menu/components/AppSidebar.tsx
+
+  Step 7. core에서 homeupm 패키지 제거
+    - core/pkg/server/http/api/api.go에서 homeupm 등록 제거
+    - core/pkg/homeupm/ 디렉토리 삭제
+
+  Step 8. 동작 확인
+    - go build ./core/... 및 ./extensions/home-upm/... 빌드 확인
+    - SITE_MODE=upm 빌드 후 /ui/ 접근 → /extensions/home-upm 리다이렉트 확인
+    - SITE_MODE=default 빌드 후 /ui/ 접근 → /home 리다이렉트 확인
+    - SITE_MODE=default 빌드 후 /ui/home 직접 접근 시 기존 HomePage 렌더링 확인
+      (/home → /home redirect 루프가 없어야 함)
+
+--------------------------------------------------------------------------------
+11-5. 비고
+--------------------------------------------------------------------------------
+
+  - home-dashboard feature (components/hooks/types)는 core에 유지한다.
+    이유: UPM 전용이지만 현재로서는 다른 extension이 재사용할 가능성을 열어두기 위함.
+    향후 완전히 UPM 전용으로 확정되면 extension 내부로 추가 이동 가능.
+
+    검토 코멘트:
+      이 선택은 "route wrapper만 extension으로 이동"하는 절충안이다.
+      PromQL, Alerta 연동, Kubernetes UI가 UPM 전용으로 확정되면
+      home-dashboard feature까지 extensions/home-upm/frontend/src/features 아래로 옮기는 편이
+      설계 목적(프로젝트별 홈 독립성)에 더 잘 맞는다.
+
+  - home-extension 없는 config(demo, default 등)는 HOME_PATH = '/home'이 생성되므로
+    기존 대시보드 홈 동작이 그대로 유지된다. 기존 프로젝트에 영향 없음.
+
+  - 향후 다른 프로젝트 전용 홈이 필요하면 동일한 패턴으로
+    extensions/{project-name}/ 을 만들고 meta/configs/{mode}.json에
+    "home-extension": "{project-name}" 를 추가하고
+    "extensions" 배열에도 "{project-name}" 를 포함하면 된다.
+
+================================================================================
+--------------------------------------------------------------------------------
+12. 전광판 설계
+--------------------------------------------------------------------------------
+
+--------------------------------------------------------------------------------
+12-1. 목적
+--------------------------------------------------------------------------------
+
+  Pod 상세 패널의 Storage (Volume) 항목에
+  해당 Pod에 마운트된 PVC별 스토리지 사용 현황을 상세 표시한다.
+
+  현재:
+    Storage (Volume)  ████████░░░░  0%  (단일 수치, 항상 0% 문제)
+
+  목표:
+    Storage (Volume)
+    ┌────────────────────────────────────────────────┐
+    │ pgdata-ofcs-postgres-0                         │
+    │  Space  ████████░░  80%   8.0 GB / 10.0 GB    │
+    ├────────────────────────────────────────────────┤
+    │ logdata-ofcs-app-0                             │
+    │  Space  ███░░░░░░░  30%   1.5 GB / 5.0 GB     │
+    └────────────────────────────────────────────────┘
+    PVC 없는 pod → "No Volumes" 표시
+
+  참고:
+    섹션 10 [기능 1]의 설계를 기반으로 하며,
+    Grafana "Kubernetes / Persistent Volumes" 대시보드의 실제 PromQL을
+    UPM Pod 상세 패널에 맞게 변환한 쿼리를 아래에 명세한다.
+
+--------------------------------------------------------------------------------
+12-2. Grafana 대비 변환 포인트
+--------------------------------------------------------------------------------
+
+  Grafana 대시보드:
+    namespace + persistentvolumeclaim(PVC 이름)을 변수로 직접 선택한다.
+
+  UPM Pod 상세 패널:
+    Pod 클릭 시 namespace + pod 이름을 이미 알고 있다.
+    kubelet_volume_stats_* 메트릭에 pod 레이블이 포함되므로
+    PVC 이름 없이 namespace + pod 조합으로 해당 Pod의 모든 PVC를 한 번에 조회한다.
+    조회 결과에 persistentvolumeclaim 레이블이 남아 있어 PVC별 그룹핑이 가능하다.
+
+  topk(1, ...) 패턴 유지:
+    동일 PVC 메트릭이 복수 kubelet 인스턴스에서 중복 수집될 수 있으므로
+    Grafana와 동일하게 topk(1, ...)로 중복을 제거한다.
+
+  job / metrics_path 필터 포함:
+    job="kubelet", metrics_path="/metrics" 조건을 쿼리에 포함한다.
+    (metrics_path="/metrics/cadvisor"와 구분하기 위함)
+
+--------------------------------------------------------------------------------
+12-3. 적용 PromQL (pod 기준, 2개 쿼리 배치 호출)
+--------------------------------------------------------------------------------
+
+  배경:
+    kubelet_volume_stats_* 메트릭은 kubelet이 볼륨 단위로 수집하므로
+    pod 레이블이 존재하지 않는다. namespace, persistentvolumeclaim 레이블만 있음.
+    pod → PVC 매핑은 kube-state-metrics의
+    kube_pod_spec_volumes_persistentvolumeclaims_info 로 연결한다.
+
+  join 패턴:
+    max by (namespace, persistentvolumeclaim) (kubelet_volume_stats_*{...})
+    * on(namespace, persistentvolumeclaim) group_left()
+    max by (namespace, persistentvolumeclaim) (
+      kube_pod_spec_volumes_persistentvolumeclaims_info{namespace="$namespace", pod="$pod"}
+    )
+
+  주의:
+    kube_pod_spec_volumes_persistentvolumeclaims_info 에는 uid, volume 등 extra 레이블이
+    있어 동일 (namespace, pvc) 키에 여러 series가 생성될 수 있다.
+    join 시 "multiple matches" 오류를 방지하기 위해 양쪽 모두
+    max by (namespace, persistentvolumeclaim) 로 집계하여 1:1 join 을 보장한다.
+    (topk + sum without 방식은 이 문제를 해결하지 못함)
+
+  [1] capacityBytes — PVC 전체 용량 (bytes)
+    max by (namespace, persistentvolumeclaim) (
+      kubelet_volume_stats_capacity_bytes{
+        job="kubelet", metrics_path="/metrics", namespace="$namespace"
+      }
+    )
+    * on(namespace, persistentvolumeclaim) group_left()
+    max by (namespace, persistentvolumeclaim) (
+      kube_pod_spec_volumes_persistentvolumeclaims_info{
+        namespace="$namespace", pod="$pod"
+      }
+    )
+
+  [2] availableBytes — PVC 여유 공간 (bytes)
+    max by (namespace, persistentvolumeclaim) (
+      kubelet_volume_stats_available_bytes{
+        job="kubelet", metrics_path="/metrics", namespace="$namespace"
+      }
+    )
+    * on(namespace, persistentvolumeclaim) group_left()
+    max by (namespace, persistentvolumeclaim) (
+      kube_pod_spec_volumes_persistentvolumeclaims_info{
+        namespace="$namespace", pod="$pod"
+      }
+    )
+
+  usedBytes   = capacityBytes - availableBytes  (JS 계산)
+  freeBytes   = availableBytes                  (JS 계산)
+  usedPercent = usedBytes / capacityBytes * 100 (JS 계산)
+
+
+--------------------------------------------------------------------------------
+12-4. 구현 명세
+--------------------------------------------------------------------------------
+
+  [반환 타입]
+    interface PVCVolumeDetail {
+      pvcName:     string;   // persistentvolumeclaim 레이블 값
+      usedBytes:   number;
+      freeBytes:   number;
+      usedPercent: number;
+    }
+
+  [신규/수정 파일]
+    core/frontend/src/features/home-dashboard/hooks/use-pod-volume-detail.ts (신규)
+      - usePodVolumeDetail(pod: PodInfo | null, datasourceName: string) hook
+      - enabled: pod 선택 시에만 호출 (on-demand, 배치 쿼리에 포함하지 않음)
+      - capacityBytes / availableBytes 2개 쿼리를 POST /plugins/ds/query 배치 호출
+      - usedBytes / freeBytes / usedPercent 는 JS에서 계산
+      - 결과를 persistentvolumeclaim 레이블 기준으로 PVCVolumeDetail[] 반환
+
+    core/frontend/src/features/home-dashboard/hooks/use-kubernetes-data.ts (수정)
+      - runBatchQuery, escapePromLabelValue export 추가 (use-pod-volume-detail에서 재사용)
+
+    core/frontend/src/features/home-dashboard/components/PodDetailPanel.tsx (수정)
+      - volumeDetails: PVCVolumeDetail[] prop 추가
+      - isVolumeLoading: boolean prop 추가
+      - Storage 섹션: 기존 단일 UsageRow → PVC별 카드 목록(VolumeSection)으로 교체
+      - Network 섹션: 수치 나열 → 상대 바 차트(NetworkRow)로 교체
+      - 레이아웃: CPU/Memory, Storage/Network 각각 2열 나란히 배치
+      - PVC 없는 경우 "No Volumes" 표시
+      - bytes 단위 자동 변환: B / KB / MB / GB / TB
+      - 임계값 색상 (usedPercent 기준):
+          < 80%  → green
+          80~90% → yellow
+          >= 90% → red
+
+    core/frontend/src/features/home-dashboard/index.ts (수정)
+      - usePodVolumeDetail, PVCVolumeDetail export 추가
+
+    extensions/home-upm/frontend/src/routes/home-upm.tsx (수정)
+      - usePodVolumeDetail(selectedPod, datasourceName) 호출
+      - PodDetailPanel에 volumeDetails, isVolumeLoading prop 전달
+
+--------------------------------------------------------------------------------
+12-5. 주의사항
+--------------------------------------------------------------------------------
+
+  - kubelet_volume_stats_capacity/available_bytes 는 PersistentVolumeClaim 타입
+    볼륨에서만 안정적으로 수집된다. emptyDir, configMap, secret 등은 수집되지 않을 수 있다.
+    → 결과가 빈 배열이면 "No Volumes"로 처리.
+
+  - 멀티 클러스터(Thanos) 환경:
+    cluster 레이블이 메트릭에 포함되는 경우 cluster="$cluster" 조건 추가 필요.
+    현재 UPM이 단일 클러스터이면 생략 가능.
+
+  - 조회 시점:
+    Pod 클릭 시(selectedPod 변경 시)에만 쿼리 실행.
+    전체 Node Topology 갱신 주기와 무관하게 동작한다.
+
+================================================================================
+--------------------------------------------------------------------------------
+13. Pod 상세 패널 - Network 표시 개선
+--------------------------------------------------------------------------------
+
+--------------------------------------------------------------------------------
+13-1. 목적
+--------------------------------------------------------------------------------
+
+  현재 Network 섹션은 Rx/Tx 수치만 나열되어 트래픽 방향과 비율을 직관적으로
+  파악하기 어렵다. 상대적 바 차트를 추가하여 시각적으로 개선한다.
+
+  현재:
+    Network
+    ↓ 123.0 KB/s  ↑ 15.7 KB/s
+
+  변경 후:
+    Network                              합계 138.7 KB/s
+    ↓ 수신   ████████████░░░░  123.0 KB/s
+    ↑ 송신   ██░░░░░░░░░░░░░░   15.7 KB/s
+
+--------------------------------------------------------------------------------
+13-2. 바 차트 스케일 방식
+--------------------------------------------------------------------------------
+
+  max(rxBps, txBps)를 100%로 잡고 각 바의 너비를 상대적으로 계산한다.
+  외부 기준값(네트워크 대역폭 한도 등) 없이 두 값의 상대 비율만 표현한다.
+
+  예시:
+    rxBps = 123.0 KB/s, txBps = 15.7 KB/s
+    max = 123.0 → rx 바 100%, tx 바 12.8%
+
+  rxBps = txBps = 0 인 경우:
+    바 없이 "0 B/s" 수치만 표시한다.
+
+--------------------------------------------------------------------------------
+13-3. 색상 및 레이블
+--------------------------------------------------------------------------------
+
+  ↓ 수신 (Rx):  cyan   (text-cyan-400   / bg-cyan-500)
+  ↑ 송신 (Tx):  green  (text-green-400  / bg-green-500)
+
+  합계 표시:
+    우측 상단에 작은 글씨로 "합계 {rx+tx}" 표시.
+    단위는 Rx/Tx와 동일한 자동 단위 변환 적용.
+
+  단위 변환 (기존 로직 재사용):
+    < 1 KB  → B/s
+    < 1 MB  → KB/s
+    < 1 GB  → MB/s
+    그 이상 → GB/s
+
+--------------------------------------------------------------------------------
+13-4. 구현 명세
+--------------------------------------------------------------------------------
+
+  [수정 파일]
+    core/frontend/src/features/home-dashboard/components/PodDetailPanel.tsx
+
+      변경 전 Network 섹션:
+        <UsageRow label="Network" ... />  (단순 수치 표시)
+
+      변경 후:
+        NetworkRow 컴포넌트 (인라인 또는 동일 파일 내 분리):
+          props: rxBps: number, txBps: number
+
+          렌더링:
+            1) 합계 = rxBps + txBps → formatBps(합계) 우측 표시
+            2) scale = Math.max(rxBps, txBps) || 1
+            3) rx 바 너비 = (rxBps / scale) * 100 + '%'
+            4) tx 바 너비 = (txBps / scale) * 100 + '%'
+            5) 레이블: "↓ 수신", "↑ 송신"
+            6) 수치: formatBps(rxBps), formatBps(txBps)
+
+  [변경 없음]
+    use-kubernetes-data.ts — networkRxBps, networkTxBps 쿼리 및 PodInfo 타입 변경 없음.
+    데이터는 기존 배치 쿼리에서 이미 수집 중이므로 추가 API 호출 불필요.

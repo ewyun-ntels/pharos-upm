@@ -88,10 +88,12 @@ export default defineConfig({
       '@pharos/shared/types': path.resolve(__dirname, '../../shared/frontend/src/types'),
       '@pharos/shared/styles': path.resolve(__dirname, '../../shared/frontend/src/styles'),
       '@pharos/shared': path.resolve(__dirname, '../../shared/frontend/src'),
+      '@pharos/core/features/home-dashboard': path.resolve(__dirname, './src/features/home-dashboard'),
       '@pharos/core/datasource-editor-registry': path.resolve(__dirname, './src/features/dashboard/datasources'),
       '@pharos/core/panel-registry': path.resolve(__dirname, './src/features/dashboard/panels/registry'),
       // Meta generated files
       '@pharos/meta/extension-loader': path.resolve(__dirname, '../../meta/generated/frontend/extension-loader.ts'),
+      '@pharos/meta/site-config': path.resolve(__dirname, '../../meta/generated/frontend/site-config.ts'),
       '@pharos/meta/userJSONSchema': path.resolve(__dirname, '../../meta/generated/frontend/userJSONSchema.ts'),
       '@pharos/meta/menu-order': path.resolve(__dirname, '../../meta/generated/frontend/menu-order.ts'),
       // Extension aliases (from meta/generated/frontend/vite-extensions.json)
@@ -129,6 +131,11 @@ export default defineConfig({
         secure: false,
       },
       '/ui-config': {
+        target: process.env.API_SERVER_URL || 'http://192.168.15.102:31000',
+        changeOrigin: true,
+        secure: false,
+      },
+      '/home-upm': {
         target: process.env.API_SERVER_URL || 'http://192.168.15.102:31000',
         changeOrigin: true,
         secure: false,

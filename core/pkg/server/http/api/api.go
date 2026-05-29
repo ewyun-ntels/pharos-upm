@@ -11,7 +11,6 @@ import (
 	"ntels.com/pharos/core/pkg/dashboard"
 	"ntels.com/pharos/core/pkg/folders"
 	"ntels.com/pharos/core/pkg/groups"
-	"ntels.com/pharos/core/pkg/homeupm"
 	"ntels.com/pharos/core/pkg/metrics"
 	"ntels.com/pharos/core/pkg/notification"
 	"ntels.com/pharos/core/pkg/plugins"
@@ -66,7 +65,6 @@ func GetApis(configPath string, config common.Config) []Api {
 		&userhandler.Api{},
 		&rolehandler.Api{},
 		&metrics.Api{},
-		&homeupm.Api{},
 	}
 	allApi = append(allApi, addApi...)
 

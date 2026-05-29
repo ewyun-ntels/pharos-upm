@@ -7,6 +7,7 @@ import { t } from 'i18next';
 import { userProvider, USER_RESOURCES } from '@providers/user-provider';
 import { UserSchema } from '@pharos/shared/types/user';
 import { useDashboardStore } from '@features/dashboard/hooks/use-dashboard-store';
+import { HOME_PATH } from '@pharos/meta/site-config';
 
 // OAuth2 client_id
 const CLIENT_ID = '7a1e1782d4162e17dfc6f2bedd2c74ca';
@@ -148,13 +149,13 @@ export default function AuthPage() {
           return;
         }
 
-        navigate('/home-upm');
+        navigate(HOME_PATH);
       } catch (error) {
         console.error('Failed to fetch user info:', error);
       }
     } else {
       // required action 완료 → 홈으로
-      navigate('/home-upm');
+      navigate(HOME_PATH);
     }
   };
 

@@ -5,4 +5,5 @@ package main
 import (
 	_ "ntels.com/pharos/extensions/alarm"
 	_ "ntels.com/pharos/extensions/log"
+	_ "ntels.com/pharos/extensions/home-upm"
 )

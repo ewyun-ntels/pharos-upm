@@ -18,6 +18,7 @@
     "./extension-registry": "./src/features/extension/registry/index.ts",
     "./menu-registry": "./src/features/menu/registry/index.ts",
     "./filter-registry": "./src/features/dashboard/filters/registry/index.ts",
+    "./features/home-dashboard": "./src/features/home-dashboard/index.ts",
     "./login-registry": "./src/features/login/index.ts",
     "./site-registry": "./src/features/site/index.ts",
     "./providers/theme-provider": "./src/providers/theme-provider/index.tsx",

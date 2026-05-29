@@ -30,6 +30,7 @@ type SiteModeConfig struct {
 	Icon           string   `json:"icon"`
 	MenuVariables  []string `json:"menuVariables"`
 	LoginExtension string   `json:"login-extension"`
+	HomeExtension  string   `json:"home-extension"`
 	Extensions     []string `json:"extensions"`
 }
 
@@ -144,6 +145,19 @@ func resolveSiteModeToExtensions(projectRoot, siteMode string) []string {
 
 	var allExtensions []string
 	allExtensions = append(allExtensions, config.LoginExtension)
+	if config.HomeExtension != "" && !containsExtension(config.Extensions, config.HomeExtension) {
+		slog.Error("home-extension must also be listed in extensions", "home-extension", config.HomeExtension)
+		os.Exit(1)
+	}
 	allExtensions = append(allExtensions, config.Extensions...)
 	return allExtensions
+}
+
+func containsExtension(extensions []string, target string) bool {
+	for _, ext := range extensions {
+		if ext == "all" || ext == target {
+			return true
+		}
+	}
+	return false
 }

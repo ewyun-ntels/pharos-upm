@@ -6,6 +6,8 @@ export { MultiSelectFilter } from './components/MultiSelectFilter';
 export { useKubernetesData, useClusterMeta } from './hooks/use-kubernetes-data';
 export { useActiveAlerts } from './hooks/use-active-alerts';
 export { useHomeUPMConfig } from './hooks/use-home-upm-config';
+export { usePodVolumeDetail } from './hooks/use-pod-volume-detail';
 export type { AlarmItem } from './hooks/use-active-alerts';
 export type { HomeUPMConfig } from './hooks/use-home-upm-config';
+export type { PVCVolumeDetail } from './hooks/use-pod-volume-detail';
 export type { PodInfo, NodeInfo, ClusterSummaryData, KubernetesConfig, ResourceStatus, PodPhase } from './types';

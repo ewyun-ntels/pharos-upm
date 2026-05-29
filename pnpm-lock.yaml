@@ -751,6 +751,31 @@ importers:
         specifier: ^6.0.3
         version: 6.0.3
 
+  extensions/home-upm/frontend:
+    dependencies:
+      '@pharos/core':
+        specifier: workspace:*
+        version: link:../../../core/frontend
+      '@pharos/shared':
+        specifier: workspace:*
+        version: link:../../../shared/frontend
+      react:
+        specifier: 19.2.6
+        version: 19.2.6
+      react-dom:
+        specifier: 19.2.6
+        version: 19.2.6(react@19.2.6)
+    devDependencies:
+      '@types/react':
+        specifier: 19.2.14
+        version: 19.2.14
+      '@types/react-dom':
+        specifier: ^19.2.3
+        version: 19.2.3(@types/react@19.2.14)
+      typescript:
+        specifier: ^6.0.3
+        version: 6.0.3
+
   extensions/log/frontend:
     dependencies:
       '@pharos/core':

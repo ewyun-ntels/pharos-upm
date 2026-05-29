@@ -24,7 +24,7 @@ interface DsQueryResponse {
 
 const PROM_REGEX_SPECIAL_CHARS = /[\\^$.*+?()[\]{}|]/g;
 
-function escapePromLabelValue(value: string): string {
+export function escapePromLabelValue(value: string): string {
   return value
     .replace(/\\/g, '\\\\')
     .replace(/"/g, '\\"')
@@ -35,7 +35,7 @@ function escapePromRegexValue(value: string): string {
   return escapePromLabelValue(value.replace(PROM_REGEX_SPECIAL_CHARS, '\\$&'));
 }
 
-async function runBatchQuery(
+export async function runBatchQuery(
   datasourceName: string,
   queries: Record<string, string>,
 ): Promise<Record<string, IndexRow[]>> {

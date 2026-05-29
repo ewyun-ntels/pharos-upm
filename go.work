@@ -6,6 +6,7 @@ use (
 	./extensions/catv/business
 	./extensions/dashboard/datasources/clickhouse
 	./extensions/example
+	./extensions/home-upm
 	./extensions/log
 	./meta/scripts
 	./shared

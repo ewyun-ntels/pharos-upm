@@ -42,6 +42,7 @@
       "@pharos/shared/styles/*": ["../../shared/frontend/src/styles/*"],
       "@pharos/shared/utils/*": ["../../shared/frontend/utils/*"],
       "@pharos/extension-*": ["../../extensions/*/frontend/src"],
+      "@pharos/meta/site-config": ["../../meta/generated/frontend/site-config"],
       "@pharos/meta/*": ["../../meta/generated/frontend/*"],
       "@external-plugins/*": ["../../plugins/panel/*"],
       "@features/*": ["./src/features/*"]
