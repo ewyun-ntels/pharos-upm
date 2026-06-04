@@ -7,7 +7,7 @@
   "extensions": ["alarm", "log", "home-upm"],
   "menu-order": [
     {
-      "label": "Dashboard",
+      "label": "Favorites",
       "items": [
         {
           "extension": "core",
