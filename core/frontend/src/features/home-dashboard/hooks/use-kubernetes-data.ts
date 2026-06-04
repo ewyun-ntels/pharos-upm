@@ -23,6 +23,10 @@ interface DsQueryResponse {
 }
 
 const PROM_REGEX_SPECIAL_CHARS = /[\\^$.*+?()[\]{}|]/g;
+const PROM_DURATION_PATTERN = /^[1-9][0-9]*(ms|s|m|h|d|w|y)$/;
+const DEFAULT_RESTART_WINDOW = '1h';
+const DEFAULT_WARNING_RESTARTS = 1;
+const DEFAULT_ERROR_RESTARTS = 3;
 
 export function escapePromLabelValue(value: string): string {
   return value
@@ -90,14 +94,23 @@ function buildNodeFilter(nodes: string[]): string {
   return `, node=~"${nodes.map(escapePromRegexValue).join('|')}"`;
 }
 
+function normalizePromDuration(value: string): string {
+  return PROM_DURATION_PATTERN.test(value) ? value : DEFAULT_RESTART_WINDOW;
+}
+
+function normalizePositiveThreshold(value: number, fallback: number): number {
+  return Number.isFinite(value) && value > 0 ? value : fallback;
+}
+
 function getPodKey(namespace: string, pod: string): string {
   return `${namespace}/${pod}`;
 }
 
-function buildQueries(namespaces: string[], cluster: string, nodes: string[]) {
+function buildQueries(namespaces: string[], cluster: string, nodes: string[], restartWindow: string) {
   const ns = buildNsFilter(namespaces);
   const cl = cluster ? `, cluster="${escapePromLabelValue(cluster)}"` : '';
   const nd = buildNodeFilter(nodes);
+  const restartRange = normalizePromDuration(restartWindow);
   const podInfoSelector = `kube_pod_info{${ns}${cl}${nd}}`;
   const filterBySelectedPods = (expr: string) =>
     nodes.length === 0 ? expr : `(${expr}) and on (namespace, pod) ${podInfoSelector}`;
@@ -110,20 +123,34 @@ function buildQueries(namespaces: string[], cluster: string, nodes: string[]) {
   const cpuLimits = `kube_pod_container_resource_limits{job="kube-state-metrics", ${ns}${cl}, resource="cpu"}`;
   const memRequests = `kube_pod_container_resource_requests{job="kube-state-metrics", ${ns}${cl}, resource="memory"}`;
   const memLimits = `kube_pod_container_resource_limits{job="kube-state-metrics", ${ns}${cl}, resource="memory"}`;
+  const storageSelector = `job="kubelet", ${ns}${cl}`;
+  const selectedPvcFilter = nodes.length === 0
+    ? ''
+    : ` * on(namespace, persistentvolumeclaim) group_left() max by (namespace, persistentvolumeclaim) (` +
+      `kube_pod_spec_volumes_persistentvolumeclaims_info{${ns}${cl}} * on(namespace, pod) group_left() ${podInfoSelector}` +
+      `)`;
+  const clusterStorageUsed = `sum(max by (namespace, persistentvolumeclaim) ` +
+    `(kubelet_volume_stats_used_bytes{${storageSelector}})${selectedPvcFilter}) / ` +
+    `sum(max by (namespace, persistentvolumeclaim) ` +
+    `(kubelet_volume_stats_capacity_bytes{${storageSelector}})${selectedPvcFilter})`;
 
   return {
     podInfo:       podInfoSelector,
     podPhase:      filterBySelectedPods(`kube_pod_status_phase{${ns}${cl}}`),
     podRestarts:   `sum by (namespace, pod) (${filterBySelectedPods(`kube_pod_container_status_restarts_total{${ns}${cl}}`)})`,
+    podRecentRestarts: `sum by (namespace, pod) (${filterBySelectedPods(`increase(kube_pod_container_status_restarts_total{${ns}${cl}}[${restartRange}])`)})`,
     cpuUsage:      `sum by (namespace, pod) (${filterBySelectedPods(cpuUsageByContainer)}) / sum by (namespace, pod) (${filterBySelectedPods(cpuLimitsByContainer)})`,
     memUsage:      `sum by (namespace, pod) (${filterBySelectedPods(memUsageByContainer)}) / sum by (namespace, pod) (${filterBySelectedPods(memLimitsByContainer)})`,
     clusterCpuReq: `sum(${filterBySelectedPods(cpuUsageByContainer)}) / sum(${filterBySelectedPods(cpuRequests)})`,
     clusterCpuLim: `sum(${filterBySelectedPods(cpuUsageByContainer)}) / sum(${filterBySelectedPods(cpuLimits)})`,
     clusterMemReq: `sum(${filterBySelectedPods(memUsageByContainer)}) / sum(${filterBySelectedPods(memRequests)})`,
     clusterMemLim: `sum(${filterBySelectedPods(memUsageByContainer)}) / sum(${filterBySelectedPods(memLimits)})`,
+    clusterStorageUsed,
     storageUsage:  `sum by (namespace, pod) (${filterBySelectedPods(`kubelet_volume_stats_used_bytes{job="kubelet", ${ns}${cl}}`)}) / sum by (namespace, pod) (${filterBySelectedPods(`kubelet_volume_stats_capacity_bytes{job="kubelet", ${ns}${cl}}`)})`,
     networkRx:     `sum by (namespace, pod) (${filterBySelectedPods(`rate(container_network_receive_bytes_total{${ns}${cl}}[5m])`)})`,
     networkTx:     `sum by (namespace, pod) (${filterBySelectedPods(`rate(container_network_transmit_bytes_total{${ns}${cl}}[5m])`)})`,
+    nodeReady:     `kube_node_status_condition{condition="Ready",status="true"}`,
+    nodeRole:      `kube_node_role{}`,
   };
 }
 
@@ -137,20 +164,32 @@ function getStr(row: IndexRow, key: string): string {
   return String(row[key] ?? '');
 }
 
-function computePodStatus(phase: string, restarts: number, cpu: number, mem: number): ResourceStatus {
+function computePodStatus(
+  phase: string,
+  recentRestarts: number,
+  cpu: number,
+  mem: number,
+  warningRestarts: number,
+  errorRestarts: number,
+): ResourceStatus {
   if (phase === 'Failed' || phase === 'Unknown') return 'error';
-  if (restarts >= 5 || cpu >= 0.95 || mem >= 0.95) return 'error';
-  if (phase === 'Pending' || restarts >= 3 || cpu >= 0.8 || mem >= 0.8) return 'warning';
+  if (recentRestarts >= errorRestarts || cpu >= 0.95 || mem >= 0.95) return 'error';
+  if (phase === 'Pending' || recentRestarts >= warningRestarts || cpu >= 0.8 || mem >= 0.8) return 'warning';
   return 'normal';
 }
 
-function computeNodeStatus(pods: PodInfo[], cpu: number, mem: number): ResourceStatus {
+function computeNodeStatus(pods: PodInfo[], cpu: number, mem: number, ready: boolean): ResourceStatus {
+  if (!ready) return 'error';
   if (pods.some((p) => p.status === 'error') || cpu >= 0.9 || mem >= 0.9) return 'error';
   if (pods.some((p) => p.status === 'warning') || cpu >= 0.7 || mem >= 0.7) return 'warning';
   return 'normal';
 }
 
-function processResults(data: Record<string, IndexRow[]>): {
+function processResults(
+  data: Record<string, IndexRow[]>,
+  warningRestarts: number,
+  errorRestarts: number,
+): {
   nodes: NodeInfo[];
   clusterSummary: ClusterSummaryData;
 } {
@@ -160,7 +199,10 @@ function processResults(data: Record<string, IndexRow[]>): {
   });
 
   const restartsMap = new Map<string, number>();
-  (data.podRestarts ?? []).forEach((row) => restartsMap.set(getPodKey(getStr(row, 'namespace'), getStr(row, 'pod')), getVal(row)));
+  (data.podRestarts ?? []).forEach((row) => restartsMap.set(getPodKey(getStr(row, 'namespace'), getStr(row, 'pod')), Math.round(getVal(row))));
+
+  const recentRestartsMap = new Map<string, number>();
+  (data.podRecentRestarts ?? []).forEach((row) => recentRestartsMap.set(getPodKey(getStr(row, 'namespace'), getStr(row, 'pod')), Math.round(getVal(row))));
 
   const cpuMap = new Map<string, number>();
   (data.cpuUsage ?? []).forEach((row) => cpuMap.set(getPodKey(getStr(row, 'namespace'), getStr(row, 'pod')), getVal(row)));
@@ -177,6 +219,20 @@ function processResults(data: Record<string, IndexRow[]>): {
   const networkTxMap = new Map<string, number>();
   (data.networkTx ?? []).forEach((row) => networkTxMap.set(getPodKey(getStr(row, 'namespace'), getStr(row, 'pod')), getVal(row)));
 
+  const nodeReadyMap = new Map<string, boolean>();
+  (data.nodeReady ?? []).forEach((row) => nodeReadyMap.set(getStr(row, 'node'), getVal(row) === 1));
+
+  const nodeRolesMap = new Map<string, string[]>();
+  (data.nodeRole ?? []).forEach((row) => {
+    const nodeName = getStr(row, 'node');
+    const role = getStr(row, 'role');
+    if (role) {
+      const list = nodeRolesMap.get(nodeName) ?? [];
+      list.push(role);
+      nodeRolesMap.set(nodeName, list);
+    }
+  });
+
   const nodeMap = new Map<string, PodInfo[]>();
   (data.podInfo ?? []).forEach((row) => {
     const name = getStr(row, 'pod');
@@ -185,14 +241,15 @@ function processResults(data: Record<string, IndexRow[]>): {
     const key = getPodKey(namespace, name);
     const phase = (phaseMap.get(key) ?? 'Unknown') as PodPhase;
     const restarts = restartsMap.get(key) ?? 0;
+    const recentRestarts = recentRestartsMap.get(key) ?? 0;
     const cpuPercent = cpuMap.get(key) ?? 0;
     const memPercent = memMap.get(key) ?? 0;
     const storagePercent = storageMap.get(key) ?? 0;
     const networkRxBps = networkRxMap.get(key) ?? 0;
     const networkTxBps = networkTxMap.get(key) ?? 0;
-    const status = computePodStatus(phase, restarts, cpuPercent, memPercent);
+    const status = computePodStatus(phase, recentRestarts, cpuPercent, memPercent, warningRestarts, errorRestarts);
 
-    const pod: PodInfo = { name, node, namespace, phase, cpuPercent, memPercent, storagePercent, networkRxBps, networkTxBps, restarts, status };
+    const pod: PodInfo = { name, node, namespace, phase, cpuPercent, memPercent, storagePercent, networkRxBps, networkTxBps, restarts, recentRestarts, status };
     const list = nodeMap.get(node) ?? [];
     list.push(pod);
     nodeMap.set(node, list);
@@ -202,15 +259,21 @@ function processResults(data: Record<string, IndexRow[]>): {
   nodeMap.forEach((pods, nodeName) => {
     const cpuPercent = pods.length ? pods.reduce((s, p) => s + p.cpuPercent, 0) / pods.length : 0;
     const memPercent = pods.length ? pods.reduce((s, p) => s + p.memPercent, 0) / pods.length : 0;
-    nodes.push({ name: nodeName, cpuPercent, memPercent, pods, status: computeNodeStatus(pods, cpuPercent, memPercent) });
+    const ready = nodeReadyMap.get(nodeName) ?? true;
+    const roles = nodeRolesMap.get(nodeName) ?? [];
+    nodes.push({ name: nodeName, cpuPercent, memPercent, pods, status: computeNodeStatus(pods, cpuPercent, memPercent, ready), ready, roles });
   });
   nodes.sort((a, b) => a.name.localeCompare(b.name));
+
+  const storageUsedPercent = getVal((data.clusterStorageUsed ?? [])[0] ?? {});
 
   const clusterSummary: ClusterSummaryData = {
     cpuRequestsPercent: getVal((data.clusterCpuReq ?? [])[0] ?? {}),
     cpuLimitsPercent:   getVal((data.clusterCpuLim ?? [])[0] ?? {}),
     memRequestsPercent: getVal((data.clusterMemReq ?? [])[0] ?? {}),
     memLimitsPercent:   getVal((data.clusterMemLim ?? [])[0] ?? {}),
+    storageUsedPercent,
+    storageFreePercent: Math.max(0, 1 - storageUsedPercent),
     nodeCount: nodes.length,
     podCount: (data.podInfo ?? []).length,
   };
@@ -244,10 +307,15 @@ export function useKubernetesData(config: KubernetesConfig, refetchInterval = 30
   return useQuery({
     queryKey: ['home-upm-kubernetes', config],
     queryFn: async () => {
-      const { datasourceName, namespaces, nodes, cluster } = config;
-      const queries = buildQueries(namespaces, cluster, nodes);
+      const { datasourceName, namespaces, nodes, cluster, restartWindow } = config;
+      const errorRestarts = normalizePositiveThreshold(config.errorRestarts, DEFAULT_ERROR_RESTARTS);
+      const warningRestarts = Math.min(
+        normalizePositiveThreshold(config.warningRestarts, DEFAULT_WARNING_RESTARTS),
+        errorRestarts,
+      );
+      const queries = buildQueries(namespaces, cluster, nodes, restartWindow);
       const data = await runBatchQuery(datasourceName, queries);
-      return processResults(data);
+      return processResults(data, warningRestarts, errorRestarts);
     },
     refetchInterval: refetchInterval === 0 ? false : refetchInterval,
     staleTime: 5_000,

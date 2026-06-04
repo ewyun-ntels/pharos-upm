@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@pharos/shared/components/ui';
+import { Button, Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@pharos/shared/components/ui';
 import { RefreshCcw } from 'lucide-react';
 import {
   ClusterSummary,
@@ -10,6 +10,7 @@ import {
   useKubernetesData,
   useActiveAlerts,
   useHomeUPMConfig,
+  DEFAULT_HOME_UPM_CONFIG,
   useClusterMeta,
   usePodVolumeDetail,
 } from '@pharos/core/features/home-dashboard';
@@ -37,13 +38,15 @@ function findRelatedAlerts(pod: PodInfo, alerts: AlarmItem[]): AlarmItem[] {
 export default function HomeUPMPage() {
   const [selectedPod, setSelectedPod] = useState<PodInfo | null>(null);
   const [refreshInterval, setRefreshInterval] = useState(30_000);
+  const [isManualRefreshing, setIsManualRefreshing] = useState(false);
   const [selectedNamespaces, setSelectedNamespaces] = useState<string[]>([]);
   const [selectedNodes, setSelectedNodes] = useState<string[]>([]);
 
   const { data: homeConfig } = useHomeUPMConfig();
-  const datasourceName = homeConfig?.datasource ?? 'prometheus-metric';
+  const effectiveHomeConfig = homeConfig ?? DEFAULT_HOME_UPM_CONFIG;
+  const datasourceName = effectiveHomeConfig.datasource;
 
-  const { data: clusterMeta, isLoading: metaLoading } = useClusterMeta(datasourceName);
+  const { data: clusterMeta, isLoading: metaLoading, refetch: refetchClusterMeta } = useClusterMeta(datasourceName);
 
   const k8sConfig: KubernetesConfig = useMemo(
     () => ({
@@ -51,13 +54,23 @@ export default function HomeUPMPage() {
       namespaces: selectedNamespaces,
       nodes: selectedNodes,
       cluster: DEFAULT_CLUSTER,
+      restartWindow: effectiveHomeConfig.restartWindow,
+      warningRestarts: effectiveHomeConfig.warningRestarts,
+      errorRestarts: effectiveHomeConfig.errorRestarts,
     }),
-    [datasourceName, selectedNamespaces, selectedNodes],
+    [datasourceName, selectedNamespaces, selectedNodes, effectiveHomeConfig.restartWindow, effectiveHomeConfig.warningRestarts, effectiveHomeConfig.errorRestarts],
   );
 
-  const { data: k8sData, isLoading: k8sLoading, isError: k8sError, error: k8sErrorDetail } = useKubernetesData(k8sConfig, refreshInterval);
-  const { alerts, criticalCount, majorCount, minorCount, isLoading: alertsLoading } = useActiveAlerts(refreshInterval);
-  const { data: volumeDetails, isLoading: isVolumeLoading } = usePodVolumeDetail(selectedPod, datasourceName);
+  const {
+    data: k8sData,
+    isLoading: k8sLoading,
+    isFetching: k8sFetching,
+    isError: k8sError,
+    error: k8sErrorDetail,
+    refetch: refetchK8sData,
+  } = useKubernetesData(k8sConfig, refreshInterval);
+  const { alerts, criticalCount, majorCount, minorCount, isLoading: alertsLoading, refetch: refetchAlerts } = useActiveAlerts(refreshInterval);
+  const { data: volumeDetails, isLoading: isVolumeLoading, refetch: refetchVolumeDetails } = usePodVolumeDetail(selectedPod, datasourceName);
 
   const relatedAlerts = selectedPod ? findRelatedAlerts(selectedPod, alerts) : [];
 
@@ -71,7 +84,22 @@ export default function HomeUPMPage() {
     setSelectedPod(null);
   };
 
+  const handleManualRefresh = async () => {
+    setIsManualRefreshing(true);
+    try {
+      await Promise.all([
+        refetchClusterMeta(),
+        refetchK8sData(),
+        refetchAlerts(),
+        selectedPod ? refetchVolumeDetails() : Promise.resolve(),
+      ]);
+    } finally {
+      setIsManualRefreshing(false);
+    }
+  };
+
   const currentRefreshLabel = REFRESH_OPTIONS.find(o => o.value === refreshInterval)?.label ?? '30s';
+  const isRefreshing = isManualRefreshing || k8sFetching || alertsLoading;
 
   return (
     <main className="flex flex-col w-full h-full overflow-auto">
@@ -123,6 +151,18 @@ export default function HomeUPMPage() {
                   ))}
                 </SelectContent>
               </Select>
+              <Button
+                type="button"
+                variant="outline"
+                size="icon"
+                className="h-8 w-8"
+                onClick={handleManualRefresh}
+                disabled={isRefreshing}
+                aria-label="Refresh now"
+                title="Refresh now"
+              >
+                <RefreshCcw className={`h-4 w-4 ${isRefreshing ? 'animate-spin' : ''}`} />
+              </Button>
             </div>
           </div>
         </div>
@@ -164,10 +204,10 @@ export default function HomeUPMPage() {
             <span className="w-2 h-2 rounded-full bg-green-500 inline-block" /> 정상
           </span>
           <span className="flex items-center gap-1.5">
-            <span className="w-2 h-2 rounded-full bg-yellow-400 inline-block" /> 경고 (CPU/MEM &gt;80% 또는 재시작 3회+)
+            <span className="w-2 h-2 rounded-full bg-yellow-400 inline-block" /> 경고: Pending, CPU/MEM Limit 80%+, 최근 {effectiveHomeConfig.restartWindow} 재시작 {effectiveHomeConfig.warningRestarts}회+
           </span>
           <span className="flex items-center gap-1.5">
-            <span className="w-2 h-2 rounded-full bg-red-500 inline-block" /> 오류 (CrashLoop / Failed / &gt;95%)
+            <span className="w-2 h-2 rounded-full bg-red-500 inline-block" /> 오류: Failed/Unknown, CPU/MEM Limit 95%+, 최근 {effectiveHomeConfig.restartWindow} 재시작 {effectiveHomeConfig.errorRestarts}회+
           </span>
         </div>
 

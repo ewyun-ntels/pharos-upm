@@ -24,7 +24,7 @@ export interface ActiveAlertsResult {
   minorCount: number;
   isLoading: boolean;
   isError: boolean;
-  refetch: () => void;
+  refetch: () => Promise<void>;
 }
 
 export function useActiveAlerts(refetchInterval = 30_000): ActiveAlertsResult {

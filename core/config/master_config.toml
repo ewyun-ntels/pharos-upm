@@ -301,6 +301,9 @@ enable_metrics = false
 # ---------------------------------------------------------------------------
 [home_upm]
 datasource = "prometheus-metric"
+restart_window = "1h"
+warning_restarts = 1
+error_restarts = 3
 
 [alarm.alerta]
 url = "http://10.255.254.22:30880"

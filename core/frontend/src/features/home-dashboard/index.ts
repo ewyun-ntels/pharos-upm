@@ -5,7 +5,7 @@ export { ActiveAlerts } from './components/ActiveAlerts';
 export { MultiSelectFilter } from './components/MultiSelectFilter';
 export { useKubernetesData, useClusterMeta } from './hooks/use-kubernetes-data';
 export { useActiveAlerts } from './hooks/use-active-alerts';
-export { useHomeUPMConfig } from './hooks/use-home-upm-config';
+export { useHomeUPMConfig, DEFAULT_HOME_UPM_CONFIG } from './hooks/use-home-upm-config';
 export { usePodVolumeDetail } from './hooks/use-pod-volume-detail';
 export type { AlarmItem } from './hooks/use-active-alerts';
 export type { HomeUPMConfig } from './hooks/use-home-upm-config';

@@ -12,6 +12,7 @@ export interface PodInfo {
   networkRxBps: number;
   networkTxBps: number;
   restarts: number;
+  recentRestarts: number;
   status: ResourceStatus;
 }
 
@@ -21,6 +22,8 @@ export interface NodeInfo {
   memPercent: number;
   pods: PodInfo[];
   status: ResourceStatus;
+  ready: boolean;
+  roles: string[];
 }
 
 export interface ClusterSummaryData {
@@ -28,6 +31,8 @@ export interface ClusterSummaryData {
   cpuLimitsPercent: number;
   memRequestsPercent: number;
   memLimitsPercent: number;
+  storageUsedPercent: number;
+  storageFreePercent: number;
   nodeCount: number;
   podCount: number;
 }
@@ -37,6 +42,9 @@ export interface KubernetesConfig {
   namespaces: string[];  // empty = all
   nodes: string[];       // empty = all
   cluster: string;
+  restartWindow: string;
+  warningRestarts: number;
+  errorRestarts: number;
 }
 
 export type IndexRow = Record<string, unknown>;
