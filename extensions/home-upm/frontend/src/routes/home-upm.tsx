@@ -1,6 +1,9 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { Button, Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@pharos/shared/components/ui';
 import { RefreshCcw } from 'lucide-react';
+import { useHasPermission } from '@pharos/shared/features/auth';
+import { PermissionKeysSchema } from '@pharos/shared/types/role';
+import { useToast } from '@/hooks/use-toast';
 import {
   ClusterSummary,
   NodeTopology,
@@ -13,6 +16,7 @@ import {
   DEFAULT_HOME_UPM_CONFIG,
   useClusterMeta,
   usePodVolumeDetail,
+  useDeletePod,
 } from '@pharos/core/features/home-dashboard';
 import type { PodInfo, KubernetesConfig, AlarmItem } from '@pharos/core/features/home-dashboard';
 
@@ -35,12 +39,19 @@ function findRelatedAlerts(pod: PodInfo, alerts: AlarmItem[]): AlarmItem[] {
   );
 }
 
+function getPodKey(pod: Pick<PodInfo, 'namespace' | 'name' | 'uid'>): string {
+  return pod.uid ? `uid/${pod.uid}` : `${pod.namespace}/${pod.name}`;
+}
+
 export default function HomeUPMPage() {
   const [selectedPod, setSelectedPod] = useState<PodInfo | null>(null);
+  const [deleteRequestedPodKey, setDeleteRequestedPodKey] = useState<string | null>(null);
   const [refreshInterval, setRefreshInterval] = useState(30_000);
   const [isManualRefreshing, setIsManualRefreshing] = useState(false);
   const [selectedNamespaces, setSelectedNamespaces] = useState<string[]>([]);
   const [selectedNodes, setSelectedNodes] = useState<string[]>([]);
+  const canDeletePod = useHasPermission(PermissionKeysSchema.enum['role:pod_delete']);
+  const { toast } = useToast();
 
   const { data: homeConfig } = useHomeUPMConfig();
   const effectiveHomeConfig = homeConfig ?? DEFAULT_HOME_UPM_CONFIG;
@@ -71,17 +82,32 @@ export default function HomeUPMPage() {
   } = useKubernetesData(k8sConfig, refreshInterval);
   const { alerts, criticalCount, majorCount, minorCount, isLoading: alertsLoading, refetch: refetchAlerts } = useActiveAlerts(refreshInterval);
   const { data: volumeDetails, isLoading: isVolumeLoading, refetch: refetchVolumeDetails } = usePodVolumeDetail(selectedPod, datasourceName);
+  const deletePodMutation = useDeletePod();
 
   const relatedAlerts = selectedPod ? findRelatedAlerts(selectedPod, alerts) : [];
 
   const handleNamespacesChange = (next: string[]) => {
     setSelectedNamespaces(next);
     setSelectedPod(null);
+    setDeleteRequestedPodKey(null);
   };
 
   const handleNodesChange = (next: string[]) => {
     setSelectedNodes(next);
     setSelectedPod(null);
+    setDeleteRequestedPodKey(null);
+  };
+
+  const handlePodClick = (pod: PodInfo) => {
+    setSelectedPod(pod);
+    if (deleteRequestedPodKey !== getPodKey(pod)) {
+      setDeleteRequestedPodKey(null);
+    }
+  };
+
+  const handleClosePodDetail = () => {
+    setSelectedPod(null);
+    setDeleteRequestedPodKey(null);
   };
 
   const handleManualRefresh = async () => {
@@ -97,6 +123,41 @@ export default function HomeUPMPage() {
       setIsManualRefreshing(false);
     }
   };
+
+  const handleDeletePod = async (pod: PodInfo) => {
+    if (!window.confirm(`Delete pod "${pod.name}" in namespace "${pod.namespace}"?`)) {
+      return;
+    }
+
+    try {
+      await deletePodMutation.mutateAsync(pod);
+      setDeleteRequestedPodKey(getPodKey(pod));
+      toast({ description: `Pod ${pod.name} delete requested.` });
+    } catch (error) {
+      const err = error as any;
+      const message =
+        err?.response?.data?.error ??
+        err?.response?.data?.details ??
+        err?.message ??
+        'Failed to delete pod.';
+      toast({ description: message, variant: 'destructive' });
+    }
+  };
+
+  useEffect(() => {
+    if (!selectedPod || !deleteRequestedPodKey || !k8sData?.nodes) return;
+    if (getPodKey(selectedPod) !== deleteRequestedPodKey) return;
+
+    const stillExists = k8sData.nodes.some((node) =>
+      node.pods.some((pod) => getPodKey(pod) === deleteRequestedPodKey),
+    );
+
+    if (!stillExists) {
+      toast({ description: `Pod ${selectedPod.name} 삭제 완료 또는 재생성 중.` });
+      setSelectedPod(null);
+      setDeleteRequestedPodKey(null);
+    }
+  }, [deleteRequestedPodKey, k8sData?.nodes, selectedPod, toast]);
 
   const currentRefreshLabel = REFRESH_OPTIONS.find(o => o.value === refreshInterval)?.label ?? '30s';
   const isRefreshing = isManualRefreshing || k8sFetching || alertsLoading;
@@ -183,7 +244,7 @@ export default function HomeUPMPage() {
             isLoading={k8sLoading}
             isError={k8sError}
             errorMessage={k8sErrorDetail instanceof Error ? k8sErrorDetail.message : undefined}
-            onPodClick={setSelectedPod}
+            onPodClick={handlePodClick}
           />
         </div>
 
@@ -192,7 +253,11 @@ export default function HomeUPMPage() {
           <PodDetailPanel
             pod={selectedPod}
             relatedAlerts={relatedAlerts}
-            onClose={() => setSelectedPod(null)}
+            onClose={handleClosePodDetail}
+            onDelete={handleDeletePod}
+            canDeletePod={canDeletePod}
+            isDeletingPod={deletePodMutation.isPending}
+            deleteRequested={deleteRequestedPodKey === getPodKey(selectedPod)}
             volumeDetails={volumeDetails}
             isVolumeLoading={isVolumeLoading}
           />

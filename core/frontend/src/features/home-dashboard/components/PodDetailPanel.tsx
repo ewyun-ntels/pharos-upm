@@ -1,6 +1,5 @@
 import { Card, CardContent, CardHeader, CardTitle, Button, Badge } from '@pharos/shared/components/ui';
-import { X, ExternalLink, Server, RotateCcw, Circle, AlertTriangle, XCircle } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
+import { X, Server, RotateCcw, Circle, AlertTriangle, XCircle, Trash2 } from 'lucide-react';
 import type { PodInfo, ResourceStatus } from '../types';
 import type { AlarmItem } from '../hooks/use-active-alerts';
 import type { PVCVolumeDetail } from '../hooks/use-pod-volume-detail';
@@ -145,6 +144,10 @@ interface PodDetailPanelProps {
   pod: PodInfo;
   relatedAlerts: AlarmItem[];
   onClose: () => void;
+  onDelete?: (pod: PodInfo) => void;
+  canDeletePod?: boolean;
+  isDeletingPod?: boolean;
+  deleteRequested?: boolean;
   volumeDetails?: PVCVolumeDetail[];
   isVolumeLoading?: boolean;
 }
@@ -153,11 +156,13 @@ export function PodDetailPanel({
   pod,
   relatedAlerts,
   onClose,
+  onDelete,
+  canDeletePod = false,
+  isDeletingPod = false,
+  deleteRequested = false,
   volumeDetails,
   isVolumeLoading,
 }: PodDetailPanelProps) {
-  const navigate = useNavigate();
-
   return (
     <Card className="border border-border shadow-md">
       <CardHeader className="py-3 px-4 flex flex-row items-center justify-between gap-2">
@@ -167,17 +172,26 @@ export function PodDetailPanel({
           <span className={`shrink-0 text-xs px-2 py-0.5 rounded-full font-medium ${phaseColor(pod.phase)}`}>
             {pod.phase}
           </span>
+          {deleteRequested && (
+            <span className="shrink-0 text-xs px-2 py-0.5 rounded-full font-medium bg-amber-500/15 text-amber-300 border border-amber-500/30">
+              Delete requested
+            </span>
+          )}
         </div>
         <div className="flex items-center gap-2 shrink-0">
-          <Button
-            variant="outline"
-            size="sm"
-            className="h-7 text-xs gap-1"
-            onClick={() => navigate('/dashboards')}
-          >
-            <ExternalLink className="w-3 h-3" />
-            대시보드
-          </Button>
+          {canDeletePod && onDelete && (
+            <Button
+              variant="destructive"
+              size="sm"
+              className="h-7 text-xs gap-1"
+              aria-label={isDeletingPod || deleteRequested ? 'Delete requested' : 'Delete pod'}
+              disabled={isDeletingPod || deleteRequested}
+              onClick={() => onDelete(pod)}
+            >
+              <Trash2 className="w-3 h-3" />
+              {isDeletingPod ? 'Deleting...' : deleteRequested ? 'Delete requested' : 'Delete'}
+            </Button>
+          )}
           <Button variant="ghost" size="icon" className="h-7 w-7" onClick={onClose}>
             <X className="w-4 h-4" />
           </Button>

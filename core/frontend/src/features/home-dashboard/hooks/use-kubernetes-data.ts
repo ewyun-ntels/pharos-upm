@@ -111,9 +111,11 @@ function buildQueries(namespaces: string[], cluster: string, nodes: string[], re
   const cl = cluster ? `, cluster="${escapePromLabelValue(cluster)}"` : '';
   const nd = buildNodeFilter(nodes);
   const restartRange = normalizePromDuration(restartWindow);
-  const podInfoSelector = `kube_pod_info{${ns}${cl}${nd}}`;
+  const podInfoRaw = `kube_pod_info{${ns}${cl}${nd}}`;
+  const podInfoSelector = `max by (namespace, pod, node, uid) (${podInfoRaw})`;
+  const podInfoFilter = `max by (namespace, pod) (${podInfoRaw})`;
   const filterBySelectedPods = (expr: string) =>
-    nodes.length === 0 ? expr : `(${expr}) and on (namespace, pod) ${podInfoSelector}`;
+    nodes.length === 0 ? expr : `(${expr}) and on (namespace, pod) ${podInfoFilter}`;
 
   const cpuUsageByContainer = `max by (cluster, namespace, pod, container) (node_namespace_pod_container:container_cpu_usage_seconds_total:sum_rate5m{${ns}${cl}})`;
   const cpuLimitsByContainer = `max by (cluster, namespace, pod, container) (cluster:namespace:pod_cpu:active:kube_pod_container_resource_limits{${ns}${cl}})`;
@@ -127,7 +129,7 @@ function buildQueries(namespaces: string[], cluster: string, nodes: string[], re
   const selectedPvcFilter = nodes.length === 0
     ? ''
     : ` * on(namespace, persistentvolumeclaim) group_left() max by (namespace, persistentvolumeclaim) (` +
-      `kube_pod_spec_volumes_persistentvolumeclaims_info{${ns}${cl}} * on(namespace, pod) group_left() ${podInfoSelector}` +
+      `kube_pod_spec_volumes_persistentvolumeclaims_info{${ns}${cl}} * on(namespace, pod) group_left() ${podInfoFilter}` +
       `)`;
   const clusterStorageUsed = `sum(max by (namespace, persistentvolumeclaim) ` +
     `(kubelet_volume_stats_used_bytes{${storageSelector}})${selectedPvcFilter}) / ` +
@@ -236,6 +238,7 @@ function processResults(
   const nodeMap = new Map<string, PodInfo[]>();
   (data.podInfo ?? []).forEach((row) => {
     const name = getStr(row, 'pod');
+    const uid = getStr(row, 'uid');
     const node = getStr(row, 'node') || 'unknown';
     const namespace = getStr(row, 'namespace');
     const key = getPodKey(namespace, name);
@@ -249,7 +252,7 @@ function processResults(
     const networkTxBps = networkTxMap.get(key) ?? 0;
     const status = computePodStatus(phase, recentRestarts, cpuPercent, memPercent, warningRestarts, errorRestarts);
 
-    const pod: PodInfo = { name, node, namespace, phase, cpuPercent, memPercent, storagePercent, networkRxBps, networkTxBps, restarts, recentRestarts, status };
+    const pod: PodInfo = { name, uid, node, namespace, phase, cpuPercent, memPercent, storagePercent, networkRxBps, networkTxBps, restarts, recentRestarts, status };
     const list = nodeMap.get(node) ?? [];
     list.push(pod);
     nodeMap.set(node, list);
@@ -266,6 +269,13 @@ function processResults(
   nodes.sort((a, b) => a.name.localeCompare(b.name));
 
   const storageUsedPercent = getVal((data.clusterStorageUsed ?? [])[0] ?? {});
+  const podStatusCounts = nodes.flatMap((node) => node.pods).reduce(
+    (acc, pod) => {
+      acc[pod.status] += 1;
+      return acc;
+    },
+    { normal: 0, warning: 0, error: 0 } as Record<ResourceStatus, number>,
+  );
 
   const clusterSummary: ClusterSummaryData = {
     cpuRequestsPercent: getVal((data.clusterCpuReq ?? [])[0] ?? {}),
@@ -276,6 +286,9 @@ function processResults(
     storageFreePercent: Math.max(0, 1 - storageUsedPercent),
     nodeCount: nodes.length,
     podCount: (data.podInfo ?? []).length,
+    podNormalCount: podStatusCounts.normal,
+    podWarningCount: podStatusCounts.warning,
+    podErrorCount: podStatusCounts.error,
   };
 
   return { nodes, clusterSummary };

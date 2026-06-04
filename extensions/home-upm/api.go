@@ -1,14 +1,25 @@
 package homeupm
 
 import (
+	"context"
+	"errors"
+	"fmt"
 	"log/slog"
 	"net/http"
 	"os"
 	"regexp"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/pelletier/go-toml/v2"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/rest"
+	"k8s.io/client-go/tools/clientcmd"
+	"ntels.com/pharos/core/pkg/authhandler"
 	"ntels.com/pharos/core/pkg/common"
+	sharedRole "ntels.com/pharos/shared/types/role"
 )
 
 const (
@@ -16,6 +27,8 @@ const (
 	defaultRestartWindow   = "1h"
 	defaultWarningRestarts = 1
 	defaultErrorRestarts   = 3
+
+	kubernetesRequestTimeout = 15 * time.Second
 )
 
 var promDurationPattern = regexp.MustCompile(`^[1-9][0-9]*(ms|s|m|h|d|w|y)$`)
@@ -82,7 +95,14 @@ func (a *Api) Load() error { return nil }
 func (a *Api) Unload() {}
 
 func (a *Api) RegisterRoutes(routes gin.IRoutes) {
+	podDeleteAuth := authhandler.GetAuthenticationHandler(
+		true,
+		string(sharedRole.RoleSuperAdmin),
+		string(sharedRole.RolePodDelete),
+	)
+
 	routes.GET("", a.getConfig)
+	routes.DELETE("/pods/:namespace/:name", podDeleteAuth, a.deletePod)
 }
 
 func (a *Api) GetRelativePath() string {
@@ -98,11 +118,80 @@ func (a *Api) getConfig(c *gin.Context) {
 	})
 }
 
+func (a *Api) deletePod(c *gin.Context) {
+	namespace := c.Param("namespace")
+	name := c.Param("name")
+	if namespace == "" || name == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "namespace and pod name are required"})
+		return
+	}
+
+	if err := deleteKubernetesPod(c.Request.Context(), namespace, name); err != nil {
+		statusCode := http.StatusServiceUnavailable
+		var statusErr apierrors.APIStatus
+		if errors.As(err, &statusErr) {
+			if code := statusErr.Status().Code; code > 0 {
+				statusCode = int(code)
+			}
+		}
+		slog.Error("home-upm: failed to delete pod", "namespace", namespace, "pod", name, "status", statusCode, "error", err)
+		c.JSON(statusCode, gin.H{
+			"error":   "failed to delete pod",
+			"details": err.Error(),
+		})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"message":   "pod delete requested",
+		"namespace": namespace,
+		"pod":       name,
+	})
+}
+
 func (a *Api) applyDefaults() {
 	a.datasource = defaultDatasource
 	a.restartWindow = defaultRestartWindow
 	a.warningRestarts = defaultWarningRestarts
 	a.errorRestarts = defaultErrorRestarts
+}
+
+func deleteKubernetesPod(ctx context.Context, namespace, name string) error {
+	ctx, cancel := context.WithTimeout(ctx, kubernetesRequestTimeout)
+	defer cancel()
+
+	config, source, err := buildKubernetesConfig()
+	if err != nil {
+		return err
+	}
+	config.Timeout = kubernetesRequestTimeout
+
+	clientset, err := kubernetes.NewForConfig(config)
+	if err != nil {
+		return fmt.Errorf("create kubernetes client from %s: %w", source, err)
+	}
+
+	if err := clientset.CoreV1().Pods(namespace).Delete(ctx, name, metav1.DeleteOptions{}); err != nil {
+		return fmt.Errorf("delete pod using %s: %w", source, err)
+	}
+	return nil
+}
+
+func buildKubernetesConfig() (*rest.Config, string, error) {
+	kubeConfig, kubeConfigErr := clientcmd.NewNonInteractiveDeferredLoadingClientConfig(
+		clientcmd.NewDefaultClientConfigLoadingRules(),
+		&clientcmd.ConfigOverrides{},
+	).ClientConfig()
+	if kubeConfigErr == nil {
+		return kubeConfig, "kubeconfig", nil
+	}
+
+	inClusterConfig, inClusterErr := rest.InClusterConfig()
+	if inClusterErr == nil {
+		return inClusterConfig, "in-cluster service account", nil
+	}
+
+	return nil, "", fmt.Errorf("load kubeconfig failed: %v; load in-cluster config failed: %w", kubeConfigErr, inClusterErr)
 }
 
 func (a *Api) applyConfig(cfg homeUPMSection) {

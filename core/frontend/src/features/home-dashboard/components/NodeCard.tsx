@@ -84,23 +84,25 @@ export function NodeCard({ node, onPodClick }: NodeCardProps) {
             <UsageBar percent={node.memPercent} status={memStatus} />
           </div>
         </div>
-        {(!node.ready || node.roles.length > 0) && (
-          <div className="flex flex-wrap gap-1 mt-1.5">
-            {!node.ready && (
-              <span className="text-[10px] px-1.5 py-0.5 rounded-sm bg-red-500/15 text-red-400 font-medium border border-red-500/20">
-                NotReady
-              </span>
-            )}
-            {node.roles.map((role) => (
-              <span
-                key={role}
-                className="text-[10px] px-1.5 py-0.5 rounded-sm bg-blue-500/15 text-blue-400 font-medium border border-blue-500/20"
-              >
-                {role}
-              </span>
-            ))}
-          </div>
-        )}
+        <div className="flex flex-wrap gap-1 mt-1.5">
+          <span
+            className={
+              node.ready
+                ? 'text-[10px] px-1.5 py-0.5 rounded-sm bg-green-500/15 text-green-400 font-medium border border-green-500/20'
+                : 'text-[10px] px-1.5 py-0.5 rounded-sm bg-red-500/15 text-red-400 font-medium border border-red-500/20'
+            }
+          >
+            {node.ready ? 'Ready' : 'NotReady'}
+          </span>
+          {node.roles.map((role) => (
+            <span
+              key={role}
+              className="text-[10px] px-1.5 py-0.5 rounded-sm bg-blue-500/15 text-blue-400 font-medium border border-blue-500/20"
+            >
+              {role}
+            </span>
+          ))}
+        </div>
       </CardHeader>
 
       <CardContent className="px-2 pb-2 pt-0">

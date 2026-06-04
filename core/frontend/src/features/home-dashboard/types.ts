@@ -3,6 +3,7 @@ export type ResourceStatus = 'normal' | 'warning' | 'error';
 
 export interface PodInfo {
   name: string;
+  uid: string;
   node: string;
   namespace: string;
   phase: PodPhase;
@@ -35,6 +36,9 @@ export interface ClusterSummaryData {
   storageFreePercent: number;
   nodeCount: number;
   podCount: number;
+  podNormalCount: number;
+  podWarningCount: number;
+  podErrorCount: number;
 }
 
 export interface KubernetesConfig {

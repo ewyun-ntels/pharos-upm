@@ -93,23 +93,35 @@ var CoreRoleMetadata = []sharedRole.RoleMetadata{
 		DisplayName: "Notification Read",
 		Description: "View notifications",
 		Group:       GroupRole,
+		Hide:        boolPtr(true),
 	},
 	{
 		Key:         string(sharedRole.RoleNotificationCreate),
 		DisplayName: "Notification Create",
 		Description: "Create new notifications",
 		Group:       GroupRole,
+		Hide:        boolPtr(true),
 	},
 	{
 		Key:         string(sharedRole.RoleNotificationUpdate),
 		DisplayName: "Notification Update",
 		Description: "Update notifications",
 		Group:       GroupRole,
+		Hide:        boolPtr(true),
 	},
 	{
 		Key:         string(sharedRole.RoleNotificationDelete),
 		DisplayName: "Notification Delete",
 		Description: "Delete notifications",
+		Group:       GroupRole,
+		Hide:        boolPtr(true),
+	},
+
+	// UPM roles
+	{
+		Key:         string(sharedRole.RolePodDelete),
+		DisplayName: "Pod Delete",
+		Description: "Delete Kubernetes pods from the home topology",
 		Group:       GroupRole,
 	},
 

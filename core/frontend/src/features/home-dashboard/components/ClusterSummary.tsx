@@ -2,6 +2,8 @@ import { Card, CardContent } from '@pharos/shared/components/ui';
 import { Skeleton } from '@pharos/shared/components/ui';
 import type { ClusterSummaryData } from '../types';
 
+type PodStatusTone = 'normal' | 'warning' | 'error';
+
 interface StatCardProps {
   title: string;
   rows: SummaryRowProps[];
@@ -11,6 +13,12 @@ interface SummaryRowProps {
   label: string;
   percent: number;
   dangerDirection?: 'high' | 'low';
+}
+
+interface PodStatusRowProps {
+  label: string;
+  count: number;
+  tone: PodStatusTone;
 }
 
 function getStatusColor(percent: number, dangerDirection: 'high' | 'low' = 'high') {
@@ -48,13 +56,46 @@ function SummaryRow({ label, percent, dangerDirection = 'high' }: SummaryRowProp
 
 function StatCard({ title, rows }: StatCardProps) {
   return (
-    <Card className="flex-1 min-w-0">
+    <Card className="min-w-0">
       <CardContent className="p-4 space-y-3">
         <p className="text-sm font-medium text-foreground truncate">{title}</p>
         <div className="space-y-2.5">
           {rows.map((row) => (
             <SummaryRow key={row.label} {...row} />
           ))}
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+const podStatusColor: Record<PodStatusTone, string> = {
+  normal: 'bg-green-500',
+  warning: 'bg-yellow-400',
+  error: 'bg-red-500',
+};
+
+function PodStatusRow({ label, count, tone }: PodStatusRowProps) {
+  return (
+    <div className="flex items-center justify-between gap-3 text-xs">
+      <span className="flex items-center gap-2 text-muted-foreground min-w-0">
+        <span className={`h-2.5 w-2.5 rounded-full shrink-0 ${podStatusColor[tone]}`} />
+        <span className="truncate">{label}</span>
+      </span>
+      <span className="text-foreground font-semibold tabular-nums">{count}</span>
+    </div>
+  );
+}
+
+function PodStatusCard({ data }: { data: ClusterSummaryData | undefined }) {
+  return (
+    <Card className="min-w-0">
+      <CardContent className="p-4 space-y-3">
+        <p className="text-sm font-medium text-foreground truncate">Pod Status</p>
+        <div className="space-y-2.5">
+          <PodStatusRow label="정상" count={data?.podNormalCount ?? 0} tone="normal" />
+          <PodStatusRow label="경고" count={data?.podWarningCount ?? 0} tone="warning" />
+          <PodStatusRow label="오류" count={data?.podErrorCount ?? 0} tone="error" />
         </div>
       </CardContent>
     </Card>
@@ -69,9 +110,9 @@ interface ClusterSummaryProps {
 export function ClusterSummary({ data, isLoading }: ClusterSummaryProps) {
   if (isLoading) {
     return (
-      <div className="flex gap-3">
-        {Array.from({ length: 3 }).map((_, i) => (
-          <Skeleton key={i} className="flex-1 h-24 rounded-lg" />
+      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-3">
+        {Array.from({ length: 4 }).map((_, i) => (
+          <Skeleton key={i} className="h-24 rounded-lg" />
         ))}
       </div>
     );
@@ -87,7 +128,7 @@ export function ClusterSummary({ data, isLoading }: ClusterSummaryProps) {
           </>
         )}
       </div>
-      <div className="flex gap-3">
+      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-3">
         <StatCard
           title="CPU"
           rows={[
@@ -109,6 +150,7 @@ export function ClusterSummary({ data, isLoading }: ClusterSummaryProps) {
             { label: 'Free', percent: data?.storageFreePercent ?? 0, dangerDirection: 'low' },
           ]}
         />
+        <PodStatusCard data={data} />
       </div>
     </div>
   );

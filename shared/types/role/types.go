@@ -148,6 +148,7 @@ const (
 	RoleNotificationDelete     PermissionKeys = "role:notification_delete"
 	RoleNotificationRead       PermissionKeys = "role:notification_read"
 	RoleNotificationUpdate     PermissionKeys = "role:notification_update"
+	RolePodDelete              PermissionKeys = "role:pod_delete"
 	RoleSuperAdmin             PermissionKeys = "role:super_admin"
 	RoleUserCreate             PermissionKeys = "role:user_create"
 	RoleUserDelete             PermissionKeys = "role:user_delete"

@@ -18,6 +18,7 @@ export const PermissionKeysSchema = z.enum([
     "role:notification_delete",
     "role:notification_read",
     "role:notification_update",
+    "role:pod_delete",
     "role:super_admin",
     "role:user_create",
     "role:user_delete",
