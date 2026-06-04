@@ -15,6 +15,7 @@ import {
 import {FolderInput, FolderOpen, FolderMinus, Pencil, Trash2, Folder as LucideFolder, Settings} from 'lucide-react';
 import { ActionSchema } from '@pharos/shared/types/dashboard';
 import type {DashboardData, DashboardFolder} from '@pharos/shared/types/dashboard';
+import {DASHBOARD_HOME_ENABLED} from '@pharos/meta/site-config';
 
 // ============================================================================
 // Tree Row 타입
@@ -220,13 +221,15 @@ export function getDashboardColumns({
             </DropdownMenu>
           )}
           {/* Home: 모든 권한 */}
-          <ToggleIconButton
-            icon={<Home />}
-            size="icon-xs"
-            tooltip="Set as home"
-            toggled={homeId === dashboardData.id}
-            onClick={() => setHomeId(dashboardData.id)}
-          />
+          {DASHBOARD_HOME_ENABLED && (
+            <ToggleIconButton
+              icon={<Home />}
+              size="icon-xs"
+              tooltip="Set as home"
+              toggled={homeId === dashboardData.id}
+              onClick={() => setHomeId(dashboardData.id)}
+            />
+          )}
         </div>
       );
     },
