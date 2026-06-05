@@ -27,6 +27,7 @@ const metadata: Extension = {
     {
       label: 'logs',
       path: '/extensions/log/logs',
+      icon: React.createElement(ScrollTextIcon, {className: 'h-4 w-4'}),
     },
   ],
 };

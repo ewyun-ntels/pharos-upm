@@ -34,6 +34,7 @@ const metadata: Extension = {
     {
       label: 'alerta',
       path: '/extensions/alarm/alerta',
+      icon: React.createElement(BellIcon, {className: 'h-4 w-4'}),
     },
   ],
 };

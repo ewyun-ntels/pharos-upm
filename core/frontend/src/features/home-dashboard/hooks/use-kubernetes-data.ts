@@ -131,10 +131,11 @@ function buildQueries(namespaces: string[], cluster: string, nodes: string[], re
     : ` * on(namespace, persistentvolumeclaim) group_left() max by (namespace, persistentvolumeclaim) (` +
       `kube_pod_spec_volumes_persistentvolumeclaims_info{${ns}${cl}} * on(namespace, pod) group_left() ${podInfoFilter}` +
       `)`;
-  const clusterStorageUsed = `sum(max by (namespace, persistentvolumeclaim) ` +
-    `(kubelet_volume_stats_used_bytes{${storageSelector}})${selectedPvcFilter}) / ` +
-    `sum(max by (namespace, persistentvolumeclaim) ` +
+  const clusterStorageUsedBytes = `sum(max by (namespace, persistentvolumeclaim) ` +
+    `(kubelet_volume_stats_used_bytes{${storageSelector}})${selectedPvcFilter})`;
+  const clusterStorageCapacityBytes = `sum(max by (namespace, persistentvolumeclaim) ` +
     `(kubelet_volume_stats_capacity_bytes{${storageSelector}})${selectedPvcFilter})`;
+  const clusterStorageUsed = `${clusterStorageUsedBytes} / ${clusterStorageCapacityBytes}`;
 
   return {
     podInfo:       podInfoSelector,
@@ -142,12 +143,24 @@ function buildQueries(namespaces: string[], cluster: string, nodes: string[], re
     podRestarts:   `sum by (namespace, pod) (${filterBySelectedPods(`kube_pod_container_status_restarts_total{${ns}${cl}}`)})`,
     podRecentRestarts: `sum by (namespace, pod) (${filterBySelectedPods(`increase(kube_pod_container_status_restarts_total{${ns}${cl}}[${restartRange}])`)})`,
     cpuUsage:      `sum by (namespace, pod) (${filterBySelectedPods(cpuUsageByContainer)}) / sum by (namespace, pod) (${filterBySelectedPods(cpuLimitsByContainer)})`,
+    cpuUsageCores: `sum by (namespace, pod) (${filterBySelectedPods(cpuUsageByContainer)})`,
+    cpuLimitCores: `sum by (namespace, pod) (${filterBySelectedPods(cpuLimitsByContainer)})`,
     memUsage:      `sum by (namespace, pod) (${filterBySelectedPods(memUsageByContainer)}) / sum by (namespace, pod) (${filterBySelectedPods(memLimitsByContainer)})`,
+    memUsageBytes: `sum by (namespace, pod) (${filterBySelectedPods(memUsageByContainer)})`,
+    memLimitBytes: `sum by (namespace, pod) (${filterBySelectedPods(memLimitsByContainer)})`,
+    clusterCpuUsageCores: `sum(${filterBySelectedPods(cpuUsageByContainer)})`,
+    clusterCpuRequestCores: `sum(${filterBySelectedPods(cpuRequests)})`,
+    clusterCpuLimitCores: `sum(${filterBySelectedPods(cpuLimits)})`,
     clusterCpuReq: `sum(${filterBySelectedPods(cpuUsageByContainer)}) / sum(${filterBySelectedPods(cpuRequests)})`,
     clusterCpuLim: `sum(${filterBySelectedPods(cpuUsageByContainer)}) / sum(${filterBySelectedPods(cpuLimits)})`,
+    clusterMemUsageBytes: `sum(${filterBySelectedPods(memUsageByContainer)})`,
+    clusterMemRequestBytes: `sum(${filterBySelectedPods(memRequests)})`,
+    clusterMemLimitBytes: `sum(${filterBySelectedPods(memLimits)})`,
     clusterMemReq: `sum(${filterBySelectedPods(memUsageByContainer)}) / sum(${filterBySelectedPods(memRequests)})`,
     clusterMemLim: `sum(${filterBySelectedPods(memUsageByContainer)}) / sum(${filterBySelectedPods(memLimits)})`,
     clusterStorageUsed,
+    clusterStorageUsedBytes,
+    clusterStorageCapacityBytes,
     storageUsage:  `sum by (namespace, pod) (${filterBySelectedPods(`kubelet_volume_stats_used_bytes{job="kubelet", ${ns}${cl}}`)}) / sum by (namespace, pod) (${filterBySelectedPods(`kubelet_volume_stats_capacity_bytes{job="kubelet", ${ns}${cl}}`)})`,
     networkRx:     `sum by (namespace, pod) (${filterBySelectedPods(`rate(container_network_receive_bytes_total{${ns}${cl}}[5m])`)})`,
     networkTx:     `sum by (namespace, pod) (${filterBySelectedPods(`rate(container_network_transmit_bytes_total{${ns}${cl}}[5m])`)})`,
@@ -209,8 +222,20 @@ function processResults(
   const cpuMap = new Map<string, number>();
   (data.cpuUsage ?? []).forEach((row) => cpuMap.set(getPodKey(getStr(row, 'namespace'), getStr(row, 'pod')), getVal(row)));
 
+  const cpuUsageCoresMap = new Map<string, number>();
+  (data.cpuUsageCores ?? []).forEach((row) => cpuUsageCoresMap.set(getPodKey(getStr(row, 'namespace'), getStr(row, 'pod')), getVal(row)));
+
+  const cpuLimitCoresMap = new Map<string, number>();
+  (data.cpuLimitCores ?? []).forEach((row) => cpuLimitCoresMap.set(getPodKey(getStr(row, 'namespace'), getStr(row, 'pod')), getVal(row)));
+
   const memMap = new Map<string, number>();
   (data.memUsage ?? []).forEach((row) => memMap.set(getPodKey(getStr(row, 'namespace'), getStr(row, 'pod')), getVal(row)));
+
+  const memUsageBytesMap = new Map<string, number>();
+  (data.memUsageBytes ?? []).forEach((row) => memUsageBytesMap.set(getPodKey(getStr(row, 'namespace'), getStr(row, 'pod')), getVal(row)));
+
+  const memLimitBytesMap = new Map<string, number>();
+  (data.memLimitBytes ?? []).forEach((row) => memLimitBytesMap.set(getPodKey(getStr(row, 'namespace'), getStr(row, 'pod')), getVal(row)));
 
   const storageMap = new Map<string, number>();
   (data.storageUsage ?? []).forEach((row) => storageMap.set(getPodKey(getStr(row, 'namespace'), getStr(row, 'pod')), getVal(row)));
@@ -246,13 +271,35 @@ function processResults(
     const restarts = restartsMap.get(key) ?? 0;
     const recentRestarts = recentRestartsMap.get(key) ?? 0;
     const cpuPercent = cpuMap.get(key) ?? 0;
+    const cpuUsageCores = cpuUsageCoresMap.get(key) ?? 0;
+    const cpuLimitCores = cpuLimitCoresMap.get(key) ?? 0;
     const memPercent = memMap.get(key) ?? 0;
+    const memUsageBytes = memUsageBytesMap.get(key) ?? 0;
+    const memLimitBytes = memLimitBytesMap.get(key) ?? 0;
     const storagePercent = storageMap.get(key) ?? 0;
     const networkRxBps = networkRxMap.get(key) ?? 0;
     const networkTxBps = networkTxMap.get(key) ?? 0;
     const status = computePodStatus(phase, recentRestarts, cpuPercent, memPercent, warningRestarts, errorRestarts);
 
-    const pod: PodInfo = { name, uid, node, namespace, phase, cpuPercent, memPercent, storagePercent, networkRxBps, networkTxBps, restarts, recentRestarts, status };
+    const pod: PodInfo = {
+      name,
+      uid,
+      node,
+      namespace,
+      phase,
+      cpuPercent,
+      cpuUsageCores,
+      cpuLimitCores,
+      memPercent,
+      memUsageBytes,
+      memLimitBytes,
+      storagePercent,
+      networkRxBps,
+      networkTxBps,
+      restarts,
+      recentRestarts,
+      status,
+    };
     const list = nodeMap.get(node) ?? [];
     list.push(pod);
     nodeMap.set(node, list);
@@ -280,10 +327,18 @@ function processResults(
   const clusterSummary: ClusterSummaryData = {
     cpuRequestsPercent: getVal((data.clusterCpuReq ?? [])[0] ?? {}),
     cpuLimitsPercent:   getVal((data.clusterCpuLim ?? [])[0] ?? {}),
+    cpuUsageCores:      getVal((data.clusterCpuUsageCores ?? [])[0] ?? {}),
+    cpuRequestCores:    getVal((data.clusterCpuRequestCores ?? [])[0] ?? {}),
+    cpuLimitCores:      getVal((data.clusterCpuLimitCores ?? [])[0] ?? {}),
     memRequestsPercent: getVal((data.clusterMemReq ?? [])[0] ?? {}),
     memLimitsPercent:   getVal((data.clusterMemLim ?? [])[0] ?? {}),
+    memUsageBytes:      getVal((data.clusterMemUsageBytes ?? [])[0] ?? {}),
+    memRequestBytes:    getVal((data.clusterMemRequestBytes ?? [])[0] ?? {}),
+    memLimitBytes:      getVal((data.clusterMemLimitBytes ?? [])[0] ?? {}),
     storageUsedPercent,
     storageFreePercent: Math.max(0, 1 - storageUsedPercent),
+    storageUsedBytes:   getVal((data.clusterStorageUsedBytes ?? [])[0] ?? {}),
+    storageCapacityBytes: getVal((data.clusterStorageCapacityBytes ?? [])[0] ?? {}),
     nodeCount: nodes.length,
     podCount: (data.podInfo ?? []).length,
     podNormalCount: podStatusCounts.normal,

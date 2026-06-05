@@ -8,7 +8,11 @@ export interface PodInfo {
   namespace: string;
   phase: PodPhase;
   cpuPercent: number;
+  cpuUsageCores: number;
+  cpuLimitCores: number;
   memPercent: number;
+  memUsageBytes: number;
+  memLimitBytes: number;
   storagePercent: number;
   networkRxBps: number;
   networkTxBps: number;
@@ -30,10 +34,18 @@ export interface NodeInfo {
 export interface ClusterSummaryData {
   cpuRequestsPercent: number;
   cpuLimitsPercent: number;
+  cpuUsageCores: number;
+  cpuRequestCores: number;
+  cpuLimitCores: number;
   memRequestsPercent: number;
   memLimitsPercent: number;
+  memUsageBytes: number;
+  memRequestBytes: number;
+  memLimitBytes: number;
   storageUsedPercent: number;
   storageFreePercent: number;
+  storageUsedBytes: number;
+  storageCapacityBytes: number;
   nodeCount: number;
   podCount: number;
   podNormalCount: number;

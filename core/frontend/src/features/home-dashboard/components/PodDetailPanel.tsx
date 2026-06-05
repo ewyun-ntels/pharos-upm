@@ -17,7 +17,7 @@ function phaseColor(phase: string) {
   return 'bg-muted text-muted-foreground';
 }
 
-function UsageRow({ label, percent }: { label: string; percent: number }) {
+function UsageRow({ label, percent, detail }: { label: string; percent: number; detail?: string }) {
   const pct = Math.round(percent * 100);
   const barColor = pct >= 95 ? 'bg-red-500' : pct >= 80 ? 'bg-yellow-400' : 'bg-green-500';
 
@@ -30,6 +30,9 @@ function UsageRow({ label, percent }: { label: string; percent: number }) {
       <div className="h-2 rounded-full bg-muted overflow-hidden">
         <div className={`h-full rounded-full ${barColor}`} style={{ width: `${Math.min(pct, 100)}%` }} />
       </div>
+      {detail && (
+        <p className="text-xs text-muted-foreground tabular-nums text-right">{detail}</p>
+      )}
     </div>
   );
 }
@@ -55,6 +58,18 @@ function formatBytes(bytes: number): string {
   if (bytes < 1024 * 1024 * 1024) return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
   if (bytes < 1024 ** 4) return `${(bytes / 1024 / 1024 / 1024).toFixed(1)} GB`;
   return `${(bytes / 1024 ** 4).toFixed(1)} TB`;
+}
+
+function formatCpuCores(cores: number): string {
+  const value = Number.isFinite(cores) ? cores : 0;
+  if (value <= 0) return '0m';
+  if (value < 1) return `${Math.round(value * 1000)}m`;
+  const formatted = value.toFixed(value >= 10 ? 0 : 2).replace(/\.?0+$/, '');
+  return `${formatted} ${formatted === '1' ? 'core' : 'cores'}`;
+}
+
+function formatUsageLimit(usage: string, limit: string, hasLimit: boolean): string {
+  return hasLimit ? `${usage} / ${limit}` : `${usage} / No limit`;
 }
 
 function NetworkRow({ rxBps, txBps }: { rxBps: number; txBps: number }) {
@@ -163,6 +178,17 @@ export function PodDetailPanel({
   volumeDetails,
   isVolumeLoading,
 }: PodDetailPanelProps) {
+  const cpuDetail = formatUsageLimit(
+    formatCpuCores(pod.cpuUsageCores ?? 0),
+    formatCpuCores(pod.cpuLimitCores ?? 0),
+    pod.cpuLimitCores > 0,
+  );
+  const memDetail = formatUsageLimit(
+    formatBytes(pod.memUsageBytes ?? 0),
+    formatBytes(pod.memLimitBytes ?? 0),
+    pod.memLimitBytes > 0,
+  );
+
   return (
     <Card className="border border-border shadow-md">
       <CardHeader className="py-3 px-4 flex flex-row items-center justify-between gap-2">
@@ -214,8 +240,8 @@ export function PodDetailPanel({
 
         {/* Resource usage */}
         <div className="grid grid-cols-2 gap-4">
-          <UsageRow label="CPU (Limits 대비)" percent={pod.cpuPercent} />
-          <UsageRow label="Memory (Limits 대비)" percent={pod.memPercent} />
+          <UsageRow label="CPU (Limits 대비)" percent={pod.cpuPercent} detail={cpuDetail} />
+          <UsageRow label="Memory (Limits 대비)" percent={pod.memPercent} detail={memDetail} />
           <VolumeSection volumeDetails={volumeDetails} isLoading={isVolumeLoading} />
           <NetworkRow rxBps={pod.networkRxBps} txBps={pod.networkTxBps} />
         </div>

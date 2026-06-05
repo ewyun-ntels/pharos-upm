@@ -17,6 +17,15 @@ interface AlertaResponse {
   alerts: AlarmItem[];
 }
 
+function alarmTimeValue(alert: AlarmItem): number {
+  const time = new Date(alert.lastReceiveTime).getTime();
+  return Number.isNaN(time) ? Number.NEGATIVE_INFINITY : time;
+}
+
+function sortAlertsByLatest(alerts: AlarmItem[]): AlarmItem[] {
+  return [...alerts].sort((a, b) => alarmTimeValue(b) - alarmTimeValue(a));
+}
+
 export interface ActiveAlertsResult {
   alerts: AlarmItem[];
   criticalCount: number;
@@ -42,9 +51,13 @@ export function useActiveAlerts(refetchInterval = 30_000): ActiveAlertsResult {
     setIsLoading(true);
     setIsError(false);
     try {
-      const resp = await axiosInstance.get<AlertaResponse>('/alarm/alerts');
-      const all = resp.data.alerts ?? [];
-      const open = all.filter(a => a.status === 'open');
+      const resp = await axiosInstance.get<AlertaResponse>('/alarm/alerts', {
+        params: {
+          status: 'open',
+          'sort-by': 'lastReceiveTime',
+        },
+      });
+      const open = sortAlertsByLatest(resp.data.alerts ?? []);
       if (isMounted.current) setAlerts(open);
     } catch {
       if (isMounted.current) setIsError(true);

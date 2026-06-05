@@ -40,22 +40,10 @@
       "label": "UPM",
       "separator": true,
       "items": [
-        {
-          "extension": "alarm",
-          "name": "alarm",
-          "display_name": "Alarm",
-          "items": [
-            {"extension": "alarm", "name": "alerta", "display_name": "Alarms"}
-          ]
-        },
-        {
-          "extension": "log",
-          "name": "log",
-          "display_name": "Logs",
-          "items": [
-            {"extension": "log", "name": "logs", "display_name": "Logs"}
-          ]
-        }
+        {"extension": "alarm", "name": "alerta", "display_name": "Alarm"},
+        {"extension": "log", "name": "logs", "display_name": "Log"},
+        {"extension": "alarm", "name": "alarm", "display_name": "Alarm", "hidden": true},
+        {"extension": "log", "name": "log", "display_name": "Log", "hidden": true}
       ]
     }
   ]

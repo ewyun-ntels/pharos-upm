@@ -195,6 +195,15 @@ function formatTime(iso: string): string {
   }
 }
 
+function alertTimeValue(iso: string): number {
+  const time = new Date(iso).getTime();
+  return Number.isNaN(time) ? Number.NEGATIVE_INFINITY : time;
+}
+
+function sortAlertsByLatest(alerts: AlertaAlert[]): AlertaAlert[] {
+  return [...alerts].sort((a, b) => alertTimeValue(b.lastReceiveTime) - alertTimeValue(a.lastReceiveTime));
+}
+
 // ---------------------------------------------------------------------------
 // Export
 // ---------------------------------------------------------------------------
@@ -390,6 +399,8 @@ const columns: ColumnDef<AlertaAlert>[] = [
   {
     accessorKey: 'lastReceiveTime',
     header: 'Last Received',
+    sortingFn: (rowA, rowB, columnId) =>
+      alertTimeValue(rowA.getValue<string>(columnId)) - alertTimeValue(rowB.getValue<string>(columnId)),
     cell: ({getValue}) => (
       <span className="text-xs text-muted-foreground whitespace-nowrap">{formatTime(getValue<string>())}</span>
     ),
@@ -424,7 +435,11 @@ export function AlertaDashboard() {
     setIsLoading(true);
     setError(null);
     try {
-      const resp = await axiosInstance.get<AlertaResponse>('/alarm/alerts');
+      const resp = await axiosInstance.get<AlertaResponse>('/alarm/alerts', {
+        params: {
+          'sort-by': 'lastReceiveTime',
+        },
+      });
       setAlerts(resp.data.alerts ?? []);
       setLastRefreshed(new Date());
     } catch (err: unknown) {
@@ -460,13 +475,8 @@ export function AlertaDashboard() {
       ? alerts
       : alerts.filter(a => currentFilter.statuses.includes(a.status as AlertStatus));
 
-  // Sort: critical first, then by lastReceiveTime desc
-  const sortedAlerts = [...filteredAlerts].sort((a, b) => {
-    const sevA = SEVERITY_ORDER.indexOf(a.severity.toLowerCase() as Severity);
-    const sevB = SEVERITY_ORDER.indexOf(b.severity.toLowerCase() as Severity);
-    if (sevA !== sevB) return sevA - sevB;
-    return new Date(b.lastReceiveTime).getTime() - new Date(a.lastReceiveTime).getTime();
-  });
+  // Sort: latest first by lastReceiveTime.
+  const sortedAlerts = sortAlertsByLatest(filteredAlerts);
 
   return (
     <main className="flex flex-col w-full h-full gap-0">
